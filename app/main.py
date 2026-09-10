@@ -49,7 +49,13 @@ def _creds(request: Request):
     data = request.session.get("creds")
     if not data:
         raise HTTPException(401, "Not signed in to Google")
-    return gd.creds_from_session(data)
+    creds = gd.creds_from_session(data)
+    # creds_from_session may have refreshed; keep the new token so the next
+    # request does not refresh all over again.
+    fresh = gd.creds_to_session(creds)
+    if fresh != data:
+        request.session["creds"] = fresh
+    return creds
 
 
 @app.get("/oauth2/login")
