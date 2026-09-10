@@ -1,0 +1,19 @@
+{
+  "artboards": [
+    { "file": "Search.dc.html",   "x": 0,    "y": 0,    "w": 1440, "h": 900,  "title": "Desktop — paste the album" },
+    { "file": "Scanning.dc.html", "x": 1560, "y": 0,    "w": 1440, "h": 900,  "title": "Desktop — scanning" },
+    { "file": "Main.dc.html",     "x": 3120, "y": 0,    "w": 1440, "h": 1000, "title": "Desktop — results" },
+    { "file": "Mobile.dc.html",   "x": 0,    "y": 1160, "w": 390,  "h": 844,  "title": "Phone — results" },
+    { "file": "Tokens.dc.html",   "x": 530,  "y": 1160, "w": 880,  "h": 1000, "title": "The system, as specified" }
+  ],
+  "annotations": [
+    {
+      "id": "what-this-tests",
+      "x": 1560,
+      "y": 1160,
+      "w": 420,
+      "text": "What the DESIGN.md decided:\n\n· one shadow, used twice — everything else is a 1px hairline\n· 14px radius on photos, 8px on controls, full on the search bar\n· 16px gutters in the grid against 32px between sections\n· 48px buttons, 56px inputs\n\nWhat it did not decide: the accent is Airbnb's own #ff385c, and Cereal is not licensable so Nunito Sans stands in."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}
