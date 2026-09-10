@@ -62,4 +62,6 @@ Two things to do before signing in:
 ------------------------------------------------------------------
 MSG
 
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
+# Via python -m rather than the console script: a pip --user install puts
+# the uvicorn binary in ~/.local/bin, which is not always on PATH.
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
