@@ -17,7 +17,7 @@ ENV PYTHONUNBUFFERED=1
 
 # libglib/libgomp are what opencv and onnxruntime need even in headless builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      libglib2.0-0 libgomp1 curl \
+      libglib2.0-0 libgomp1 libgl1 curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Hugging Face Spaces (and most hosts) run containers as a non-root user.
@@ -29,13 +29,18 @@ COPY --from=builder --chown=appuser /home/appuser/.local /home/appuser/.local
 WORKDIR /home/appuser/app
 COPY --chown=appuser app ./app
 
-# DATA_DIR holds the model files and the embedding cache. Point it at a mounted
-# volume if the host offers one; otherwise the index rebuilds after a restart.
-ENV DATA_DIR=/home/appuser/data
-RUN mkdir -p $DATA_DIR
+# DATA_DIR holds the embedding cache (SQLite). Point it at a mounted volume if
+# the host offers one; otherwise the index rebuilds after a restart.
+# MODEL_ROOT holds the face model and is baked into the image below.
+ENV DATA_DIR=/home/appuser/data MODEL_ROOT=/home/appuser/models
+RUN mkdir -p $DATA_DIR $MODEL_ROOT
 
-# Bake the face model into the image so the first scan is not slow.
-RUN python -c "from app import faces; e = faces.engine(); print('face engine:', e.name)"
+# Bake the face model into the image so the first scan is not slow. It goes to
+# MODEL_ROOT, not DATA_DIR, so mounting a volume on DATA_DIR cannot shadow it.
+# insightface keeps the 276 MB download archive after unpacking; deleting it in
+# this same layer is what actually keeps it out of the image.
+RUN python -c "from app import faces; e = faces.engine(); print('face engine:', e.name)" \
+ && find $MODEL_ROOT -name '*.zip' -delete
 
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \

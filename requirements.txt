@@ -5,7 +5,11 @@ itsdangerous==2.2.0
 google-auth==2.58.0
 google-auth-oauthlib==1.4.1
 google-api-python-client==2.200.0
-numpy
-opencv-python-headless
-onnxruntime
-insightface
+# Pinned deliberately. These four used to float, so every rebuild picked up
+# whatever was newest - insightface went 0.7.3 -> 2.0 in 2026 and OpenCV went
+# to 5.x. These exact versions pass tests/test_matching.py and
+# tests/test_pipeline.py (separation 0.828).
+numpy==2.4.6
+opencv-python-headless==5.0.0.93
+onnxruntime==1.29.0
+insightface==2.0
