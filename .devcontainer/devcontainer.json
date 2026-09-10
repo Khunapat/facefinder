@@ -1,0 +1,33 @@
+{
+  "name": "FaceFinder",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+
+  // insightface 2.0 depends on the full opencv-python, whose cv2 links
+  // libGL.so.1. Without these the very first "import cv2" fails.
+  "onCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 && sudo rm -rf /var/lib/apt/lists/*",
+
+  // Install deps and pull the ~276 MB face model now, so the first scan is
+  // not also waiting on a download. Runs once, when the codespace is built.
+  "postCreateCommand": "pip install --user -r requirements.txt && python -c \"from app import faces; print('face engine:', faces.engine().name)\"",
+
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "FaceFinder",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"],
+      "settings": { "python.defaultInterpreterPath": "/usr/local/bin/python" }
+    }
+  },
+
+  "remoteEnv": {
+    // Keep the model out of DATA_DIR so a rebuild does not have to re-download
+    // it, and so DATA_DIR stays purely the index.
+    "MODEL_ROOT": "/home/vscode/.facefinder-models"
+  }
+}

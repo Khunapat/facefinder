@@ -104,10 +104,51 @@ environment variables.
 | `INDEX_WORKERS`        | no       | parallel downloads while scanning (4)          |
 | `THUMB_SIZE`           | no       | pixels on the long edge when scanning (1600)   |
 
-### Option A — Hugging Face Spaces (recommended, free)
+### Option A - GitHub Codespaces (free, and the quickest to try)
 
-Free tier gives 2 vCPU and 16 GB RAM, which is far more than Render's or
-Fly's free tiers and is the reason this is the easiest fit for a model workload.
+Runs the app on GitHub's machines straight from this repo, with a public
+HTTPS URL anyone can open on a phone. Free tier is 120 core-hours a month,
+which is about 60 hours on a 2-core machine.
+
+Worth knowing: a codespace has proper datacenter cores and no thermal
+throttling, so indexing an album is typically several times faster than on a
+thin laptop, where a 15 W CPU throttles hard under a sustained scan.
+
+1. Add your OAuth credentials as **Codespaces secrets** (not in the repo):
+   <https://github.com/settings/codespaces> -> New secret ->
+   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, granted to this repository.
+2. **Code -> Codespaces -> Create codespace**. The devcontainer installs the
+   dependencies and pulls the face model on first build, so give it a few
+   minutes.
+3. In the codespace terminal:
+
+   ```bash
+   ./scripts/run-codespace.sh
+   ```
+
+   It works out the public URL from the codespace itself and prints the exact
+   redirect URI to register - PUBLIC_BASE_URL and the redirect URI cannot
+   drift apart, which is the usual reason sign-in fails.
+4. Paste that redirect URI into the OAuth client in Google Cloud Console.
+5. **PORTS** tab -> right-click port 8000 -> **Port Visibility -> Public**.
+   Without this, visitors hit a GitHub login wall instead of the app.
+
+Caveats: codespaces stop after about 30 minutes idle, so a long scan with
+nobody connected can be interrupted (it resumes by skipping already-indexed
+file IDs). The index lives in the codespace, so deleting it loses the index,
+not the model. And it is a development environment rather than a hosting
+product - fine for one graduation, not a permanent home.
+
+### Option B - Hugging Face Spaces
+
+2 vCPU and 16 GB RAM, which is far more memory than any other tier here
+and makes this a comfortable fit for a model workload.
+
+**No longer free.** Hugging Face now requires a paid plan (PRO for personal
+accounts) to create Gradio or Docker Spaces - only Static Spaces are free.
+PRO also unlocks "Protected" visibility, which is the setting you want here:
+the source stays private while the running app is publicly reachable. A
+*Private* Space returns 404 to everyone but you, so classmates cannot use it.
 
 1. Create a Space, SDK = **Docker**, visibility public or private.
 2. Put this at the very top of the Space's `README.md`:
@@ -123,11 +164,10 @@ Fly's free tiers and is the reason this is the easiest fit for a model workload.
    *secrets*. `PUBLIC_BASE_URL` is `https://<user>-<space>.hf.space`.
 4. Push this folder to the Space's git remote. It builds and deploys itself.
 
-Caveat: the free tier has no persistent disk, so a restart clears the index and
-the next search re-scans the album. A $5/month persistent volume mounted at
-`DATA_DIR` removes that.
+Caveat: persistent storage for Spaces was retired in 2026, so a restart clears
+the index and the next search re-scans the album.
 
-### Option B — Google Cloud Run
+### Option C - Google Cloud Run
 
 Neat because it lives in the same Google Cloud project as the OAuth client, and
 it scales to zero so an idle app costs nothing.
