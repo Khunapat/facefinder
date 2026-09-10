@@ -59,12 +59,18 @@ def login(request: Request):
         access_type="offline", include_granted_scopes="true", prompt="consent"
     )
     request.session["oauth_state"] = state
+    # google-auth-oauthlib turns on PKCE by default: authorization_url() above
+    # generated a code_verifier and sent its challenge to Google. The callback
+    # builds a fresh Flow, so unless we carry the verifier across in the session
+    # the token exchange fails with "invalid_grant: Missing code verifier".
+    request.session["code_verifier"] = flow.code_verifier
     return RedirectResponse(url)
 
 
 @app.get("/oauth2/callback")
 def callback(request: Request):
     flow = _flow(state=request.session.get("oauth_state"))
+    flow.code_verifier = request.session.get("code_verifier")
     url = str(request.url)
     # Hosts terminate TLS in front of us, so the URL we see can say http.
     if config.PUBLIC_BASE_URL.startswith("https") and url.startswith("http://"):
