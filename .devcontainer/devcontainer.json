@@ -28,6 +28,11 @@
   "remoteEnv": {
     // Keep the model out of DATA_DIR so a rebuild does not have to re-download
     // it, and so DATA_DIR stays purely the index.
-    "MODEL_ROOT": "/home/vscode/.facefinder-models"
+    //
+    // Resolved from the container's own HOME rather than hardcoded: the
+    // devcontainers images run as "vscode" but GitHub's default Codespaces
+    // image runs as "codespace", and a hardcoded /home/vscode path fails with
+    // EACCES on the latter.
+    "MODEL_ROOT": "${containerEnv:HOME}/.facefinder-models"
   }
 }

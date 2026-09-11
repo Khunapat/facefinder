@@ -45,5 +45,16 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "buffalo_l")
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "1600"))
 INDEX_WORKERS = int(os.environ.get("INDEX_WORKERS", "4"))
 
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(MODEL_ROOT, exist_ok=True)
+def _ensure_dir(path: str, var: str) -> None:
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(
+            "Cannot create %s=%s (%s).\n"
+            "Point it somewhere writable, or unset it to fall back to DATA_DIR."
+            % (var, path, e.strerror)
+        ) from e
+
+
+_ensure_dir(DATA_DIR, "DATA_DIR")
+_ensure_dir(MODEL_ROOT, "MODEL_ROOT")
