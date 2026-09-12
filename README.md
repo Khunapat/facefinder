@@ -133,9 +133,19 @@ thin laptop, where a 15 W CPU throttles hard under a sustained scan.
 5. **PORTS** tab -> right-click port 8000 -> **Port Visibility -> Public**.
    Without this, visitors hit a GitHub login wall instead of the app.
 
-Caveats: codespaces stop after about 30 minutes idle, so a long scan with
-nobody connected can be interrupted (it resumes by skipping already-indexed
-file IDs). The index lives in the codespace, so deleting it loses the index,
+Once the secrets are stored, starting the codespace is the whole procedure -
+the devcontainer starts the server for you and forwards port 8000 publicly.
+`tail -f /tmp/facefinder.log` shows what it is doing.
+
+**A stopped codespace cannot be woken by a visitor.** Idle for the timeout
+period and it stops; the URL is then dead until you open the codespace again.
+Nothing in the repo can change that, so it is worth raising the timeout to its
+240-minute maximum under <https://github.com/settings/codespaces>. If you need
+a URL that stays up unattended for days, a small always-on host is the honest
+answer, not a codespace.
+
+Other caveats: a long scan with nobody connected can be interrupted (it resumes
+by skipping already-indexed file IDs). The index lives in the codespace, so deleting it loses the index,
 not the model. And it is a development environment rather than a hosting
 product - fine for one graduation, not a permanent home.
 

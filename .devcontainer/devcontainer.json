@@ -10,10 +10,16 @@
   // not also waiting on a download. Runs once, when the codespace is built.
   "postCreateCommand": "pip install --user -r requirements.txt && python -c \"from app import faces; print('face engine:', faces.engine().name)\"",
 
+  // Start the server whenever the codespace starts, so opening it is enough -
+  // no command to remember. Backgrounded because a postStartCommand that never
+  // returns would hold up startup. Logs to /tmp/facefinder.log.
+  "postStartCommand": "nohup bash scripts/run-codespace.sh >> /tmp/facefinder.log 2>&1 & echo 'FaceFinder starting; tail -f /tmp/facefinder.log'",
+
   "forwardPorts": [8000],
   "portsAttributes": {
     "8000": {
       "label": "FaceFinder",
+      "visibility": "public",
       "onAutoForward": "notify"
     }
   },
