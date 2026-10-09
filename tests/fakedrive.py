@@ -118,6 +118,7 @@ def install(out_dir: str, image_dirs=None) -> FakeDrive:
 
     fake = FakeDrive(out_dir, image_dirs)
     gd.creds_from_session = lambda data: type("Creds", (), {"token": "dev"})()
+    gd.creds_to_session = lambda creds: {"token": "dev"}
     gd.service = lambda creds: _Service()
     for name in (
         "folder_meta", "list_images", "fetch_image_bytes",

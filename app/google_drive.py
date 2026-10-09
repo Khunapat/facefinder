@@ -1,9 +1,11 @@
 """Thin wrapper over the Drive v3 API: list an album, fetch pixels, copy files."""
+import datetime
 import io
+import logging
 import re
 
 import requests
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import AuthorizedSession, Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -13,8 +15,20 @@ from . import config
 IMAGE_MIMES = ("image/jpeg", "image/png", "image/heic", "image/webp", "image/jpg")
 FOLDER_MIME = "application/vnd.google-apps.folder"
 
+log = logging.getLogger("facefinder")
+
 
 def creds_from_session(data: dict) -> Credentials:
+    # The expiry has to make the round trip. Without it google-auth leaves
+    # expiry=None, which makes .expired False and .valid True forever, so the
+    # refresh below never fires and the access token silently goes stale after
+    # about an hour.
+    stamp = data.get("expiry")
+    expiry = None
+    if stamp:
+        expiry = datetime.datetime.fromtimestamp(
+            stamp, datetime.timezone.utc
+        ).replace(tzinfo=None)  # google-auth compares against naive UTC
     c = Credentials(
         token=data.get("token"),
         refresh_token=data.get("refresh_token"),
@@ -22,6 +36,7 @@ def creds_from_session(data: dict) -> Credentials:
         client_id=config.GOOGLE_CLIENT_ID,
         client_secret=config.GOOGLE_CLIENT_SECRET,
         scopes=config.SCOPES,
+        expiry=expiry,
     )
     if not c.valid and c.refresh_token:
         c.refresh(Request())
@@ -29,7 +44,27 @@ def creds_from_session(data: dict) -> Credentials:
 
 
 def creds_to_session(c: Credentials) -> dict:
-    return {"token": c.token, "refresh_token": c.refresh_token}
+    return {
+        "token": c.token,
+        "refresh_token": c.refresh_token,
+        "expiry": c.expiry.replace(tzinfo=datetime.timezone.utc).timestamp()
+        if c.expiry
+        else None,
+    }
+
+
+def _authed_session(creds: Credentials) -> AuthorizedSession:
+    """One AuthorizedSession per credentials object, kept for connection reuse.
+
+    Unlike a bare requests.get with a hand-built Authorization header, this
+    refreshes the token when it expires and retries a 401, which is what keeps
+    the thumbnail path alive through a long scan.
+    """
+    s = getattr(creds, "_ff_session", None)
+    if s is None:
+        s = AuthorizedSession(creds)
+        creds._ff_session = s
+    return s
 
 
 def service(creds: Credentials):
@@ -92,16 +127,22 @@ def fetch_image_bytes(creds: Credentials, svc, file_meta: dict, size: int = None
     """Prefer Drive's own thumbnail: a 1600px JPEG instead of a 12 MB RAW-ish
     original is ~50x less bandwidth and plenty for face embedding."""
     link = file_meta.get("thumbnailLink")
+    name = file_meta.get("name", file_meta.get("id", "?"))
+    why = "Drive returned no thumbnailLink"
     if link:
         url = re.sub(r"=s\d+(-c)?$", f"=s{size or config.THUMB_SIZE}", link)
         try:
-            r = requests.get(
-                url, headers={"Authorization": f"Bearer {creds.token}"}, timeout=30
-            )
+            r = _authed_session(creds).get(url, timeout=30)
             if r.ok and len(r.content) > 1024:
                 return r.content
-        except requests.RequestException:
-            pass
+            why = "thumbnail fetch returned HTTP %s" % r.status_code
+        except requests.RequestException as e:
+            why = "thumbnail fetch failed: %s" % type(e).__name__
+
+    # Falling back means pulling the full-size original - on a DSLR album that
+    # is tens of MB per photo instead of a few hundred KB. Say so, because
+    # otherwise a scan just mysteriously slows to a crawl.
+    log.warning("full-size download for %s (%s)", name, why)
     buf = io.BytesIO()
     downloader = MediaIoBaseDownload(
         buf, svc.files().get_media(fileId=file_meta["id"], supportsAllDrives=True)

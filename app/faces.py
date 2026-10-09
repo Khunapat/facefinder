@@ -20,7 +20,7 @@ from . import config
 _lock = threading.Lock()
 _engine = None
 
-MODEL_DIR = os.path.join(config.DATA_DIR, "models")
+MODEL_DIR = os.path.join(config.MODEL_ROOT, "models")
 ZOO = "https://github.com/opencv/opencv_zoo/raw/main/models"
 YUNET = ("face_detection_yunet_2023mar.onnx", f"{ZOO}/face_detection_yunet")
 SFACE = ("face_recognition_sface_2021dec.onnx", f"{ZOO}/face_recognition_sface")
@@ -43,7 +43,7 @@ class InsightFaceEngine:
 
         self.app = FaceAnalysis(
             name=config.MODEL_NAME,
-            root=config.DATA_DIR,
+            root=config.MODEL_ROOT,
             providers=["CPUExecutionProvider"],
         )
         self.app.prepare(ctx_id=-1, det_size=(config.DET_SIZE, config.DET_SIZE))

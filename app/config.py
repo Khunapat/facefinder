@@ -37,6 +37,13 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET", "dev-only-change-me")
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 DB_PATH = os.path.join(DATA_DIR, "index.sqlite")
 
+# Where the face model files live. Deliberately separate from DATA_DIR:
+# the Docker image bakes the model in at build time, and DATA_DIR is the
+# path you mount a persistent volume on. If they were the same directory
+# the volume would shadow the baked-in model and the container would
+# re-download ~300 MB on first boot.
+MODEL_ROOT = os.environ.get("MODEL_ROOT", DATA_DIR)
+
 # --- Face engine ---
 # Cosine similarity threshold. ArcFace/buffalo_l: >0.5 is a confident match,
 # 0.35-0.5 is "probably them". We default low and let the user tighten it.
@@ -52,4 +59,16 @@ INDEX_WORKERS = int(os.environ.get("INDEX_WORKERS", "4"))
 CLUSTER_THRESHOLD = float(os.environ.get("CLUSTER_THRESHOLD", "0.46"))
 COPY_WORKERS = int(os.environ.get("COPY_WORKERS", "4"))
 
-os.makedirs(DATA_DIR, exist_ok=True)
+def _ensure_dir(path: str, var: str) -> None:
+    try:
+        os.makedirs(path, exist_ok=True)
+    except OSError as e:
+        raise SystemExit(
+            "Cannot create %s=%s (%s).\n"
+            "Point it somewhere writable, or unset it to fall back to DATA_DIR."
+            % (var, path, e.strerror)
+        ) from e
+
+
+_ensure_dir(DATA_DIR, "DATA_DIR")
+_ensure_dir(MODEL_ROOT, "MODEL_ROOT")
