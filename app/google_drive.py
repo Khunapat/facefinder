@@ -88,12 +88,12 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
     return out
 
 
-def fetch_image_bytes(creds: Credentials, svc, file_meta: dict) -> bytes:
+def fetch_image_bytes(creds: Credentials, svc, file_meta: dict, size: int = None) -> bytes:
     """Prefer Drive's own thumbnail: a 1600px JPEG instead of a 12 MB RAW-ish
     original is ~50x less bandwidth and plenty for face embedding."""
     link = file_meta.get("thumbnailLink")
     if link:
-        url = re.sub(r"=s\d+(-c)?$", f"=s{config.THUMB_SIZE}", link)
+        url = re.sub(r"=s\d+(-c)?$", f"=s{size or config.THUMB_SIZE}", link)
         try:
             r = requests.get(
                 url, headers={"Authorization": f"Bearer {creds.token}"}, timeout=30
@@ -113,31 +113,61 @@ def fetch_image_bytes(creds: Credentials, svc, file_meta: dict) -> bytes:
 
 
 def ensure_folder(svc, name: str, parent: str = None) -> dict:
-    """Find-or-create a folder owned by the user. Created by us, so plain
-    drive.file scope is enough to write into it."""
+    """Find-or-create a folder, so running an export twice reuses the folder.
+
+    With the limited scope the app can only write into folders it made, so it
+    only reuses folders carrying its own tag; a same-named folder the user made
+    by hand would be found but could not be written to."""
     q = (
         f"name = '{name.replace(chr(39), chr(92) + chr(39))}' "
-        f"and mimeType = '{FOLDER_MIME}' and trashed = false"
+        f"and mimeType = '{FOLDER_MIME}' and trashed = false "
+        f"and '{parent or 'root'}' in parents"
     )
-    if parent:
-        q += f" and '{parent}' in parents"
+    if config.DRIVE_ACCESS != "full":
+        q += " and appProperties has { key='ff' and value='1' }"
     found = svc.files().list(
-        q=q, fields="files(id,name)", pageSize=1, spaces="drive"
+        q=q,
+        fields="files(id,name)",
+        pageSize=1,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
     ).execute().get("files", [])
     if found:
         return found[0]
-    body = {"name": name, "mimeType": FOLDER_MIME}
+    body = {"name": name, "mimeType": FOLDER_MIME, "appProperties": {"ff": "1"}}
     if parent:
         body["parents"] = [parent]
-    return svc.files().create(body=body, fields="id,name").execute()
+    return svc.files().create(
+        body=body, fields="id,name", supportsAllDrives=True
+    ).execute()
 
 
-def copy_into(svc, file_id: str, dest_folder_id: str, name: str = None) -> dict:
+def copied_sources(svc, folder_id: str) -> set:
+    """Source file IDs already copied into this folder by an earlier export."""
+    out, page = set(), None
+    while True:
+        resp = svc.files().list(
+            q=f"'{folder_id}' in parents and trashed=false",
+            fields="nextPageToken, files(appProperties)",
+            pageSize=1000,
+            pageToken=page,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
+        ).execute()
+        for f in resp.get("files", []):
+            src = (f.get("appProperties") or {}).get("ff_src")
+            if src:
+                out.add(src)
+        page = resp.get("nextPageToken")
+        if not page:
+            return out
+
+
+def copy_into(svc, file_id: str, dest_folder_id: str) -> dict:
     """Server-side copy. Google moves the bytes internally: we never download
-    or re-upload the full-resolution photo."""
-    body = {"parents": [dest_folder_id]}
-    if name:
-        body["name"] = name
+    or re-upload the full-resolution photo. The copy remembers which file it
+    came from so a second export can skip it."""
+    body = {"parents": [dest_folder_id], "appProperties": {"ff_src": file_id}}
     return svc.files().copy(
         fileId=file_id, body=body, fields="id,name", supportsAllDrives=True
     ).execute()

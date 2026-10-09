@@ -1,14 +1,17 @@
-"""FaceFinder - find every photo of one person in a shared Drive album."""
+"""FaceFinder - sort a shared Drive album into one folder per person."""
 import os
+import secrets
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from google_auth_oauthlib.flow import Flow
+from googleapiclient.errors import HttpError
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import config, faces
+from . import cluster, config, faces
 from . import google_drive as gd
 from . import store
 
@@ -23,6 +26,10 @@ app.add_middleware(
 STATIC = os.path.join(os.path.dirname(__file__), "static")
 _jobs = {}          # folder_id -> running index thread
 _jobs_lock = threading.Lock()
+_exports = {}       # job_id -> progress dict, read by the page while it runs
+_mat_cache = {}     # folder_id -> (stamp, matrix, meta)
+_people_cache = {}  # (folder_id, faces, threshold) -> grouped people
+_face_cache = {}    # (folder_id, file_id, face_idx) -> small JPEG, memory only
 
 
 # --------------------------------------------------------------- auth -----
@@ -50,6 +57,13 @@ def _creds(request: Request):
     if not data:
         raise HTTPException(401, "Not signed in to Google")
     return gd.creds_from_session(data)
+
+
+def _need_album(request: Request, folder_id: str):
+    """The index is shared between users, so a session may only read an album
+    it has itself opened through Drive (which is where access is checked)."""
+    if not folder_id or folder_id not in request.session.get("albums", []):
+        raise HTTPException(403, "Open the album first")
 
 
 @app.get("/oauth2/login")
@@ -98,6 +112,7 @@ def me(request: Request):
         "user": request.session.get("user", {}),
         "configured": bool(config.GOOGLE_CLIENT_ID),
         "default_threshold": config.DEFAULT_THRESHOLD,
+        "drive_access": config.DRIVE_ACCESS,
     }
 
 
@@ -120,6 +135,8 @@ async def open_album(request: Request):
         raise HTTPException(400, "That link points at a file, not a folder")
     if store.album(folder_id) is None:
         store.set_album(folder_id, name=meta["name"], status="pending")
+    opened = [a for a in request.session.get("albums", []) if a != folder_id]
+    request.session["albums"] = (opened + [folder_id])[-20:]
     return {
         "folder_id": folder_id,
         "name": meta["name"],
@@ -143,14 +160,17 @@ def _index_worker(folder_id: str, creds_data: dict):
             message="%d new photos to scan" % len(todo),
         )
         faces.engine()   # load the model once, before the pool starts
+        local = threading.local()   # Drive clients are not thread-safe
 
         def one(meta):
             try:
-                data = gd.fetch_image_bytes(creds, svc, meta)
-                found = faces.embed_image(data)
+                if not hasattr(local, "svc"):
+                    local.svc = gd.service(creds)
+                data = gd.fetch_image_bytes(creds, local.svc, meta)
+                found, size = faces.analyze(data)
             except Exception:
-                found = []
-            store.save_photo(folder_id, meta["id"], meta["name"], found)
+                found, size = [], None
+            store.save_photo(folder_id, meta["id"], meta["name"], found, size)
             store.bump_progress(folder_id, 1, len(found))
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
@@ -173,9 +193,8 @@ def _index_worker(folder_id: str, creds_data: dict):
 async def start_index(request: Request):
     body = await request.json()
     folder_id = body.get("folder_id")
-    if not folder_id:
-        raise HTTPException(400, "folder_id required")
     _creds(request)
+    _need_album(request, folder_id)
     if body.get("rebuild"):
         store.clear_album(folder_id)
         store.set_album(folder_id, status="pending")
@@ -200,16 +219,34 @@ def album_status(folder_id: str):
     return dict(row)
 
 
+def _matrix(folder_id: str):
+    """Embeddings for one album, kept in memory between requests: naming ten
+    people is ten searches against the same matrix."""
+    row = store.album(folder_id)
+    stamp = (row["status"], row["faces"], row["done"]) if row else None
+    hit = _mat_cache.get(folder_id)
+    if hit and hit[0] == stamp:
+        return hit[1], hit[2]
+    mat, meta = store.load_matrix(folder_id)
+    if row and row["status"] == "ready":
+        if len(_mat_cache) >= 4:
+            _mat_cache.pop(next(iter(_mat_cache)))
+        _mat_cache[folder_id] = (stamp, mat, meta)
+    return mat, meta
+
+
 # ------------------------------------------------------------- search -----
 @app.post("/api/search")
-async def search(
+def search(
     request: Request,
     folder_id: str = Form(...),
     threshold: float = Form(config.DEFAULT_THRESHOLD),
     selfies: list[UploadFile] = File(...),
 ):
+    """Photos of ONE person. The page calls this once per person it was given."""
     _creds(request)
-    images = [await f.read() for f in selfies]
+    _need_album(request, folder_id)
+    images = [f.file.read() for f in selfies]
     query = faces.best_query_vector(images)
     if query is None:
         raise HTTPException(
@@ -217,7 +254,7 @@ async def search(
             "No face found in the photo you uploaded. "
             "Try a clearer, front-facing one.",
         )
-    mat, meta = store.load_matrix(folder_id)
+    mat, meta = _matrix(folder_id)
     if not meta:
         raise HTTPException(400, "This album has not been scanned yet.")
     if mat.shape[1] != query.shape[0]:
@@ -237,7 +274,6 @@ async def search(
             "file_id": fid,
             "name": m["name"],
             "score": round(s, 4),
-            "bbox": m["bbox"],
             "confident": s >= threshold + 0.12,
         }
         for fid, (s, m) in best.items()
@@ -248,12 +284,71 @@ async def search(
         "count": len(hits),
         "scanned": len(best),
         "threshold": threshold,
-        "matches": hits[:500],
+        "matches": hits[:2000],
     }
 
 
+GROUPING = {"loose": -0.06, "balanced": 0.0, "strict": 0.06}
+
+
+@app.post("/api/people")
+def people(request: Request, body: dict = Body(...)):
+    """Everyone in the album, grouped by face, with no names given."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    mat, meta = _matrix(folder_id)
+    if not meta:
+        raise HTTPException(400, "This album has not been scanned yet.")
+    thr = config.CLUSTER_THRESHOLD + GROUPING.get(body.get("grouping"), 0.0)
+    if mat.shape[1] < 512:
+        thr -= 0.08          # the small fallback model scores lower overall
+    key = (folder_id, len(meta), round(thr, 3))
+    found = _people_cache.get(key)
+    if found is None:
+        found = cluster.group_album(mat, meta, thr)
+        if len(_people_cache) >= 8:
+            _people_cache.pop(next(iter(_people_cache)))
+        _people_cache[key] = found
+    return {
+        "people": found,
+        "faces": len(meta),
+        "photos": len({m["file_id"] for m in meta}),
+    }
+
+
+@app.get("/api/face/{folder_id}/{file_id}/{face_idx}")
+def face(request: Request, folder_id: str, file_id: str, face_idx: int):
+    """A small crop of one face, so a person can be recognised and named."""
+    creds = _creds(request)
+    _need_album(request, folder_id)
+    key = (folder_id, file_id, face_idx)
+    data = _face_cache.get(key)
+    if data is None:
+        box = store.face_box(folder_id, file_id, face_idx)
+        if box is None:
+            raise HTTPException(404, "Unknown face")
+        svc = gd.service(creds)
+        meta = (
+            svc.files()
+            .get(fileId=file_id, fields="id,thumbnailLink", supportsAllDrives=True)
+            .execute()
+        )
+        data = faces.crop_face(gd.fetch_image_bytes(creds, svc, meta), box[0], box[1])
+        if data is None:
+            raise HTTPException(404, "Could not read that photo")
+        if len(_face_cache) >= 800:
+            _face_cache.pop(next(iter(_face_cache)))
+        _face_cache[key] = data
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
+
+
 @app.get("/api/thumb/{file_id}")
-def thumb(request: Request, file_id: str):
+def thumb(request: Request, file_id: str, s: int = 0):
     creds = _creds(request)
     svc = gd.service(creds)
     meta = (
@@ -261,45 +356,181 @@ def thumb(request: Request, file_id: str):
         .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
         .execute()
     )
+    size = min(max(s, 200), config.THUMB_SIZE) if s else None
     return Response(
-        content=gd.fetch_image_bytes(creds, svc, meta),
+        content=gd.fetch_image_bytes(creds, svc, meta, size),
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
 
 
-# --------------------------------------------------------------- copy -----
-@app.post("/api/copy")
-async def copy(request: Request):
-    body = await request.json()
-    file_ids = body.get("file_ids") or []
-    if not file_ids:
-        raise HTTPException(400, "Nothing selected")
-    creds = _creds(request)
-    svc = gd.service(creds)
+# ------------------------------------------------------------- export -----
+def _clean_name(name) -> str:
+    return " ".join(str(name or "").split())[:100]
 
-    dest = body.get("dest_folder_id")
-    if dest:
-        dest_id = gd.parse_folder_id(dest)
-        dest_name = gd.folder_meta(svc, dest_id)["name"]
-    else:
-        folder = gd.ensure_folder(svc, body.get("dest_name") or "My Graduation Photos")
-        dest_id, dest_name = folder["id"], folder["name"]
 
-    copied, failed = 0, []
-    for fid in file_ids:
+def _copy_with_retry(svc, file_id: str, folder_id: str):
+    """Return None on success, or a short error string."""
+    for attempt in range(4):
         try:
-            gd.copy_into(svc, fid, dest_id)
-            copied += 1
+            gd.copy_into(svc, file_id, folder_id)
+            return None
+        except HttpError as e:
+            busy = e.resp.status in (429, 500, 502, 503) or "ateLimit" in str(e)
+            if busy and attempt < 3:
+                time.sleep(1.5 * 2 ** attempt)
+                continue
+            return "HTTP %s" % e.resp.status
         except Exception as e:
-            failed.append({"file_id": fid, "error": str(e)[:150]})
-    return {
-        "copied": copied,
-        "failed": failed,
-        "dest_id": dest_id,
-        "dest_name": dest_name,
-        "dest_url": "https://drive.google.com/drive/folders/" + dest_id,
+            return str(e)[:120]
+
+
+def _export_worker(job: dict, creds_data: dict, dest_link: str, dest_name: str):
+    """Make one folder per person and copy that person's photos into it."""
+    try:
+        creds = gd.creds_from_session(creds_data)
+        svc = gd.service(creds)
+        fallback_name = "FaceFinder - %s" % (job["album"] or "album")
+
+        given = None
+        if dest_link:
+            try:
+                given = gd.folder_meta(svc, gd.parse_folder_id(dest_link))
+            except Exception as e:
+                raise RuntimeError(
+                    "Cannot open the destination folder. Check the link, or leave "
+                    "it empty to get a new folder in My Drive."
+                ) from e
+            root = given
+        else:
+            root = gd.ensure_folder(svc, dest_name or fallback_name)
+
+        local = threading.local()   # Drive clients are not thread-safe
+        tally = threading.Lock()
+
+        with ThreadPoolExecutor(max_workers=config.COPY_WORKERS) as pool:
+            for person in job["people"]:
+                try:
+                    folder = gd.ensure_folder(svc, person["name"], parent=root["id"])
+                except HttpError:
+                    if root is not given:
+                        raise
+                    # The app may only write where Drive lets it. Never lose the
+                    # work: put the folders somewhere it can write and say so.
+                    root = gd.ensure_folder(svc, fallback_name)
+                    job["note"] = (
+                        'FaceFinder is not allowed to write into "%s", so the '
+                        'folders are in "%s" in your My Drive instead. You can '
+                        "drag them across." % (given["name"], root["name"])
+                    )
+                    given = None
+                    folder = gd.ensure_folder(svc, person["name"], parent=root["id"])
+
+                job["root_name"] = root["name"]
+                job["root_url"] = "https://drive.google.com/drive/folders/" + root["id"]
+                person["url"] = "https://drive.google.com/drive/folders/" + folder["id"]
+
+                have = gd.copied_sources(svc, folder["id"])
+                todo = [f for f in person.pop("file_ids") if f not in have]
+                person["skipped"] = person["total"] - len(todo)
+                job["done"] += person["skipped"]
+                job["skipped"] += person["skipped"]
+
+                def one(file_id, folder_id=folder["id"]):
+                    if not hasattr(local, "svc"):
+                        local.svc = gd.service(creds)
+                    err = _copy_with_retry(local.svc, file_id, folder_id)
+                    with tally:
+                        if err:
+                            job["failed"].append({"file_id": file_id, "error": err})
+                        else:
+                            person["copied"] += 1
+                            job["copied"] += 1
+                        job["done"] += 1
+
+                list(pool.map(one, todo))
+        job["status"] = "done"
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = str(e)[:300]
+    finally:
+        job["finished"] = time.time()
+
+
+@app.post("/api/export")
+def export(request: Request, body: dict = Body(...)):
+    """Start copying. groups: [{name, file_ids}], one Drive folder per name."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+
+    merged = {}                 # two groups with one name are one person
+    for g in (body.get("groups") or [])[:300]:
+        name = _clean_name(g.get("name"))
+        ids = [f for f in (g.get("file_ids") or []) if isinstance(f, str)]
+        if not name or not ids:
+            continue
+        slot = merged.setdefault(name.casefold(), {"name": name, "ids": {}})
+        slot["ids"].update(dict.fromkeys(ids))
+    if not merged:
+        raise HTTPException(400, "Give at least one person a name and some photos")
+
+    # Old finished jobs are only progress reports; drop them after an hour.
+    for old in [k for k, j in _exports.items() if time.time() - j.get("finished", 9e18) > 3600]:
+        _exports.pop(old, None)
+
+    row = store.album(folder_id)
+    people_rows = [
+        {
+            "name": s["name"],
+            "file_ids": list(s["ids"]),
+            "total": len(s["ids"]),
+            "copied": 0,
+            "skipped": 0,
+            "url": None,
+        }
+        for s in merged.values()
+    ]
+    job = {
+        "status": "running",
+        "album": row["name"] if row else "",
+        "total": sum(p["total"] for p in people_rows),
+        "done": 0,
+        "copied": 0,
+        "skipped": 0,
+        "failed": [],
+        "people": people_rows,
+        "root_name": None,
+        "root_url": None,
+        "note": None,
+        "message": None,
     }
+    job_id = secrets.token_urlsafe(12)
+    _exports[job_id] = job
+    threading.Thread(
+        target=_export_worker,
+        args=(
+            job,
+            request.session["creds"],
+            (body.get("dest_link") or "").strip(),
+            _clean_name(body.get("dest_name")),
+        ),
+        daemon=True,
+    ).start()
+    return {"job_id": job_id, "total": job["total"]}
+
+
+@app.get("/api/export/{job_id}")
+def export_status(job_id: str):
+    job = _exports.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Unknown export")
+    out = {k: v for k, v in job.items() if k not in ("people", "failed")}
+    out["failed"] = len(job["failed"])
+    out["people"] = [
+        {k: v for k, v in p.items() if k != "file_ids"} for p in job["people"]
+    ]
+    return out
 
 
 # --------------------------------------------------------------- page -----

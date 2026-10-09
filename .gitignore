@@ -5,3 +5,4 @@ __pycache__/
 data/
 client_secret*.json
 models/
+tests/img_extra/

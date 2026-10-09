@@ -50,6 +50,15 @@ def conn() -> sqlite3.Connection:
         c.row_factory = sqlite3.Row
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(SCHEMA)
+        # Added after the first release: the size each photo was scanned at.
+        have = {r["name"] for r in c.execute("PRAGMA table_info(photos)")}
+        for col in ("w", "h"):
+            if col not in have:
+                try:
+                    c.execute(f"ALTER TABLE photos ADD COLUMN {col} INTEGER")
+                except sqlite3.OperationalError:
+                    pass                # another thread added it first
+        c.commit()
         _local.conn = c
     return _local.conn
 
@@ -96,12 +105,15 @@ def indexed_file_ids(folder_id: str) -> set:
     return {r["file_id"] for r in rows}
 
 
-def save_photo(folder_id: str, file_id: str, name: str, faces: list):
-    """faces: list of dicts with embedding (np.ndarray), det_score, bbox."""
+def save_photo(folder_id: str, file_id: str, name: str, faces: list, size=None):
+    """faces: list of dicts with embedding (np.ndarray), det_score, bbox.
+    size: (width, height) of the image the boxes were measured on."""
     c = conn()
+    w, h = size if size else (None, None)
     c.execute(
-        "INSERT OR REPLACE INTO photos (folder_id, file_id, name) VALUES (?,?,?)",
-        (folder_id, file_id, name),
+        "INSERT OR REPLACE INTO photos (folder_id, file_id, name, w, h) "
+        "VALUES (?,?,?,?,?)",
+        (folder_id, file_id, name, w, h),
     )
     for i, f in enumerate(faces):
         emb = np.asarray(f["embedding"], dtype=np.float32)
@@ -152,3 +164,16 @@ def clear_album(folder_id: str):
     c.execute("DELETE FROM photos WHERE folder_id=?", (folder_id,))
     c.execute("DELETE FROM albums WHERE folder_id=?", (folder_id,))
     c.commit()
+
+
+def face_box(folder_id: str, file_id: str, face_idx: int):
+    """Return (bbox, (w, h) or None) for one stored face, or None if unknown."""
+    r = conn().execute(
+        "SELECT f.bbox, p.w, p.h FROM faces f "
+        "JOIN photos p ON p.folder_id=f.folder_id AND p.file_id=f.file_id "
+        "WHERE f.folder_id=? AND f.file_id=? AND f.face_idx=?",
+        (folder_id, file_id, face_idx),
+    ).fetchone()
+    if r is None:
+        return None
+    return json.loads(r["bbox"] or "[]"), ((r["w"], r["h"]) if r["w"] else None)

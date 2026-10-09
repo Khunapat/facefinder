@@ -1,10 +1,11 @@
 # FaceFinder
 
-Find every photo of one person inside a big shared Google Drive album, and copy
-them into your own Drive folder.
+Sort a big shared Google Drive album by who is in it: every person gets their
+own folder of photos in your Drive.
 
 Built for the graduation-photo problem: the photographer hands over one folder
-with 4,000 photos in it, and finding yourself means scrolling for an hour.
+with 4,000 photos in it, and finding yourself (or sorting out who gets which
+photos) means scrolling for an hour.
 
 ## How it works
 
@@ -13,10 +14,35 @@ with 4,000 photos in it, and finding yourself means scrolling for an hour.
 3. The server scans the album once and stores a **face embedding** — a vector of
    512 numbers — for every face it finds. This is the slow step, and it happens
    only once per album.
-4. You upload one to three photos of your own face.
-5. Your face becomes a vector too, and matching is a dot product against the
-   cached vectors. This part takes milliseconds.
-6. You uncheck any wrong results, then the app copies the rest into your Drive.
+4. You say who you want, in one of two ways (below).
+5. You uncheck any wrong photos, then the app makes **one folder per name** and
+   copies each person's photos into theirs.
+
+### Two ways to say who you want
+
+**I know who I'm looking for.** Add as many people as you like. Each gets one to
+three photos of their face and a name. Each face becomes a vector, and matching
+is a dot product against the cached vectors.
+
+**Show me everyone in the album.** No uploads. The cached vectors are grouped
+into people (`app/cluster.py`: link every pair of faces above a similarity
+threshold, then let the labels settle — Chinese Whispers, the approach dlib
+uses). You get one card per person with a face crop and a photo count. Tick the
+ones you want a folder for and type a name; tap a face to review that person's
+photos. If one person shows up as two cards, give both the same name and they
+share a folder. The "Grouping" control trades that kind of split against the
+opposite mistake, two people merged into one.
+
+Either way a group photo is copied into the folder of every selected person in
+it, and running the export again only copies what is missing.
+
+### Where the folders go
+
+Leave the destination empty and you get `FaceFinder - <album name>` in My Drive
+with a folder per person inside. Type a name to choose that folder's name
+instead. Paste a Drive folder link to put the person folders inside a folder you
+already have — see `DRIVE_ACCESS` below, because Google only allows that with
+the wider permission.
 
 ### There is no LLM and no AI API key involved
 
@@ -49,8 +75,11 @@ exposes a slider.
 
 ### Privacy
 
-The server stores face vectors and file IDs. It does not store the photos —
-image bytes are fetched, embedded, and discarded. Copies land in the user's own
+The server stores face vectors, face box positions and file IDs. It does not
+store the photos — image bytes are fetched, embedded, and discarded. The small
+face crops shown on the "everyone" screen are cut from the photo on request and
+held in memory only. The index is shared between users of the same album, so a
+session can only read an album after opening it through its own Drive access. Copies land in the user's own
 Drive; the app never takes ownership of the album.
 
 ---
@@ -101,8 +130,25 @@ environment variables.
 | `SESSION_SECRET`       | yes      | any long random string                         |
 | `DATA_DIR`             | no       | mount a volume here to keep the index          |
 | `DEFAULT_THRESHOLD`    | no       | default match strictness (0.38)                |
+| `DRIVE_ACCESS`         | no       | `limited` (default) or `full`, see below       |
+| `CLUSTER_THRESHOLD`    | no       | similarity that links two faces when grouping (0.46) |
+| `COPY_WORKERS`         | no       | parallel copies while creating folders (4)     |
 | `INDEX_WORKERS`        | no       | parallel downloads while scanning (4)          |
 | `THUMB_SIZE`           | no       | pixels on the long edge when scanning (1600)   |
+
+#### `DRIVE_ACCESS`: writing into a folder the user already has
+
+With the default `limited`, the app asks for `drive.readonly` (read the album)
+plus `drive.file` (write only to folders it created itself). That is enough to
+create new folders in My Drive. It is **not** enough to write into an existing
+folder whose link the user pastes: Google refuses, and the export falls back to
+a new folder in My Drive and says so on the result card.
+
+Set `DRIVE_ACCESS=full` to ask for the whole-Drive scope instead. Pasted
+destination folders then work directly. The consent screen will say the app can
+see, edit, create and delete all of the user's Drive files, and everyone has to
+sign in again once. Google classes both `drive.readonly` and `drive` as
+restricted, so this does not change the 100-test-user situation.
 
 ### Option A — Hugging Face Spaces (recommended, free)
 
@@ -160,12 +206,28 @@ Add `http://localhost:8000/oauth2/callback` as a second redirect URI.
 ```
 app/config.py         environment configuration
 app/faces.py          detection + embedding (insightface, opencv fallback)
-app/google_drive.py   Drive listing, thumbnail fetch, server-side copy
+app/cluster.py        group an album's faces into people
+app/google_drive.py   Drive listing, thumbnail fetch, folders, server-side copy
 app/store.py          SQLite cache of embeddings, one row per face
 app/main.py           FastAPI routes
 app/static/index.html the whole front end
 tests/test_matching.py accuracy check on real photos
+tests/test_pipeline.py index and search without Google
+tests/test_people.py  grouping, multi-person search and export, through the routes
+tests/fakedrive.py    a stand-in for Google Drive backed by local folders
+tests/devserver.py    the whole app on that stand-in, to try the UI offline
 ```
+
+### Trying the UI without Google
+
+```bash
+python -m tests.devserver
+```
+
+Open `http://127.0.0.1:8077/dev/login`, then paste the album link it prints. The
+album is the sample photos in `tests/img`, and "copied" folders are written
+under `data/dev-export`. Nothing in `app/` knows about this; the stand-in lives
+entirely in `tests/`.
 
 ## Performance
 

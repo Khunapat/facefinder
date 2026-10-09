@@ -124,11 +124,39 @@ def decode(data: bytes):
     return img
 
 
-def embed_image(data: bytes) -> list:
+def analyze(data: bytes):
+    """Return (faces, (width, height)) for the image as it was scanned. The size
+    is kept so a stored bbox can be mapped back onto a later fetch."""
     img = decode(data)
     if img is None:
-        return []
-    return engine().detect(img)
+        return [], None
+    h, w = img.shape[:2]
+    return engine().detect(img), (w, h)
+
+
+def embed_image(data: bytes) -> list:
+    return analyze(data)[0]
+
+
+def crop_face(data: bytes, bbox, scanned_size=None, out: int = 192) -> bytes:
+    """Square JPEG around one stored face box, for the "who is this" cards."""
+    img = decode(data)
+    if img is None or not bbox or len(bbox) < 4:
+        return None
+    h, w = img.shape[:2]
+    x0, y0, x1, y1 = bbox
+    if scanned_size and scanned_size[0]:
+        sx, sy = w / scanned_size[0], h / scanned_size[1]
+        x0, x1, y0, y1 = x0 * sx, x1 * sx, y0 * sy, y1 * sy
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    half = max(x1 - x0, y1 - y0) * 0.75         # head and a little shoulder
+    half = min(half, cx, cy, w - cx, h - cy)    # stay inside the photo
+    if half < 4:
+        return None
+    crop = img[int(cy - half):int(cy + half), int(cx - half):int(cx + half)]
+    crop = cv2.resize(crop, (out, out), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 86])
+    return buf.tobytes() if ok else None
 
 
 def best_query_vector(images: list) -> np.ndarray:

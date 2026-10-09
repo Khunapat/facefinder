@@ -12,12 +12,22 @@ REDIRECT_URI = PUBLIC_BASE_URL + "/oauth2/callback"
 
 # drive.readonly  -> read the photographer's shared album
 # drive.file      -> create/write only files this app makes (the destination copies)
-SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
-    "https://www.googleapis.com/auth/drive.file",
-    "openid",
-    "https://www.googleapis.com/auth/userinfo.email",
-]
+#
+# With those two the app can only write into folders it created itself, so a
+# destination folder the user pastes cannot be written to directly; the export
+# then falls back to a new folder in My Drive. Set DRIVE_ACCESS=full to request
+# the whole-Drive scope instead and write straight into any folder the user can
+# edit. Both drive.readonly and drive are "restricted" scopes to Google, so this
+# does not change the verification tier, only what the consent screen says.
+DRIVE_ACCESS = os.environ.get("DRIVE_ACCESS", "limited").strip().lower()
+if DRIVE_ACCESS == "full":
+    SCOPES = ["https://www.googleapis.com/auth/drive"]
+else:
+    SCOPES = [
+        "https://www.googleapis.com/auth/drive.readonly",
+        "https://www.googleapis.com/auth/drive.file",
+    ]
+SCOPES += ["openid", "https://www.googleapis.com/auth/userinfo.email"]
 
 SESSION_SECRET = os.environ.get("SESSION_SECRET", "dev-only-change-me")
 
@@ -37,5 +47,9 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "buffalo_l")
 # faces far from the camera, but slower.
 THUMB_SIZE = int(os.environ.get("THUMB_SIZE", "1600"))
 INDEX_WORKERS = int(os.environ.get("INDEX_WORKERS", "4"))
+# Similarity at which two faces are linked when grouping the whole album into
+# people. Stricter than DEFAULT_THRESHOLD: a wrong link merges two people.
+CLUSTER_THRESHOLD = float(os.environ.get("CLUSTER_THRESHOLD", "0.46"))
+COPY_WORKERS = int(os.environ.get("COPY_WORKERS", "4"))
 
 os.makedirs(DATA_DIR, exist_ok=True)
