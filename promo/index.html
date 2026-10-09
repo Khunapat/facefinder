@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder promo</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Nunito+Sans:opsz,wght@6..12,600;6..12,700;6..12,800&display=block" rel="stylesheet">
+<style>
+html,body{margin:0;background:#121318}
+canvas{display:block;height:100vh;width:auto;margin:0 auto}
+body.render canvas{height:auto}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="lib/cast.js"></script>
+<script src="timeline.js"></script>
+<script>
+// A 20-second promo for FaceFinder, as a pure function of time:
+// window.seek(t) paints frame t. No timers, no carried state, no Math.random.
+
+const { W, H, DUR } = TL;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+
+const INK = '#121318', PAPER = '#FFFFFF', SOFT = '#EEF0F6', ACCENT = '#2E4BE8',
+      MUTED = '#5E6170', GOLD = '#E9B23C';
+const DISPLAY = '"Bricolage Grotesque", "Nunito Sans", sans-serif';
+const UI = '"Nunito Sans", sans-serif';
+
+// ------------------------------------------------------------- motion kit
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, u) => a + (b - a) * u;
+const inv = (a, b, x) => clamp((x - a) / (b - a));
+const smooth = (u) => u * u * (3 - 2 * u);
+
+// Closed-form damped spring 0 -> 1.
+function spring(t, k = 170, d = 26) {
+  if (t <= 0) return 0;
+  const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) {
+    const wd = w0 * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
+  }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+}
+// A value with several targets: one spring per change, summed.
+function track(t, keys, k = 170, d = 26) {
+  let v = keys[0][1];
+  for (let i = 1; i < keys.length; i++) v += (keys[i][1] - keys[i - 1][1]) * spring(t - keys[i][0], k, d);
+  return v;
+}
+const SNAPPY = [320, 30], SOFTS = [170, 26], HEAVY = [120, 24];
+
+function rrect(x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function shadow(blur, dy, a) {
+  g.shadowColor = `rgba(18,19,24,${a})`; g.shadowBlur = blur; g.shadowOffsetY = dy;
+}
+function noShadow() { g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; }
+
+// ----------------------------------------------------------------- assets
+const IMG = {};
+const NAMES = ['nav', 'hero', 'modes', 'done',
+  ...Array.from({ length: 11 }, (_, i) => 'pill_' + i),
+  ...Array.from({ length: 11 }, (_, i) => 'scan_' + i),
+  ...Array.from({ length: 7 }, (_, i) => 'everyone_' + i),
+  ...Array.from({ length: 7 }, (_, i) => 'bar_' + i),
+  ...Array.from({ length: 5 }, (_, i) => 'copy_' + i)];
+let SPOTS = null;
+
+// Photo tiles for the wall and the scan grid, drawn once, deterministically.
+const TILE = 252, TGAP = 16, TCOLS = 4, TSTEP = TILE + TGAP;
+const tiles = [];
+function makeTile(seed, opt) {
+  const c = document.createElement('canvas'); c.width = c.height = TILE * 2;
+  const faces = Cast.photo(c.getContext('2d'), TILE * 2, TILE * 2, seed, opt);
+  return { c, faces: faces.map((f) => ({ x: f.x / 2, y: f.y / 2, w: f.w / 2, h: f.h / 2 })) };
+}
+const HERO_ROW = 13, HERO_COL = 1;            // the tile Mint is in
+const C = Cast.CREW;
+const heroTile = () => makeTile(901, { n: 3, bg: 0, cast: [C[3], C[0], C[4]] });
+const scanTiles = [];
+
+window.ready = (async () => {
+  for (let i = 0; i < 24; i++) tiles.push(makeTile(i + 1));
+  tiles.hero = heroTile();
+  const groups = [[C[0], C[1]], [C[2], C[3], C[5]], [C[4]], [C[1], C[2], C[0], C[5]], [C[3], C[4]], [C[5], C[0], C[2]]];
+  groups.forEach((cast, i) => scanTiles.push(makeTile(500 + i, { n: cast.length, bg: i % 5, cast })));
+  await Promise.all(NAMES.map((n) => new Promise((res, rej) => {
+    const im = new Image(); im.onload = res; im.onerror = () => rej(n); im.src = 'assets/ui/' + n + '.png'; IMG[n] = im;
+  })));
+  SPOTS = await new Promise((res) => {   // manifest is inlined by a script tag below when served from file://
+    res(window.UI_MANIFEST.spots);
+  });
+  await document.fonts.load('800 100px "Bricolage Grotesque"');
+  await document.fonts.load('700 100px "Bricolage Grotesque"');
+  await document.fonts.load('700 40px "Nunito Sans"');
+  await document.fonts.load('800 40px "Nunito Sans"');
+  await document.fonts.load('600 40px "Nunito Sans"');
+  return true;
+})();
+
+// ------------------------------------------------------------ type helpers
+// Words rise in on a stagger and leave upward before the next line arrives.
+function words(lines, x, y, size, t, tIn, tOut, color, opt = {}) {
+  const lh = size * (opt.lh || 1.02);
+  g.font = `${opt.weight || 800} ${size}px ${opt.font || DISPLAY}`;
+  g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  if ('letterSpacing' in g) g.letterSpacing = (opt.track ?? -0.035) * size + 'px';
+  let i = 0;
+  lines.forEach((line, li) => {
+    let cx = x;
+    const parts = line.split(' ');
+    parts.forEach((wd, wi) => {
+      const ws = wd + (wi < parts.length - 1 ? ' ' : '');
+      const w = g.measureText(ws).width;
+      const s = spring(t - tIn - i * 0.06, ...SNAPPY);
+      const out = tOut == null ? 0 : smooth(inv(tOut, tOut + 0.22, t + (lines.length * 2 - i) * 0.012));
+      const a = clamp(s * 1.6) * (1 - out) * (opt.alpha ?? 1);
+      if (a > 0.001) {
+        const dy = (1 - s) * size * 0.55 - out * size * 0.5;
+        g.save();
+        g.beginPath(); g.rect(cx - 10, y + li * lh - size * 1.0, w + 40, size * 1.32); g.clip();
+        g.globalAlpha = a; g.fillStyle = (opt.accentWord === wd) ? ACCENT : color;
+        g.fillText(ws, cx, y + li * lh + dy);
+        g.restore();
+      }
+      cx += w; i++;
+    });
+  });
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+}
+
+// A UI screenshot on a white panel. Image px -> screen with scale s.
+function panel(im, x, y, s, r, opt = {}) {
+  const w = im.width * s, h = (opt.h ?? im.height) * s;
+  g.save();
+  if (opt.shadow !== false) { shadow(60, 24, 0.14); rrect(x, y, w, h, r); g.fillStyle = PAPER; g.fill(); noShadow(); }
+  rrect(x, y, w, h, r); g.clip();
+  g.fillStyle = PAPER; g.fillRect(x, y, w, h);
+  if (opt.clipH != null) { g.beginPath(); g.rect(x, y, w, opt.clipH * s); g.clip(); }
+  g.drawImage(im, 0, opt.sy || 0, im.width, opt.h ?? im.height, x, y, w, h);
+  g.restore();
+  return { x, y, w, h, s };
+}
+
+// A fingertip: a soft ring that presses on tap.
+function finger(x, y, tTap, t, alpha = 1) {
+  const p = t - tTap;
+  const press = p > -0.08 && p < 0.16 ? Math.sin(clamp((p + 0.08) / 0.24) * Math.PI) : 0;
+  g.save(); g.globalAlpha = alpha;
+  if (p > 0 && p < 0.6) {                      // ripple
+    const u = p / 0.6;
+    g.strokeStyle = `rgba(46,75,232,${0.5 * (1 - u)})`; g.lineWidth = 6;
+    g.beginPath(); g.arc(x, y, 40 + u * 90, 0, Math.PI * 2); g.stroke();
+  }
+  shadow(24, 8, 0.25);
+  g.fillStyle = 'rgba(255,255,255,0.92)';
+  g.beginPath(); g.arc(x, y, 44 * (1 - 0.18 * press), 0, Math.PI * 2); g.fill();
+  noShadow();
+  g.strokeStyle = 'rgba(18,19,24,0.35)'; g.lineWidth = 4; g.stroke();
+  g.fillStyle = `rgba(18,19,24,${0.18 + 0.3 * press})`;
+  g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
+// The FaceFinder mark (same paths as the app's nav icon), size px wide.
+function mark(x, y, size, ring, face) {
+  const s = size / 24;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.lineCap = 'round';
+  g.strokeStyle = ring; g.lineWidth = 2.2;
+  g.beginPath(); g.arc(10.5, 10.5, 7, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(15.8, 15.8); g.lineTo(21, 21); g.stroke();
+  g.fillStyle = face; g.strokeStyle = face;
+  g.beginPath(); g.arc(8, 9.2, 1, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(13, 9.2, 1, 0, Math.PI * 2); g.fill();
+  g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(8, 12.6); g.bezierCurveTo(9.5, 13.9, 11.5, 13.9, 13, 12.6); g.stroke();
+  g.restore();
+}
+function wordmark(x, y, size, faceColor, finderColor, align = 'left') {
+  g.font = `800 ${size}px ${UI}`; g.textBaseline = 'alphabetic';
+  if ('letterSpacing' in g) g.letterSpacing = (-0.02 * size) + 'px';
+  const a = g.measureText('Face').width, b = g.measureText('Finder').width;
+  let x0 = align === 'center' ? x - (a + b) / 2 : x;
+  g.textAlign = 'left';
+  g.fillStyle = faceColor; g.fillText('Face', x0, y);
+  g.fillStyle = finderColor; g.fillText('Finder', x0 + a, y);
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+  return a + b;
+}
+
+function faceBox(x, y, w, h, u, color = ACCENT, lw = 6) {
+  if (u <= 0) return;
+  const k = 1.35 - 0.35 * u;                     // snaps in from slightly larger
+  const cx = x + w / 2, cy = y + h / 2, W2 = w * k, H2 = h * k;
+  g.save(); g.globalAlpha = clamp(u * 2);
+  g.strokeStyle = color; g.lineWidth = lw; g.lineJoin = 'round';
+  rrect(cx - W2 / 2, cy - H2 / 2, W2, H2, Math.min(W2, H2) * 0.18); g.stroke();
+  g.restore();
+}
+
+// ================================================================== SHOTS
+
+// 0-4 s: the wall of photos. "4,000 photos." "Which ones are you?"
+function wallOffset(t) { return 2600 * (1 - Math.exp(-t / 0.9)); }
+function drawHook(t) {
+  const T = TL;
+  g.fillStyle = INK; g.fillRect(0, 0, W, H);
+
+  // camera: zoom into Mint's face from TL.zoom
+  const hero = tiles.hero, off = wallOffset(t);
+  const hx = 12 + HERO_COL * TSTEP, hy = HERO_ROW * TSTEP - off;
+  const mf = hero.faces[1];
+  const fx = hx + mf.x + mf.w / 2, fy = hy + mf.y + mf.h / 2;
+  const z = 1 + 7 * spring(t - T.zoom, ...HEAVY);
+  g.save();
+  g.translate(fx, fy); g.scale(z, z); g.translate(-fx, -fy);
+  // pull the target toward screen centre while zooming
+  const pull = spring(t - T.zoom, ...HEAVY);
+  g.translate((W / 2 - fx) * pull / z, (H * 0.5 - fy) * pull / z);
+
+  const r0 = Math.floor((off - TSTEP) / TSTEP), r1 = r0 + Math.ceil(H / TSTEP) + 2;
+  const lock = spring(t - T.lockOn, ...SNAPPY);
+  for (let r = r0; r <= r1; r++) for (let c = 0; c < TCOLS; c++) {
+    const isHero = r === HERO_ROW && c === HERO_COL;
+    const tile = isHero ? hero : tiles[((r * TCOLS + c) % 24 + 24) % 24];
+    const x = 12 + c * TSTEP, y = r * TSTEP - off;
+    if (y > H + TILE || y < -TILE * 2) continue;
+    g.save(); rrect(x, y, TILE, TILE, 22); g.clip();
+    g.drawImage(tile.c, x, y, TILE, TILE);
+    g.fillStyle = `rgba(18,19,24,${isHero ? 0.5 * (1 - lock) : 0.5 + 0.35 * lock})`;
+    g.fillRect(x, y, TILE, TILE);
+    g.restore();
+    if (isHero) faceBox(x + mf.x, y + mf.y, mf.w, mf.h, lock, ACCENT, 5);
+  }
+  g.restore();
+
+  // type, with a scrim band so it reads over the wall
+  const out = smooth(inv(T.zoom - 0.1, T.zoom + 0.25, t));
+  words(['4,000'], 64, 520, 300, t, T.hookWord1, T.hookSwap - 0.25, PAPER, { track: -0.05 });
+  words(['photos.'], 72, 700, 190, t, T.hookWord2, T.hookSwap - 0.25, PAPER);
+  words(['Which ones', 'are you?'], 72, 440, 170, t, T.hookSwap, null, PAPER, { alpha: 1 - out });
+
+  // circular reveal to white, from the face
+  const rv = spring(t - T.reveal, 140, 26);
+  if (rv > 0) {
+    g.fillStyle = PAPER;
+    const rx = fx + (W / 2 - fx) * pull, ry = fy + (H * 0.5 - fy) * pull;   // the face, on screen
+    g.beginPath(); g.arc(rx, ry, rv * 1500, 0, Math.PI * 2); g.fill();
+  }
+}
+
+// 4-6 s: the brand
+function drawBrand(t) {
+  const T = TL;
+  g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
+  const s = spring(t - T.logo, 220, 20);
+  const size = 300 * (0.6 + 0.4 * s);
+  g.save(); g.globalAlpha = clamp(s * 2);
+  mark(W / 2 - size / 2, 700 - size / 2 + (1 - s) * 60, size, ACCENT, INK);
+  g.restore();
+  const s2 = spring(t - T.logo - 0.18, ...SNAPPY);
+  g.save(); g.globalAlpha = clamp(s2 * 2);
+  g.translate(0, (1 - s2) * 40);
+  wordmark(W / 2, 1075, 150, ACCENT, INK, 'center');
+  g.restore();
+  g.textAlign = 'left';
+  // tagline, centred under the lockup
+  g.save();
+  const lines = ['Sort a shared album', 'by who is in it.'];
+  g.font = `700 76px ${DISPLAY}`;
+  lines.forEach((ln, i) => {
+    const u = spring(t - T.tagline - i * 0.12, ...SNAPPY);
+    g.globalAlpha = clamp(u * 2) * (1 - smooth(inv(TL.pasteIn - 0.3, TL.pasteIn, t)));
+    g.textAlign = 'center'; g.fillStyle = MUTED;
+    g.fillText(ln, W / 2, 1290 + i * 92 + (1 - u) * 50);
+  });
+  g.restore();
+}
+
+// shared app frame for 6-17.5 s
+const S = 1010 / 1074, PX = (W - 1010) / 2;   // UI image scale and left edge
+
+function caption(t, lines, tIn, tOut, accentWord) {
+  words(lines, 72, 270, 112, t, tIn, tOut, INK, { accentWord });
+}
+
+// 6-10.5 s: paste + scan
+function drawPasteScan(t) {
+  const T = TL;
+  g.fillStyle = SOFT; g.fillRect(0, 0, W, H);
+  const exitUp = spring(t - (T.cardIn - 0.2), ...SOFTS);     // whole group leaves upward
+  g.save(); g.translate(0, -exitUp * 1900);
+
+  caption(t, ['Paste the', 'album link.'], T.pasteIn + 0.05, T.scanFrom - 0.3, 'album');
+  caption(t, ['Every face,', 'scanned once.'], T.scanFrom, T.cardIn - 0.45, 'once.');
+
+  // pill rises in
+  const pin = spring(t - T.pasteIn - 0.1, ...SOFTS);
+  const k = Math.round(10 * clamp((t - T.typeFrom) / (T.typeTo - T.typeFrom)));
+  const pillY = lerp(H + 100, 860, pin) + track(t, [[0, 0], [T.scanFrom - 0.1, -340]], ...SOFTS);
+  const press = t > T.orbTap - 0.05 && t < T.orbTap + 0.15 ? 0.03 : 0;
+  const pill = panel(IMG['pill_' + k], PX, pillY, S, 60);
+  if (press) {   // the orb dims while pressed, as :active would
+    g.save(); g.fillStyle = 'rgba(18,19,24,0.12)';
+    g.beginPath(); g.arc(PX + SPOTS.orb.x * S, pillY + SPOTS.orb.y * S, 72 * S, 0, Math.PI * 2); g.fill(); g.restore();
+  }
+
+  // scanning status panel
+  const sin = spring(t - T.scanFrom, ...SOFTS);
+  if (sin > 0.001) {
+    const sk = Math.round(10 * smooth(clamp((t - T.scanFrom - 0.2) / (T.scanTo - T.scanFrom - 0.2))));
+    const sy = pillY + pill.h + 32 + (1 - sin) * 80;
+    g.save(); g.globalAlpha = clamp(sin * 2);
+    panel(IMG['scan_' + sk], PX, sy, S, 42, { h: 350 });
+    g.restore();
+
+    // the photos being scanned: boxes pop onto each face on the beat
+    const gy = sy + 350 * S + 40, ts = 300, gap = 25, gx = (W - (ts * 3 + gap * 2)) / 2;
+    scanTiles.forEach((tile, i) => {
+      const c = i % 3, r = Math.floor(i / 3);
+      const u = spring(t - T.scanFrom - 0.15 - i * 0.07, ...SNAPPY);
+      const x = gx + c * (ts + gap), y = gy + r * (ts + gap) + (1 - u) * 120;
+      g.save(); g.globalAlpha = clamp(u * 2);
+      rrect(x, y, ts, ts, 30); g.clip();
+      g.drawImage(tile.c, x, y, ts, ts);
+      g.restore();
+      const f = ts / TILE;
+      const pu = spring(t - T.detect[i], ...SNAPPY);
+      tile.faces.forEach((fc, j) => faceBox(x + fc.x * f, y + fc.y * f, fc.w * f, fc.h * f, spring(t - T.detect[i] - j * 0.05, ...SNAPPY) * (pu > 0 ? 1 : 0), ACCENT, 5));
+    });
+  }
+
+  // fingertip: arrives, taps the orb, leaves
+  const fx = PX + SPOTS.orb.x * S, fy = pillY + SPOTS.orb.y * S;
+  const fa = smooth(inv(T.orbTap - 0.6, T.orbTap - 0.3, t)) * (1 - smooth(inv(T.orbTap + 0.3, T.orbTap + 0.6, t)));
+  if (fa > 0) finger(fx + (1 - fa) * 160, fy + 20 + (1 - fa) * 260, T.orbTap, t, fa);
+  g.restore();
+}
+
+// 10.5-17.5 s: everyone, then folders
+const CARD_TOP = 520;
+function drawEveryone(t, bg = true) {
+  const T = TL;
+  if (bg) { g.fillStyle = SOFT; g.fillRect(0, 0, W, H); }
+
+  caption(t, ['Tick who you', 'want. Name them.'], T.cardIn + 0.1, T.barIn - 0.3, 'Tick');
+  caption(t, ['One folder each,', 'in your Drive.'], T.barIn + 0.05, T.endIn - 0.4, 'folder');
+
+  const k = T.ticks.filter((x) => t >= x).length;
+  const im = IMG['everyone_' + k];
+  // pan so the row being ticked sits in view
+  const rowY = (i) => SPOTS['tick_' + i].y * S;
+  const pan = track(t, [[0, 0],
+    [T.ticks[0] - 0.55, -(rowY(0) - 380)],
+    [T.ticks[2] - 0.55, -(rowY(2) - 380)],
+    [T.ticks[4] - 0.55, -(rowY(4) - 380)]], ...SOFTS);
+  const cin = spring(t - T.cardIn, ...SOFTS);
+  const top = CARD_TOP + (1 - cin) * 1500 + pan;
+
+  g.save(); g.beginPath(); g.rect(0, CARD_TOP - 40, W, H); g.clip();
+  panel(im, PX, top, S, 42);
+  g.restore();
+
+  // fingertip taps each tick on its beat
+  if (t >= T.ticks[0] - 0.6 && t < T.ticks[5] + 0.5) {
+    let i = T.ticks.findIndex((x) => t < x + 0.25); if (i < 0) i = 5;
+    const prev = Math.max(0, i - 1);
+    const tx = (j) => PX + SPOTS['tick_' + j].x * S, ty = (j) => top + SPOTS['tick_' + j].y * S;
+    const mv = spring(t - (T.ticks[i] - 0.4), ...SNAPPY);
+    const x = i === 0 ? tx(0) : lerp(tx(prev), tx(i), mv), y = i === 0 ? ty(0) : lerp(ty(prev), ty(i), mv);
+    const fa = smooth(inv(T.ticks[0] - 0.6, T.ticks[0] - 0.3, t)) * (1 - smooth(inv(T.ticks[5] + 0.2, T.ticks[5] + 0.5, t)));
+    finger(x, y + 14, T.ticks[i], t, fa);
+  }
+
+  // action bar rises from the bottom, then copies, then the result card
+  const bin = spring(t - T.barIn, ...SOFTS);
+  if (bin > 0.001) {
+    const ck = T.copy.filter((x) => t >= x).length;
+    const copying = t >= T.exportTap + 0.25;
+    const bim = copying ? IMG['copy_' + ck] : IMG['bar_6'];
+    const bs = W / bim.width, bh = bim.height * bs;
+    const by = H - bh * bin;
+    g.save();
+    shadow(50, -10, 0.12);
+    g.fillStyle = PAPER; rrect(0, by, W, bh + 60, 40); g.fill(); noShadow();
+    rrect(0, by, W, bh + 60, 40); g.clip();
+    g.drawImage(bim, 0, by, W, bh);
+    g.restore();
+    const ex = SPOTS.export.x * bs, ey = by + (copying ? (bim.height - IMG.bar_6.height) * bs : 0) + SPOTS.export.y * bs;
+    const fa = smooth(inv(T.exportTap - 0.5, T.exportTap - 0.25, t)) * (1 - smooth(inv(T.exportTap + 0.3, T.exportTap + 0.55, t)));
+    if (fa > 0) finger(ex + (1 - fa) * 120, ey + 10 + (1 - fa) * 200, T.exportTap, t, fa);
+  }
+
+  const din = spring(t - T.done, 200, 24);
+  if (din > 0.001) {
+    g.save(); g.fillStyle = `rgba(238,240,246,${0.82 * clamp(din * 1.5)})`; g.fillRect(0, CARD_TOP - 40, W, H); g.restore();
+    const dim = IMG.done;
+    const rows = T.doneRows.filter((x) => t >= x).length;
+    const firstRowTop = SPOTS.doneRows[0] - 87;
+    const visible = rows ? SPOTS.doneRows[rows - 1] + 30 : firstRowTop;
+    const y = CARD_TOP + 60 + (1 - din) * 300;
+    g.save(); g.globalAlpha = clamp(din * 2);
+    const sc = S * (0.94 + 0.06 * din);
+    panel(dim, (W - dim.width * sc) / 2, y, sc, 42, { clipH: Math.min(dim.height, visible + 40) });
+    g.restore();
+    // portraits pop beside each row as it appears
+    T.doneRows.forEach((tr, i) => {
+      const u = spring(t - tr, ...SNAPPY);
+      if (u <= 0.001) return;
+      const cx = (W - dim.width * sc) / 2 + dim.width * sc - 120, cy = y + (SPOTS.doneRows[i] - 30) * sc;
+      g.save(); g.globalAlpha = clamp(u * 2);
+      g.translate(cx, cy); g.scale(0.6 + 0.4 * u, 0.6 + 0.4 * u);
+      g.beginPath(); g.arc(0, 0, 36, 0, Math.PI * 2); g.clip();
+      drawPortrait(i, -36, -36, 72);
+      g.restore();
+    });
+  }
+}
+
+const portraits = [];
+function drawPortrait(i, x, y, s) {
+  if (!portraits[i]) {
+    const c = document.createElement('canvas'); c.width = c.height = 240;
+    Cast.portrait(c.getContext('2d'), 240, Cast.CREW[i]); portraits[i] = c;
+  }
+  g.drawImage(portraits[i], x, y, s, s);
+}
+
+// 17.5-20 s: end card on ink, rising from the bottom
+function drawEnd(t) {
+  const T = TL;
+  const u = spring(t - T.endIn, 160, 26);
+  const top = H * (1 - u);
+  g.fillStyle = INK; g.fillRect(0, top, W, H - top + 2);
+  g.save(); g.translate(0, top * 0.35);
+  const s = spring(t - T.endIn - 0.15, 220, 22);
+  g.globalAlpha = clamp(s * 2);
+  mark(W / 2 - 110, 430, 220, ACCENT, PAPER);
+  wordmark(W / 2, 790, 120, '#8EA0FF', PAPER, 'center');
+  g.globalAlpha = 1;
+  words(['Find yourself', 'in the album.'], 92, 1100, 128, t, T.endLine, null, PAPER);
+  const s3 = spring(t - T.endSub, ...SNAPPY);
+  g.globalAlpha = clamp(s3 * 2);
+  g.font = `700 50px ${UI}`; g.textAlign = 'left'; g.fillStyle = '#B9BCCB';
+  ['Sign in with Google.', 'Paste the link.', 'Get a folder for everyone.'].forEach((ln, i) => {
+    const v = spring(t - T.endSub - i * 0.12, ...SNAPPY);
+    g.globalAlpha = clamp(v * 2);
+    g.fillText(ln, 96, 1420 + i * 76 + (1 - v) * 30);
+  });
+  g.restore();
+}
+
+// ================================================================== frame
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1; noShadow();
+  const T = TL;
+  if (t < T.brand[0]) drawHook(t);
+  else if (t < T.paste[0]) drawBrand(t);
+  else if (t < T.cardIn + 0.9) {
+    drawPasteScan(t);
+    if (t >= T.cardIn - 0.2) {       // the card slides up under the departing group
+      drawEveryone(t, false);
+    }
+  } else drawEveryone(t);
+  if (t >= T.endIn) drawEnd(t);
+}
+window.seek = (t) => { draw(Math.max(0, Math.min(DUR - 1e-6, t))); return true; };
+
+// live preview in a normal browser; off when rendering headless
+window.ready.then(() => {
+  if (navigator.webdriver) return;
+  const t0 = performance.now();
+  (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })();
+});
+</script>
+<script src="assets/ui/manifest.js"></script>
+</body>
+</html>
