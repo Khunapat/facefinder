@@ -109,14 +109,12 @@ gcloud run deploy "$SERVICE" --source . --region "$REGION" \
 RUN_URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
 
 say "6/6  Firebase Hosting in front of Cloud Run"
-FIREBASE="npx --yes firebase-tools@14"
-$FIREBASE projects:addfirebase "$PROJECT" >/dev/null 2>&1 || true
-if ! $FIREBASE deploy --only hosting --project "$PROJECT" --non-interactive; then
+if ! PROJECT="$PROJECT" REGION="$REGION" SERVICE="$SERVICE" bash scripts/deploy-firebase.sh; then
   cat <<MSG
 
-Firebase did not deploy, usually because it needs a sign-in first. Run this,
-follow the link it prints, then run this whole script again:
-  npx --yes firebase-tools@14 login --no-localhost
+Cloud Run is up at $RUN_URL, but Firebase Hosting did not deploy.
+Fix what the error above says, then run only the Firebase part:
+  bash scripts/deploy-firebase.sh
 MSG
   exit 1
 fi
