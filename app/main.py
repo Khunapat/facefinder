@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.errors import HttpError
 from starlette.middleware.sessions import SessionMiddleware
@@ -19,11 +20,15 @@ app = FastAPI(title="FaceFinder")
 app.add_middleware(
     SessionMiddleware,
     secret_key=config.SESSION_SECRET,
+    # Firebase Hosting forwards only a cookie called __session to Cloud Run
+    # and drops every other one, so the session must use exactly that name.
+    session_cookie="__session",
     same_site="lax",
     https_only=config.PUBLIC_BASE_URL.startswith("https"),
 )
 
 STATIC = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 _jobs = {}          # folder_id -> running index thread
 _jobs_lock = threading.Lock()
 _exports = {}       # job_id -> progress dict, read by the page while it runs
@@ -553,6 +558,7 @@ def sort_album(request: Request, body: dict = Body(...)):
     job = {
         "status": "running", "folder_id": folder_id, "total": len(photos), "done": 0,
         "groups": [dict(g, file_ids=[]) for g in groups], "check": [], "none": [],
+        "names": {p["file_id"]: p["name"] for p in photos},
         "message": None, "lock": threading.Lock(),
     }
     job_id = secrets.token_urlsafe(12)

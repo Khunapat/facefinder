@@ -6,6 +6,7 @@ brightness, and the colour of the middle-lower part of the frame as "what people
 are wearing". Sorting matches colour words. Good enough to exercise every route
 and screen; it says nothing about how well the real Gemini judges photos.
 """
+import os
 import re
 
 import cv2
@@ -72,6 +73,7 @@ def install():
     """Swap the app's Gemini calls for this stand-in and switch the features on."""
     from app import gemini
 
+    os.environ.pop("GEMINI", None)
     gemini.mode = lambda: "fake"
     gemini.enabled = lambda: True
     gemini.judge = lambda jpeg: gemini.clean_judgement(judge(jpeg))

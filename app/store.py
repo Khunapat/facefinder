@@ -221,3 +221,12 @@ def face_box(folder_id: str, file_id: str, face_idx: int):
     if r is None:
         return None
     return json.loads(r["bbox"] or "[]"), ((r["w"], r["h"]) if r["w"] else None)
+
+
+# On Cloud Run the index lives in Firestore; every function above is replaced
+# by its Firestore twin, so callers keep using store.<name> unchanged.
+if config.STORE == "firestore":
+    from . import store_firestore as _fs
+
+    for _name in _fs.__all__:
+        globals()[_name] = getattr(_fs, _name)

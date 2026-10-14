@@ -21,6 +21,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("DATA_DIR", os.path.join(ROOT, "data"))
 os.environ.setdefault("GOOGLE_CLIENT_ID", "dev")
+os.environ["GEMINI"] = "off"     # never the real Gemini here; the stand-in is switched in below
 
 import cv2  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

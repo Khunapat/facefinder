@@ -36,6 +36,11 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET", "dev-only-change-me")
 # rebuilt after a restart (indexing is the only expensive step).
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 DB_PATH = os.path.join(DATA_DIR, "index.sqlite")
+# Where the index lives: "sqlite" (a file in DATA_DIR) or "firestore". Cloud
+# Run's disk is wiped on every restart, so deploy there with STORE=firestore.
+STORE = os.environ.get("STORE", "sqlite").strip().lower()
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+FIRESTORE_DATABASE = os.environ.get("FIRESTORE_DATABASE", "(default)")
 
 # Where the face model files live. Deliberately separate from DATA_DIR:
 # the Docker image bakes the model in at build time, and DATA_DIR is the
