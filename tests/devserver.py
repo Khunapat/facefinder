@@ -17,11 +17,14 @@ os.environ.setdefault("DATA_DIR", os.path.join(ROOT, "data"))
 os.environ.setdefault("GOOGLE_CLIENT_ID", "dev")
 os.environ.setdefault("PUBLIC_BASE_URL", "http://127.0.0.1:%d" % PORT)
 
-from app import config, main  # noqa: E402
-from tests import fakedrive  # noqa: E402
+from app import config, gemini, main  # noqa: E402
+from tests import fakedrive, fakegemini  # noqa: E402
 
 config.DB_PATH = os.path.join(config.DATA_DIR, "dev-index.sqlite")
 fakedrive.install(os.path.join(config.DATA_DIR, "dev-export"))
+# Real Gemini when a key or project is set, the stand-in otherwise.
+if not gemini.enabled():
+    fakegemini.install()
 
 if __name__ == "__main__":
     import uvicorn

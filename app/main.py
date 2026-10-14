@@ -11,7 +11,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.errors import HttpError
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import cluster, config, faces
+from . import cluster, config, curate, faces, gemini
 from . import google_drive as gd
 from . import store
 
@@ -30,6 +30,7 @@ _exports = {}       # job_id -> progress dict, read by the page while it runs
 _mat_cache = {}     # folder_id -> (stamp, matrix, meta)
 _people_cache = {}  # (folder_id, faces, threshold) -> grouped people
 _face_cache = {}    # (folder_id, file_id, face_idx) -> small JPEG, memory only
+_sorts = {}         # job_id -> sort-by-description progress and result
 
 
 # --------------------------------------------------------------- auth -----
@@ -125,6 +126,7 @@ def me(request: Request):
         "configured": bool(config.GOOGLE_CLIENT_ID),
         "default_threshold": config.DEFAULT_THRESHOLD,
         "drive_access": config.DRIVE_ACCESS,
+        "gemini": gemini.enabled(),
     }
 
 
@@ -157,7 +159,10 @@ async def open_album(request: Request):
 
 
 def _index_worker(folder_id: str, creds_data: dict):
-    """Walk the album once and cache an embedding for every face found."""
+    """Walk the album once: cache an embedding for every face found, a burst
+    fingerprint for every photo and, when Gemini is on, its judgement of the
+    photo. Photos scanned before Gemini was switched on get judged too."""
+    gem = None
     try:
         creds = gd.creds_from_session(creds_data)
         svc = gd.service(creds)
@@ -173,30 +178,63 @@ def _index_worker(folder_id: str, creds_data: dict):
         )
         faces.engine()   # load the model once, before the pool starts
         local = threading.local()   # Drive clients are not thread-safe
+        # Gemini calls wait on the network, not the CPU, so they get their own,
+        # wider pool and run alongside the face scan.
+        if gemini.enabled():
+            gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
+
+        def judge(file_id, data):
+            try:
+                store.save_ai(folder_id, file_id, gemini.judge(gemini.shrink(data)))
+            except Exception:
+                pass            # left unjudged; the next scan retries it
+
+        def drive_svc():
+            if not hasattr(local, "svc"):
+                local.svc = gd.service(creds)
+            return local.svc
 
         def one(meta):
+            data = None
             try:
-                if not hasattr(local, "svc"):
-                    local.svc = gd.service(creds)
-                data = gd.fetch_image_bytes(creds, local.svc, meta)
+                data = gd.fetch_image_bytes(creds, drive_svc(), meta)
                 found, size = faces.analyze(data)
             except Exception:
                 found, size = [], None
-            store.save_photo(folder_id, meta["id"], meta["name"], found, size)
+            store.save_photo(folder_id, meta["id"], meta["name"], found, size,
+                             curate.dhash(data) if data else None)
             store.bump_progress(folder_id, 1, len(found))
+            if gem and data:
+                gem.submit(judge, meta["id"], data)
+
+        def rejudge(meta):
+            try:
+                data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
+            except Exception:
+                return
+            gem.submit(judge, meta["id"], data)
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))
+            if gem:     # scanned earlier, before Gemini was on or when it failed
+                fresh = {f["id"] for f in todo}
+                missing = {m["id"] for m in store.unjudged(folder_id)} - fresh
+                list(pool.map(rejudge, [f for f in files if f["id"] in missing]))
+        if gem:
+            gem.shutdown(wait=True)
 
         row = store.album(folder_id)
-        store.set_album(
-            folder_id,
-            status="ready",
-            message="%d faces across %d photos" % (row["faces"], row["done"]),
-        )
+        msg = "%d faces across %d photos" % (row["faces"], row["done"])
+        if gem:
+            missed = row["done"] - store.judged_count(folder_id)
+            if missed:
+                msg += "; Gemini could not check %d (scan again to retry)" % missed
+        store.set_album(folder_id, status="ready", message=msg)
     except Exception as e:
         store.set_album(folder_id, status="error", message=str(e)[:300])
     finally:
+        if gem:
+            gem.shutdown(wait=False, cancel_futures=True)
         with _jobs_lock:
             _jobs.pop(folder_id, None)
 
@@ -228,7 +266,10 @@ def album_status(folder_id: str):
     row = store.album(folder_id)
     if row is None:
         raise HTTPException(404, "Unknown album")
-    return dict(row)
+    out = dict(row)
+    out["judged"] = store.judged_count(folder_id)
+    out["gemini"] = gemini.enabled()
+    return out
 
 
 def _matrix(folder_id: str):
@@ -374,6 +415,159 @@ def thumb(request: Request, file_id: str, s: int = 0):
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+
+# ------------------------------------------------------ Gemini curation -----
+def _need_gemini():
+    if not gemini.enabled():
+        raise HTTPException(
+            400, "Gemini is not switched on for this server (set GOOGLE_CLOUD_PROJECT or GEMINI_API_KEY)."
+        )
+
+
+def _ready_photos(folder_id: str) -> list:
+    row = store.album(folder_id)
+    if row is None or row["status"] != "ready":
+        raise HTTPException(400, "Wait for the scan to finish first.")
+    return store.photos(folder_id)
+
+
+@app.post("/api/cull")
+def cull(request: Request, body: dict = Body(...)):
+    """For the photographer: which frames to keep, which to drop, and why."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    out = curate.cull(_ready_photos(folder_id), body.get("strictness") or "normal")
+    out["checked"] = store.judged_count(folder_id)
+    return out
+
+
+@app.post("/api/best")
+def best(request: Request, body: dict = Body(...)):
+    """For the graduate: one person's best photos, out of all of theirs."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    file_ids = [f for f in (body.get("file_ids") or []) if isinstance(f, str)][:3000]
+    if not file_ids:
+        raise HTTPException(400, "No photos given")
+    n = max(1, min(int(body.get("n") or 10), 50))
+    photos = {p["file_id"]: p for p in _ready_photos(folder_id)}
+    mat, meta = _matrix(folder_id)
+
+    # This person's face in each photo: the face nearest to the face all the
+    # photos share. Its size in the frame says portrait or crowd shot.
+    sizes = {}
+    vec = curate.person_vector(mat, meta, file_ids) if len(meta) else None
+    if vec is not None:
+        sims = mat @ vec
+        for i, m in enumerate(meta):
+            f = m["file_id"]
+            if f in photos and sims[i] > sizes.get(f, (None, None, -1.0))[2]:
+                box, size = m["bbox"], photos[f]["size"]
+                side = max(box[2] - box[0], box[3] - box[1]) if len(box) == 4 else 0
+                frac = side / max(size) if size else 0.0
+                sizes[f] = (frac, m["det_score"], float(sims[i]))
+    faces_info = {f: (v[0], v[1]) for f, v in sizes.items()}
+    ai = {f: p["ai"] for f, p in photos.items()}
+    picks = curate.best_shots([f for f in file_ids if f in photos], ai, faces_info, n)
+    for p in picks:
+        p["name"] = photos[p["file_id"]]["name"]
+    return {"best": picks, "of": len(file_ids)}
+
+
+def _sample_lines(photos: list, limit: int) -> list:
+    judged = [p for p in photos if p["ai"]]
+    step = max(1, len(judged) // limit)
+    return [gemini.as_text(p["ai"]) for p in judged[::step][:limit]]
+
+
+@app.post("/api/groups/suggest")
+def suggest_groups(request: Request, body: dict = Body(...)):
+    """Gemini reads the album's descriptions and proposes folders to sort into."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    _need_gemini()
+    lines = _sample_lines(_ready_photos(folder_id), 150)
+    if not lines:
+        raise HTTPException(400, "Gemini has not checked any photos in this album yet.")
+    try:
+        return {"groups": gemini.suggest_groups(lines)}
+    except Exception as e:
+        raise HTTPException(502, "Gemini did not answer: %s" % str(e)[:160]) from e
+
+
+def _sort_worker(job: dict, photos: list, groups: list):
+    """Put every checked photo into the folders it fits, a batch at a time."""
+    try:
+        judged = [p for p in photos if p["ai"]]
+        batches = [judged[i:i + gemini.SORT_BATCH] for i in range(0, len(judged), gemini.SORT_BATCH)]
+
+        def one(batch):
+            try:
+                res = gemini.sort_batch([gemini.as_text(p["ai"]) for p in batch], groups)
+            except Exception:
+                res = [{"groups": [], "sure": False}] * len(batch)
+            with job["lock"]:
+                for p, r in zip(batch, res):
+                    if not r["sure"]:
+                        job["check"].append(p["file_id"])
+                    elif not r["groups"]:
+                        job["none"].append(p["file_id"])
+                    for g in r["groups"] if r["sure"] else ():
+                        job["groups"][g]["file_ids"].append(p["file_id"])
+                job["done"] += len(batch)
+
+        with ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS) as pool:
+            list(pool.map(one, batches))
+        job["check"].extend(p["file_id"] for p in photos if not p["ai"])
+        job["status"] = "done"
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = str(e)[:300]
+    finally:
+        job["finished"] = time.time()
+
+
+@app.post("/api/sort")
+def sort_album(request: Request, body: dict = Body(...)):
+    """Sort by description. groups: [{name, description}], in Thai or English.
+    The result feeds the same export as people: one Drive folder per group."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    _need_gemini()
+    groups = []
+    for g in (body.get("groups") or [])[:12]:
+        name = _clean_name(g.get("name"))
+        desc = " ".join(str(g.get("description") or name).split())[:300]
+        if name:
+            groups.append({"name": name, "description": desc})
+    if not groups:
+        raise HTTPException(400, "Describe at least one group")
+    photos = _ready_photos(folder_id)
+    for old in [k for k, j in _sorts.items() if time.time() - j.get("finished", 9e18) > 3600]:
+        _sorts.pop(old, None)
+    job = {
+        "status": "running", "folder_id": folder_id, "total": len(photos), "done": 0,
+        "groups": [dict(g, file_ids=[]) for g in groups], "check": [], "none": [],
+        "message": None, "lock": threading.Lock(),
+    }
+    job_id = secrets.token_urlsafe(12)
+    _sorts[job_id] = job
+    threading.Thread(target=_sort_worker, args=(job, photos, groups), daemon=True).start()
+    return {"job_id": job_id, "total": len(photos)}
+
+
+@app.get("/api/sort/{job_id}")
+def sort_status(request: Request, job_id: str):
+    job = _sorts.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Unknown sort")
+    _need_album(request, job["folder_id"])
+    return {k: v for k, v in job.items() if k != "lock"}
 
 
 # ------------------------------------------------------------- export -----

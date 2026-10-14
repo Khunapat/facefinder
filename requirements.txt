@@ -13,3 +13,6 @@ numpy==2.4.6
 opencv-python-headless==5.0.0.93
 onnxruntime==1.29.0
 insightface==2.0
+# Gemini (Vertex AI on Cloud Run, or an API key elsewhere). 2.5 Flash retires
+# in October 2026, so the default model is set in app/gemini.py.
+google-genai==2.30.1

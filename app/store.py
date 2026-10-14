@@ -50,12 +50,13 @@ def conn() -> sqlite3.Connection:
         c.row_factory = sqlite3.Row
         c.execute("PRAGMA journal_mode=WAL")
         c.executescript(SCHEMA)
-        # Added after the first release: the size each photo was scanned at.
+        # Added after the first release: the size each photo was scanned at,
+        # its burst fingerprint, and Gemini's judgement as JSON.
         have = {r["name"] for r in c.execute("PRAGMA table_info(photos)")}
-        for col in ("w", "h"):
+        for col, kind in (("w", "INTEGER"), ("h", "INTEGER"), ("dhash", "TEXT"), ("ai", "TEXT")):
             if col not in have:
                 try:
-                    c.execute(f"ALTER TABLE photos ADD COLUMN {col} INTEGER")
+                    c.execute(f"ALTER TABLE photos ADD COLUMN {col} {kind}")
                 except sqlite3.OperationalError:
                     pass                # another thread added it first
         c.commit()
@@ -105,15 +106,16 @@ def indexed_file_ids(folder_id: str) -> set:
     return {r["file_id"] for r in rows}
 
 
-def save_photo(folder_id: str, file_id: str, name: str, faces: list, size=None):
+def save_photo(folder_id: str, file_id: str, name: str, faces: list, size=None, dhash=None):
     """faces: list of dicts with embedding (np.ndarray), det_score, bbox.
-    size: (width, height) of the image the boxes were measured on."""
+    size: (width, height) of the image the boxes were measured on.
+    dhash: the photo's burst fingerprint (curate.dhash)."""
     c = conn()
     w, h = size if size else (None, None)
     c.execute(
-        "INSERT OR REPLACE INTO photos (folder_id, file_id, name, w, h) "
-        "VALUES (?,?,?,?,?)",
-        (folder_id, file_id, name, w, h),
+        "INSERT OR REPLACE INTO photos (folder_id, file_id, name, w, h, dhash) "
+        "VALUES (?,?,?,?,?,?)",
+        (folder_id, file_id, name, w, h, dhash),
     )
     for i, f in enumerate(faces):
         emb = np.asarray(f["embedding"], dtype=np.float32)
@@ -156,6 +158,48 @@ def load_matrix(folder_id: str):
         for r in rows
     ]
     return mat, meta
+
+
+def save_ai(folder_id: str, file_id: str, judgement: dict):
+    c = conn()
+    c.execute(
+        "UPDATE photos SET ai=? WHERE folder_id=? AND file_id=?",
+        (json.dumps(judgement, ensure_ascii=False), folder_id, file_id),
+    )
+    c.commit()
+
+
+def photos(folder_id: str) -> list:
+    """Every scanned photo with its fingerprint and Gemini judgement (or None)."""
+    rows = conn().execute(
+        "SELECT file_id, name, w, h, dhash, ai FROM photos WHERE folder_id=?",
+        (folder_id,),
+    ).fetchall()
+    return [
+        {
+            "file_id": r["file_id"],
+            "name": r["name"],
+            "size": (r["w"], r["h"]) if r["w"] else None,
+            "dhash": r["dhash"],
+            "ai": json.loads(r["ai"]) if r["ai"] else None,
+        }
+        for r in rows
+    ]
+
+
+def unjudged(folder_id: str) -> list:
+    """Photos Gemini has not checked yet: [{id, name}], ready for list_images-style use."""
+    rows = conn().execute(
+        "SELECT file_id, name FROM photos WHERE folder_id=? AND ai IS NULL",
+        (folder_id,),
+    ).fetchall()
+    return [{"id": r["file_id"], "name": r["name"]} for r in rows]
+
+
+def judged_count(folder_id: str) -> int:
+    return conn().execute(
+        "SELECT COUNT(*) FROM photos WHERE folder_id=? AND ai IS NOT NULL", (folder_id,)
+    ).fetchone()[0]
 
 
 def clear_album(folder_id: str):
