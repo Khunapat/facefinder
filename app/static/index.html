@@ -7,7 +7,7 @@
 <link rel="icon" href="/static/img/cam-wave.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Roboto:wght@500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ---------------------------------------------------------------------------
    FaceFinder's own playful pink system: pale pink page, large rounded white
@@ -44,6 +44,14 @@ button{cursor:pointer}
        box-shadow:0 6px 18px rgba(31,37,64,.08)}
 .grow{flex:1}
 .email{font-size:14px;color:var(--muted)}
+
+/* the official "Sign in with Google" button (Google's branding guidelines) */
+.gsi{height:44px;padding:0 16px 0 12px;border:1px solid #747775;border-radius:var(--r-full);background:#fff;color:#1f1f1f;
+     font-family:'Roboto',arial,sans-serif;font-size:14px;font-weight:500;letter-spacing:.25px;
+     display:inline-flex;align-items:center;gap:10px;white-space:nowrap;text-decoration:none}
+.gsi:hover{background:#f8f9fa;box-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);color:#1f1f1f}
+.gsi svg{width:20px;height:20px;flex:0 0 20px}
+.gsi.lg{height:52px;font-size:16px;padding:0 22px 0 16px}
 
 /* ------------------------------------------------------------- buttons */
 .btn{height:52px;padding:0 28px;border:0;border-radius:var(--r-full);background:var(--accent);color:#fff;
@@ -214,6 +222,7 @@ dialog::backdrop{background:rgba(31,37,64,.5)}
 }
 @media (max-width:744px){
   .nav{padding:16px}
+  #gsiNav{display:none}          /* the start screen has the big button */
   .email{display:none}
   main{padding:8px 16px 220px}
   .panel,.card{padding:24px 20px;border-radius:24px}
@@ -250,7 +259,8 @@ dialog::backdrop{background:rgba(31,37,64,.5)}
   </a>
   <div class="grow"></div>
   <span class="email" id="who"></span>
-  <button class="btn sm" id="auth"><span id="authLabel">Sign in with Google</span></button>
+  <a class="gsi" id="gsiNav" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
+  <button class="btn ghost sm" id="auth" hidden>Sign out</button>
 </nav>
 
 <main>
@@ -263,7 +273,12 @@ dialog::backdrop{background:rgba(31,37,64,.5)}
       <p>Paste the Google Drive album. FaceFinder finds every face and Gemini checks every
          photo, so each person gets their own folder, the album sorts itself into groups,
          and the bad shots are culled for you.</p>
-      <div class="pill">
+      <div id="signinBox" hidden style="margin-top:32px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+        <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
+        <span class="hint" style="font-size:14px">FaceFinder reads the shared album with your Google account
+          and puts the folders in your own Drive. It never deletes or moves anything.</span>
+      </div>
+      <div class="pill" id="albumPill">
         <div class="seg">
           <label for="album">Shared album</label>
           <input type="text" id="album" placeholder="Paste the Google Drive folder link">
@@ -477,15 +492,15 @@ async function refreshMe(){
   if(!me.configured)
     msg($("#setupWarn"), "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
   $("#who").textContent = me.user?.emailAddress || "";
-  $("#authLabel").textContent = me.signed_in ? "Sign out" : "Sign in with Google";
+  $("#gsiNav").hidden = me.signed_in;
+  $("#auth").hidden = !me.signed_in;
+  $("#signinBox").hidden = me.signed_in;
+  $("#albumPill").hidden = !me.signed_in;
   state.thr = Number(me.default_threshold) || 0.38;
   $("#th").value = state.thr; $("#thVal").textContent = state.thr.toFixed(2);
   document.querySelectorAll("[data-ai]").forEach(el => el.hidden = !state.gemini);
 }
-$("#auth").onclick = async () => {
-  if(state.signedIn){ await api("/api/logout",{method:"POST"}); location.reload(); }
-  else location.href = "/oauth2/login";
-};
+$("#auth").onclick = async () => { await api("/api/logout",{method:"POST"}); location.reload(); };
 
 // ---- the album ----
 $("#openAlbum").onclick = async () => {
