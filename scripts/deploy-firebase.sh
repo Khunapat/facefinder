@@ -19,8 +19,22 @@ if ! $FIREBASE projects:list --non-interactive >/dev/null 2>&1; then
 fi
 
 # The project must be a Firebase project and have a Hosting site named after it.
-$FIREBASE projects:addfirebase "$PROJECT" >/dev/null 2>&1 || true
-$FIREBASE hosting:sites:create "$PROJECT" --project "$PROJECT" --non-interactive >/dev/null 2>&1 || true
+# Both steps print their errors: a project that was never added to Firebase
+# usually needs its terms accepted once at console.firebase.google.com.
+if ! $FIREBASE hosting:sites:list --project "$PROJECT" --non-interactive 2>/dev/null | grep -q "$PROJECT"; then
+  $FIREBASE projects:addfirebase "$PROJECT" --non-interactive 2>&1 | grep -v "already" || true
+  if ! $FIREBASE hosting:sites:create "$PROJECT" --project "$PROJECT" --non-interactive; then
+    cat <<MSG
+
+Could not create the Firebase Hosting site. Do this once in the browser:
+  1. https://console.firebase.google.com  ->  "Add Firebase to a Google Cloud project"
+     (or "Create a project" -> pick $PROJECT), accept the terms, Analytics off.
+  2. In that Firebase project: Build > Hosting > Get started, click through.
+Then run:  bash scripts/deploy-firebase.sh
+MSG
+    exit 1
+  fi
+fi
 
 # firebase.json in the repo has no site name; deploy from a copy that does.
 cat > firebase.deploy.json <<JSON
