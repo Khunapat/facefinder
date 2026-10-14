@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder: folders created</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-direction: column; background: #ffffff; color: #222222; font-family: 'Nunito Sans', -apple-system, 'Segoe UI', Roboto, 'Noto Sans Thai', sans-serif; font-size: 16px; line-height: 1.5">
+
+  <nav style="height: 80px; flex: 0 0 80px; display: flex; align-items: center; gap: 16px; padding: 0 32px; border-bottom: 1px solid #ebebeb">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 21px; font-weight: 700; letter-spacing: -0.4px; color: {{accent}}">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"></circle><path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path><circle cx="8" cy="9.2" r="1" fill="currentColor"></circle><circle cx="13" cy="9.2" r="1" fill="currentColor"></circle><path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+      <span>Face<span style="color: #222222">Finder</span></span>
+    </div>
+    <div style="flex: 1"></div>
+    <span style="font-size: 13px; color: #6a6a6a">nan@example.com</span>
+    <button type="button" style="display: flex; align-items: center; gap: 12px; border: 1px solid #dddddd; border-radius: 9999px; padding: 8px 8px 8px 16px; background: #ffffff; font-family: inherit; font-size: 14px; font-weight: 600; color: #222222">Sign out<span style="width: 32px; height: 32px; border-radius: 9999px; background: #222222; color: #ffffff; display: grid; place-items: center; font-size: 13px; font-weight: 700">N</span></button>
+  </nav>
+
+  <main style="flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; box-sizing: border-box; padding: 48px 24px">
+
+    <div style="max-width: 760px; margin: 0 auto">
+      <div style="display: flex; align-items: center; height: 64px; box-sizing: border-box; padding: 0 8px 0 24px; background: #ffffff; border: 1px solid #dddddd; border-radius: 9999px; box-shadow: rgba(0,0,0,0.02) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px 0, rgba(0,0,0,0.1) 0 4px 8px 0">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center">
+          <label for="album" style="font-size: 12px; font-weight: 700; line-height: 1.33">Shared album</label>
+          <input id="album" type="text" value="https://drive.google.com/drive/folders/[ALBUM LINK]" style="border: 0; outline: 0; padding: 0; width: 100%; background: transparent; font-family: inherit; font-size: 14px; color: #222222">
+        </div>
+        <button type="button" aria-label="Open album" style="width: 48px; height: 48px; flex: 0 0 48px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.4"></circle><path d="M16 16l5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg></button>
+      </div>
+      <div style="margin-top: 16px; padding: 12px 16px; font-size: 14px; line-height: 1.43; border-radius: 8px; background: #f7f7f7; border: 1px solid #ebebeb">Album <strong>Graduation 2026 — Faculty of Engineering</strong> is open.</div>
+      <div style="height: 4px; margin: 16px 0 8px; border-radius: 9999px; background: {{accent}}"></div>
+      <div style="display: flex; gap: 12px; align-items: center">
+        <span style="font-size: 14px; color: #6a6a6a">Ready — 1,186 faces across 812 photos.</span>
+        <div style="flex: 1"></div>
+        <a href="#" style="font-size: 14px">Rescan from scratch</a>
+      </div>
+    </div>
+
+    <section style="margin-top: 24px; padding: 24px; border: 1px solid #ebebeb; border-radius: 14px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.18px; line-height: 1.2">93 photos copied into 4 folders</h2>
+      <p style="margin: 4px 0 0; font-size: 14px; color: #6a6a6a">Inside <a href="#"><strong>FaceFinder - Graduation 2026 — Faculty of Engineering</strong></a> in your Drive. 11 photos were already there and left alone.</p>
+      <div style="margin-top: 16px; padding: 12px 16px; font-size: 14px; line-height: 1.43; border-radius: 8px; background: #f7f7f7; color: #6a6a6a; border: 1px solid #ebebeb">FaceFinder is not allowed to write into "Photos to send", so the folders are in "FaceFinder - Graduation 2026 — Faculty of Engineering" in your My Drive instead. You can drag them across.</div>
+      <ul style="list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 24px">
+        <li style="font-size: 14px; color: #6a6a6a"><a href="#" style="font-weight: 600">Nan</a> — 38 photos</li>
+        <li style="font-size: 14px; color: #6a6a6a"><a href="#" style="font-weight: 600">Beam</a> — 31 photos</li>
+        <li style="font-size: 14px; color: #6a6a6a"><a href="#" style="font-weight: 600">Fah</a> — 24 photos</li>
+        <li style="font-size: 14px; color: #6a6a6a"><a href="#" style="font-weight: 600">Person 10</a> — 11 photos</li>
+      </ul>
+    </section>
+
+    <div role="tablist" aria-label="How to find people" style="display: flex; gap: 4px; padding: 4px; margin: 32px auto 0; width: fit-content; max-width: 100%; background: #f2f2f2; border-radius: 9999px">
+      <button type="button" role="tab" aria-selected="false" style="border: 0; background: transparent; color: #6a6a6a; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.29; padding: 10px 20px; border-radius: 9999px">I know who I'm looking for</button>
+      <button type="button" role="tab" aria-selected="true" style="border: 0; background: #222222; color: #ffffff; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.29; padding: 10px 20px; border-radius: 9999px">Show me everyone in the album</button>
+    </div>
+
+    <section style="margin-top: 24px; padding: 24px; border: 1px solid #ebebeb; border-radius: 14px">
+      <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.18px; line-height: 1.2">Everyone in this album</h2>
+      <p style="margin: 4px 0 0; font-size: 14px; color: #6a6a6a">Tick the people you want a folder for and type their name. Tap a face to check their photos. Same person twice? Give both the same name.</p>
+    </section>
+  </main>
+
+  <div style="position: sticky; bottom: 0; padding: 12px 24px; background: #ffffff; border-top: 1px solid #dddddd; box-shadow: rgba(0,0,0,0.06) 0 -2px 8px">
+    <div style="max-width: 1080px; margin: 0 auto; display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+      <input type="text" aria-label="Destination folder" value="https://drive.google.com/drive/folders/[PHOTOS TO SEND]" style="flex: 1; min-width: 180px; height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid #c1c1c1; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 15px">
+      <span style="font-size: 14px; color: #6a6a6a; white-space: nowrap"><strong style="color: #222222; font-size: 16px">4</strong> folders · <strong style="color: #222222; font-size: 16px">104</strong> photos</span>
+      <button type="button" style="height: 48px; padding: 14px 24px; border: 0; border-radius: 8px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 500; line-height: 1.25; white-space: nowrap">Create folders in my Drive</button>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#ff385c","options":["#ff385c","#5b3fd6","#0f7b6c","#9a6700"]},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#ff385c' };
+}
+}
+</script>
+</body>
+</html>

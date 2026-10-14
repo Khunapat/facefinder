@@ -1,0 +1,97 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-09T08:29:37Z"
+  },
+  "title": "FaceFinder Screens",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1400,
+      "title": "Everyone in the album",
+      "expand": "fill"
+    },
+    "People.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 2140,
+      "title": "People I'm looking for",
+      "expand": "fill"
+    },
+    "Review.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 860,
+      "title": "Check one person's photos",
+      "expand": "fill"
+    },
+    "Done.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Folders created",
+      "expand": "fill"
+    },
+    "Mobile.dc.html": {
+      "x": 0,
+      "y": 2260,
+      "w": 390,
+      "h": 844,
+      "title": "Phone"
+    },
+    "Playful.dc.html": {
+      "x": 470,
+      "y": 2260,
+      "w": 1440,
+      "h": 1560,
+      "title": "Playful pink direction",
+      "expand": "fill"
+    },
+    "Poses.dc.html": {
+      "x": 1990,
+      "y": 2260,
+      "w": 1280,
+      "h": 900,
+      "title": "Mascot poses (chosen)"
+    },
+    "PosesGrad.dc.html": {
+      "x": 1990,
+      "y": 3280,
+      "w": 1280,
+      "h": 900,
+      "title": "Earlier idea: graduate"
+    },
+    "Prototype.dc.html": {
+      "x": 3350,
+      "y": 2260,
+      "w": 1440,
+      "h": 1300,
+      "title": "Prototype: press Play",
+      "expand": "fill",
+      "is_interactive": true
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "People.dc.html",
+    "Review.dc.html",
+    "Done.dc.html",
+    "Mobile.dc.html",
+    "Playful.dc.html",
+    "Poses.dc.html",
+    "PosesGrad.dc.html",
+    "Prototype.dc.html"
+  ],
+  "notes": {},
+  "designSystems": []
+}

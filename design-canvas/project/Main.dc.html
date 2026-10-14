@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder: everyone in the album</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&display=swap">
+<style>
+body{margin:0}
+a{color:#222222}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="min-height: 1400px; display: flex; flex-direction: column; background: #ffffff; color: #222222; font-family: 'Nunito Sans', -apple-system, 'Segoe UI', Roboto, 'Noto Sans Thai', sans-serif; font-size: 16px; line-height: 1.5">
+
+  <nav style="height: 80px; flex: 0 0 80px; display: flex; align-items: center; gap: 16px; padding: 0 32px; border-bottom: 1px solid #ebebeb">
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 21px; font-weight: 700; letter-spacing: -0.4px; color: {{accent}}">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"></circle><path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path><circle cx="8" cy="9.2" r="1" fill="currentColor"></circle><circle cx="13" cy="9.2" r="1" fill="currentColor"></circle><path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg>
+      <span>Face<span style="color: #222222">Finder</span></span>
+    </div>
+    <div style="flex: 1"></div>
+    <span style="font-size: 13px; color: #6a6a6a">nan@example.com</span>
+    <button type="button" style="display: flex; align-items: center; gap: 12px; border: 1px solid #dddddd; border-radius: 9999px; padding: 8px 8px 8px 16px; background: #ffffff; font-family: inherit; font-size: 14px; font-weight: 600; color: #222222">Sign out<span style="width: 32px; height: 32px; border-radius: 9999px; background: #222222; color: #ffffff; display: grid; place-items: center; font-size: 13px; font-weight: 700">N</span></button>
+  </nav>
+
+  <main style="flex: 1; width: 100%; max-width: 1080px; margin: 0 auto; box-sizing: border-box; padding: 48px 24px">
+
+    <div style="text-align: center; margin-bottom: 32px">
+      <h1 style="margin: 0; font-size: 32px; font-weight: 700; line-height: 1.18; letter-spacing: -0.6px; text-wrap: balance">Give everyone their own folder of photos</h1>
+      <p style="margin: 12px auto 0; max-width: 560px; color: #6a6a6a; text-wrap: balance">Paste the album the photographer shared. Tell us who to look for, or let us show you everyone who is in it. Each person gets a folder in your Drive.</p>
+    </div>
+
+    <div style="max-width: 760px; margin: 0 auto">
+      <div style="display: flex; align-items: center; height: 64px; box-sizing: border-box; padding: 0 8px 0 24px; background: #ffffff; border: 1px solid #dddddd; border-radius: 9999px; box-shadow: rgba(0,0,0,0.02) 0 0 0 1px, rgba(0,0,0,0.04) 0 2px 6px 0, rgba(0,0,0,0.1) 0 4px 8px 0">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center">
+          <label for="album" style="font-size: 12px; font-weight: 700; line-height: 1.33">Shared album</label>
+          <input id="album" type="text" value="https://drive.google.com/drive/folders/[ALBUM LINK]" style="border: 0; outline: 0; padding: 0; width: 100%; background: transparent; font-family: inherit; font-size: 14px; color: #222222">
+        </div>
+        <button type="button" aria-label="Open album" style="width: 48px; height: 48px; flex: 0 0 48px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; display: grid; place-items: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.4"></circle><path d="M16 16l5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg></button>
+      </div>
+      <div style="margin-top: 16px; padding: 12px 16px; font-size: 14px; line-height: 1.43; border-radius: 8px; background: #f7f7f7; border: 1px solid #ebebeb">Album <strong>Graduation 2026 — Faculty of Engineering</strong> is open.</div>
+      <div style="height: 4px; margin: 16px 0 8px; border-radius: 9999px; background: {{accent}}"></div>
+      <div style="display: flex; gap: 12px; align-items: center">
+        <span style="font-size: 14px; color: #6a6a6a">Ready — 1,186 faces across 812 photos.</span>
+        <div style="flex: 1"></div>
+        <a href="#" style="font-size: 14px">Rescan from scratch</a>
+      </div>
+    </div>
+
+    <div role="tablist" aria-label="How to find people" style="display: flex; gap: 4px; padding: 4px; margin: 32px auto 0; width: fit-content; max-width: 100%; background: #f2f2f2; border-radius: 9999px">
+      <button type="button" role="tab" aria-selected="false" style="border: 0; background: transparent; color: #6a6a6a; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.29; padding: 10px 20px; border-radius: 9999px">I know who I'm looking for</button>
+      <button type="button" role="tab" aria-selected="true" style="border: 0; background: #222222; color: #ffffff; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.29; padding: 10px 20px; border-radius: 9999px">Show me everyone in the album</button>
+    </div>
+
+    <section style="margin-top: 24px; padding: 24px; border: 1px solid #ebebeb; border-radius: 14px">
+      <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+        <div style="flex: 1; min-width: 240px">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.18px; line-height: 1.2">Everyone in this album</h2>
+          <p style="margin: 4px 0 0; font-size: 14px; color: #6a6a6a">Tick the people you want a folder for and type their name. Tap a face to check their photos. Same person twice? Give both the same name.</p>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #6a6a6a">Grouping
+          <select style="height: 48px; padding: 0 12px; border: 1px solid #c1c1c1; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px"><option>Balanced</option><option>Looser — fewer, bigger groups</option><option>Stricter — never mix two people</option></select>
+        </label>
+      </div>
+
+      <div style="margin-top: 16px; padding: 12px 16px; font-size: 14px; line-height: 1.43; border-radius: 8px; background: #f7f7f7; border: 1px solid #ebebeb">Found <strong>47</strong> people who appear more than once, across 431 photos with faces.</div>
+
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 24px 16px; margin-top: 24px">
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="true" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; display: grid; place-items: center; background: {{accent}}; border: 1.5px solid {{accent}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+          <input type="text" aria-label="Name" value="Nan" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">38 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="true" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; display: grid; place-items: center; background: {{accent}}; border: 1.5px solid {{accent}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+          <input type="text" aria-label="Name" value="Beam" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">31 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">27 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="true" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; display: grid; place-items: center; background: {{accent}}; border: 1.5px solid {{accent}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+          <input type="text" aria-label="Name" value="Fah" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">24 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">22 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">19 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">17 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">15 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">12 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="true" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; display: grid; place-items: center; background: {{accent}}; border: 1.5px solid {{accent}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">11 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">9 photos</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+          <div style="position: relative">
+            <button type="button" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 14px; background: #f2f2f2; color: #c1c1c1"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"></circle><path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5"></path></svg></button>
+            <button type="button" aria-pressed="false" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; background: rgba(0,0,0,0.4); border: 1.5px solid rgba(255,255,255,0.85)"></button>
+          </div>
+          <input type="text" aria-label="Name" placeholder="Name" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #dddddd; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 14px">
+          <div style="font-size: 13px; color: #6a6a6a">8 photos</div>
+        </div>
+
+      </div>
+
+      <div style="margin-top: 16px"><a href="#" style="font-size: 14px">Show 63 people who appear in only one photo</a></div>
+    </section>
+  </main>
+
+  <div style="position: sticky; bottom: 0; padding: 12px 24px; background: #ffffff; border-top: 1px solid #dddddd; box-shadow: rgba(0,0,0,0.06) 0 -2px 8px">
+    <div style="max-width: 1080px; margin: 0 auto; display: flex; gap: 12px; flex-wrap: wrap; align-items: center">
+      <input type="text" aria-label="Destination folder" placeholder="Where to put the folders: a Drive folder link, or a name for a new one" style="flex: 1; min-width: 180px; height: 48px; box-sizing: border-box; padding: 12px; border: 1px solid #c1c1c1; border-radius: 8px; background: #ffffff; color: #222222; font-family: inherit; font-size: 15px">
+      <span style="font-size: 14px; color: #6a6a6a; white-space: nowrap"><strong style="color: #222222; font-size: 16px">4</strong> folders · <strong style="color: #222222; font-size: 16px">104</strong> photos</span>
+      <button type="button" style="height: 48px; padding: 14px 24px; border: 0; border-radius: 8px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 500; line-height: 1.25; white-space: nowrap">Create folders in my Drive</button>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#ff385c","options":["#ff385c","#5b3fd6","#0f7b6c","#9a6700"]},"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#ff385c' };
+}
+}
+</script>
+</body>
+</html>

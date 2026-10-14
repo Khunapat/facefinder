@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder mascot option B: the graduate, six poses</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#1f2540}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 32px; background: #fdf0f5; color: #1f2540; font-family: 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <div>
+    <h1 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 40px; font-weight: 600; line-height: 1.15; color: {{accent}}">Option B: the graduate</h1>
+    <p style="margin: 8px 0 0; font-size: 18px; color: #5b6178">A little graduate with a camera, drawn like a chat sticker. Same six poses, one for each step.</p>
+  </div>
+
+  <div style="flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/33d88a4f565be5e2781b825c95d4d00d" alt="Mascot waving" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Hello</div><div style="font-size: 15px; color: #5b6178">Start screen, before an album is opened.</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/48ec2b505375cfedf01c15525ad708ed" alt="Mascot searching with a magnifying glass" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Searching</div><div style="font-size: 15px; color: #5b6178">While the album is being scanned, and while looking for a person.</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/3a9819ad911b6665665b7ee473d4bafc" alt="Mascot pointing" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Choose</div><div style="font-size: 15px; color: #5b6178">Ticking and naming the people who get a folder.</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/c0e818bc3b04a3f1e72573ab806484fa" alt="Mascot holding a photo" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Check</div><div style="font-size: 15px; color: #5b6178">Reviewing one person's photos and unticking the wrong ones.</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/d2d509cfc265a79922a96fdb2c15d4db" alt="Mascot jumping with both arms up" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Done</div><div style="font-size: 15px; color: #5b6178">The folders were created in Drive.</div></div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+      <img src="/_blob/5644d9404d81f7d63ea42b1594fedae1" alt="Mascot shrugging with a question mark" style="width: 168px; height: 168px; flex: 0 0 168px; object-fit: contain">
+      <div><div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Nothing found</div><div style="font-size: 15px; color: #5b6178">No photos matched, or something went wrong.</div></div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#d6336c","options":["#d6336c","#6b4fd8","#0f7b6c","#c2410c"]},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#d6336c' };
+}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder mascot: one character, a pose for each step</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#1f2540}a:hover{color:#000000}
+</style>
+</helmet>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; padding: 48px 56px; display: flex; flex-direction: column; gap: 32px; background: #fdf0f5; color: #1f2540; font-family: 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.5">
+
+  <div>
+    <h1 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 40px; font-weight: 600; line-height: 1.15; color: {{accent}}">One character, a pose for each step</h1>
+    <p style="margin: 8px 0 0; font-size: 18px; color: #5b6178">The same little camera shows up on every screen, doing what you are doing.</p>
+  </div>
+
+  <div style="flex: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px">
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/81b537aa06ccb9795abc5d7a0969d978" alt="Mascot waving" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Hello</div>
+      <div style="font-size: 15px; color: #5b6178">Start screen, before an album is opened.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/588d3bd01fd060facdf069a202e4eec9" alt="Mascot searching with a magnifying glass" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Searching</div>
+      <div style="font-size: 15px; color: #5b6178">Scanning the album, or looking for a person.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/e5f4e5824db425f32ae4b39eda04010e" alt="Mascot pointing" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Choose</div>
+      <div style="font-size: 15px; color: #5b6178">Ticking and naming who gets a folder.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/82f5dbf4b090da47fa626a722043643d" alt="Mascot holding a photo" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Check</div>
+      <div style="font-size: 15px; color: #5b6178">Reviewing one person's photos.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/d05d7e256d0a538515028f9059f83fa4" alt="Mascot jumping with both arms up" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Done</div>
+      <div style="font-size: 15px; color: #5b6178">The folders were created in Drive.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/6a9665b2dcfb64a67ea58681616ad921" alt="Mascot shrugging with a question mark" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Nothing found</div>
+      <div style="font-size: 15px; color: #5b6178">No photos matched this person.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/27fd2a3866503168d1666e880d7b321e" alt="Mascot standing" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Waiting</div>
+      <div style="font-size: 15px; color: #5b6178">Quiet moments, like an empty list.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 16px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); text-align: center">
+      <img src="/_blob/7a4da272091100563de507951e927d68" alt="Mascot looking sorry" style="width: 180px; height: 180px; object-fit: contain">
+      <div style="font-family: 'Mitr', sans-serif; font-size: 22px; font-weight: 500">Sorry</div>
+      <div style="font-size: 15px; color: #5b6178">Something went wrong.</div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#d6336c","options":["#d6336c","#6b4fd8","#0f7b6c","#c2410c"]},"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#d6336c' };
+}
+}
+</script>
+</body>
+</html>

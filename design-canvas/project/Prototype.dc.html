@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder prototype: the pink version, clickable</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap">
+<style>
+body{margin:0}
+a{color:#1f2540}a:hover{color:#000000}
+button{cursor:pointer}
+</style>
+</helmet>
+<div style="min-height: 1300px; display: flex; flex-direction: column; background: #fdf0f5; color: #1f2540; font-family: 'Noto Sans Thai', 'Segoe UI', system-ui, sans-serif; font-size: 16px; line-height: 1.55">
+
+  <nav style="display: flex; align-items: center; gap: 16px; padding: 20px 40px">
+    <button type="button" onClick="{{ startOver }}" aria-label="FaceFinder, back to the start" style="display: flex; align-items: center; gap: 12px; padding: 0; border: 0; background: transparent">
+      <span style="width: 44px; height: 44px; border-radius: 9999px; background: #ffffff; color: {{accent}}; display: grid; place-items: center; box-shadow: 0 6px 18px rgba(31,37,64,0.08)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"></circle><path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path><circle cx="8" cy="9.2" r="1" fill="currentColor"></circle><circle cx="13" cy="9.2" r="1" fill="currentColor"></circle><path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"></path></svg></span>
+      <span style="font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 24px; font-weight: 600; color: {{accent}}">FaceFinder</span>
+    </button>
+    <div style="flex: 1"></div>
+    <span style="font-size: 14px; color: #5b6178">nan@example.com</span>
+    <button type="button" style="height: 44px; padding: 0 24px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600">Sign out</button>
+  </nav>
+
+  <main style="flex: 1; width: 100%; max-width: 1160px; margin: 0 auto; box-sizing: border-box; padding: 24px 24px 48px">
+
+    <!-- 1. start -->
+    <sc-if value="{{ isStart }}" hint-placeholder-val="{{ true }}">
+      <div style="display: flex; flex-wrap: wrap; gap: 32px; align-items: center; margin-top: 40px">
+        <div style="flex: 999 1 480px; min-width: 0">
+          <h1 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 52px; font-weight: 600; line-height: 1.15; color: {{accent}}; text-wrap: balance">Everyone gets their own folder</h1>
+          <p style="margin: 16px 0 0; max-width: 520px; font-size: 18px; font-weight: 500">Paste the album the photographer shared. We find who is in it, you name them, and each person gets a folder in your Drive.</p>
+          <div style="display: flex; align-items: center; height: 72px; box-sizing: border-box; margin-top: 32px; max-width: 620px; padding: 0 10px 0 28px; background: #ffffff; border-radius: 9999px; box-shadow: 0 10px 30px rgba(31,37,64,0.08)">
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center">
+              <label for="album" style="font-size: 12px; font-weight: 700; color: #5b6178">Shared album</label>
+              <input id="album" type="text" value="{{ album }}" onChange="{{ setAlbum }}" style="border: 0; outline: 0; padding: 0; width: 100%; background: transparent; font-family: inherit; font-size: 15px; color: #1f2540">
+            </div>
+            <button type="button" onClick="{{ openAlbum }}" style="height: 52px; padding: 0 24px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; white-space: nowrap">Open album</button>
+          </div>
+        </div>
+        <div style="flex: 1 1 280px; max-width: 340px; margin: 0 auto">
+          <img src="/_blob/81b537aa06ccb9795abc5d7a0969d978" alt="FaceFinder mascot waving hello" style="display: block; width: 100%; aspect-ratio: 1; object-fit: contain">
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- 2. scanning -->
+    <sc-if value="{{ isScan }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 640px; margin: 48px auto 0; padding: 40px; background: #ffffff; border-radius: 32px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center">
+        <img src="/_blob/588d3bd01fd060facdf069a202e4eec9" alt="FaceFinder mascot searching with a magnifying glass" style="width: 220px; height: 220px; object-fit: contain">
+        <h2 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 30px; font-weight: 600; color: {{accent}}">Looking through the album</h2>
+        <div style="width: 100%; height: 10px; border-radius: 9999px; background: #f6dbe6; overflow: hidden"><div style="height: 100%; width: {{ scanPct }}; background: {{accent}}; border-radius: 9999px"></div></div>
+        <div style="font-size: 15px; color: #5b6178">{{ scanText }}</div>
+        <div style="font-size: 14px; color: #5b6178">This is the only slow step, and the album only needs it once.</div>
+      </div>
+    </sc-if>
+
+    <!-- 3. choose -->
+    <sc-if value="{{ isChoose }}" hint-placeholder-val="{{ false }}">
+      <div style="padding: 12px 20px; background: #ffffff; border-radius: 9999px; box-shadow: 0 6px 18px rgba(31,37,64,0.06); font-size: 15px">Album <strong>Graduation 2026 — Faculty of Engineering</strong> is ready: 812 photos, 47 people.</div>
+
+      <div role="tablist" aria-label="How to find people" style="display: flex; gap: 4px; padding: 6px; margin: 24px auto 0; width: fit-content; max-width: 100%; background: #ffffff; border-radius: 9999px; box-shadow: 0 6px 18px rgba(31,37,64,0.06)">
+        <button type="button" role="tab" onClick="{{ goPeople }}" style="border: 0; background: {{ tabPeopleBg }}; color: {{ tabPeopleInk }}; font-family: inherit; font-size: 15px; font-weight: 600; padding: 10px 22px; border-radius: 9999px">I know who I'm looking for</button>
+        <button type="button" role="tab" onClick="{{ goEveryone }}" style="border: 0; background: {{ tabEveryoneBg }}; color: {{ tabEveryoneInk }}; font-family: inherit; font-size: 15px; font-weight: 600; padding: 10px 22px; border-radius: 9999px">Show me everyone in the album</button>
+      </div>
+
+      <!-- everyone -->
+      <sc-if value="{{ isEveryone }}" hint-placeholder-val="{{ false }}">
+        <section style="display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; padding: 40px; background: #ffffff; border-radius: 32px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+          <div style="flex: 1 1 260px; max-width: 320px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 30px; font-weight: 600; line-height: 1.2; color: {{accent}}">Who gets a folder?</h2>
+            <p style="margin: 0; font-size: 15px; color: #5b6178">Tick the people you want and type their name. Tap a face to check their photos. Same person twice? Give both the same name.</p>
+            <img src="/_blob/e5f4e5824db425f32ae4b39eda04010e" alt="FaceFinder mascot pointing at the people" style="width: 200px; height: 200px; object-fit: contain; transform: scaleX(-1); margin: 8px auto 0">
+          </div>
+          <div style="flex: 999 1 520px; min-width: 0">
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 16px">
+              <sc-for list="{{ people }}" as="p" hint-placeholder-count="8">
+                <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+                  <div style="position: relative">
+                    <button type="button" onClick="{{ p.open }}" aria-label="Check this person's photos" style="display: grid; place-items: center; width: 100%; aspect-ratio: 1; padding: 0; border: 0; border-radius: 24px; background: {{ p.tint }}; color: {{ p.ink }}"><svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"></circle><path d="M4.5 21c.8-4.2 3.8-6.2 7.5-6.2s6.7 2 7.5 6.2z"></path></svg></button>
+                    <button type="button" onClick="{{ p.toggle }}" aria-label="Make a folder for this person" style="position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; padding: 0; border-radius: 9999px; display: grid; place-items: center; background: {{ p.tickBg }}; border: 2px solid {{ p.tickBorder }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="opacity: {{ p.checkOpacity }}"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                  </div>
+                  <input type="text" aria-label="Name" placeholder="Name" value="{{ p.name }}" onChange="{{ p.setName }}" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 16px; border: 1.5px solid {{ p.nameBorder }}; border-radius: 9999px; background: #ffffff; color: #1f2540; font-family: inherit; font-size: 15px; font-weight: 600">
+                  <div style="padding-left: 4px; font-size: 13px; color: #5b6178">{{ p.countText }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </section>
+      </sc-if>
+
+      <!-- named people -->
+      <sc-if value="{{ isPeopleTab }}" hint-placeholder-val="{{ false }}">
+        <section style="display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; padding: 40px; background: #ffffff; border-radius: 32px; box-shadow: 0 10px 30px rgba(31,37,64,0.06)">
+          <div style="flex: 1 1 260px; max-width: 320px; display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 30px; font-weight: 600; line-height: 1.2; color: {{accent}}">Who are we looking for?</h2>
+            <p style="margin: 0; font-size: 15px; color: #5b6178">Add a photo or two of each person and give them a name. The name becomes their folder.</p>
+            <sc-if value="{{ notFound }}" hint-placeholder-val="{{ false }}"><img src="/_blob/27fd2a3866503168d1666e880d7b321e" alt="FaceFinder mascot waiting" style="width: 200px; height: 200px; object-fit: contain; margin: 8px auto 0"></sc-if>
+            <sc-if value="{{ found }}" hint-placeholder-val="{{ false }}"><img src="/_blob/82f5dbf4b090da47fa626a722043643d" alt="FaceFinder mascot holding a photo" style="width: 200px; height: 200px; object-fit: contain; margin: 8px auto 0"></sc-if>
+          </div>
+          <div style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+            <sc-for list="{{ roster }}" as="r" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid #ececf2; border-radius: 20px">
+                <div role="img" aria-label="Uploaded photo" style="width: 64px; height: 64px; flex: 0 0 64px; border-radius: 20px; background: {{ r.tint }}; color: {{ r.ink }}; display: grid; place-items: center"><svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"></circle><path d="M4.5 21c.8-4.2 3.8-6.2 7.5-6.2s6.7 2 7.5 6.2z"></path></svg></div>
+                <input type="text" aria-label="Name" placeholder="Name — becomes the folder name" value="{{ r.name }}" onChange="{{ r.setName }}" style="flex: 1; min-width: 160px; height: 48px; box-sizing: border-box; padding: 0 18px; border: 1.5px solid #dcdde6; border-radius: 9999px; background: #ffffff; color: #1f2540; font-family: inherit; font-size: 16px; font-weight: 600">
+                <sc-if value="{{ r.found }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size: 14px; color: #5b6178; white-space: nowrap">{{ r.countText }}</span>
+                  <button type="button" onClick="{{ r.open }}" style="height: 44px; padding: 0 18px; border: 1.5px solid #1f2540; border-radius: 9999px; background: #ffffff; color: #1f2540; font-family: inherit; font-size: 14px; font-weight: 600">Check photos</button>
+                </sc-if>
+              </div>
+            </sc-for>
+            <div><button type="button" onClick="{{ findThem }}" style="height: 52px; padding: 0 28px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600">Find their photos</button></div>
+          </div>
+        </section>
+      </sc-if>
+    </sc-if>
+
+    <!-- 4. copying -->
+    <sc-if value="{{ isExport }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 640px; margin: 48px auto 0; padding: 40px; background: #ffffff; border-radius: 32px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center">
+        <img src="/_blob/82f5dbf4b090da47fa626a722043643d" alt="FaceFinder mascot holding a photo" style="width: 220px; height: 220px; object-fit: contain">
+        <h2 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 30px; font-weight: 600; color: {{accent}}">Filling the folders</h2>
+        <div style="width: 100%; height: 10px; border-radius: 9999px; background: #f6dbe6; overflow: hidden"><div style="height: 100%; width: {{ exportPct }}; background: {{accent}}; border-radius: 9999px"></div></div>
+        <div style="font-size: 15px; color: #5b6178">{{ exportText }}</div>
+      </div>
+    </sc-if>
+
+    <!-- 5. done -->
+    <sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}">
+      <div style="max-width: 760px; margin: 40px auto 0; padding: 40px; background: #ffffff; border-radius: 32px; box-shadow: 0 10px 30px rgba(31,37,64,0.06); display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center">
+        <img src="/_blob/d05d7e256d0a538515028f9059f83fa4" alt="FaceFinder mascot celebrating" style="width: 240px; height: 240px; object-fit: contain">
+        <h2 style="margin: 0; font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 34px; font-weight: 600; color: {{accent}}">{{ doneTitle }}</h2>
+        <p style="margin: 0; font-size: 16px; color: #5b6178">Inside <strong style="color: #1f2540">{{ doneRoot }}</strong> in your Drive.</p>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px">
+          <sc-for list="{{ doneFolders }}" as="f" hint-placeholder-count="3">
+            <a href="#" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 9999px; background: #fdf0f5; font-size: 15px; font-weight: 600; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>{{ f.label }}</a>
+          </sc-for>
+        </div>
+        <button type="button" onClick="{{ backToChoose }}" style="margin-top: 16px; height: 48px; padding: 0 24px; border: 1.5px solid #1f2540; border-radius: 9999px; background: #ffffff; color: #1f2540; font-family: inherit; font-size: 15px; font-weight: 600">Make more folders</button>
+      </div>
+    </sc-if>
+  </main>
+
+  <!-- floating bar -->
+  <sc-if value="{{ isChoose }}" hint-placeholder-val="{{ false }}">
+    <div style="position: sticky; bottom: 0; padding: 0 24px 20px">
+      <div style="max-width: 1112px; margin: 0 auto; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; padding: 12px 12px 12px 24px; background: #ffffff; border-radius: 28px; box-shadow: 0 12px 36px rgba(31,37,64,0.14)">
+        <input type="text" aria-label="Destination folder" placeholder="Where to put the folders: a Drive folder link, or a name for a new one" value="{{ dest }}" onChange="{{ setDest }}" style="flex: 1; min-width: 180px; height: 48px; box-sizing: border-box; padding: 0 4px; border: 0; outline: 0; background: transparent; color: #1f2540; font-family: inherit; font-size: 15px">
+        <span style="font-size: 14px; color: #5b6178; white-space: nowrap">{{ summary }}</span>
+        <button type="button" onClick="{{ createFolders }}" style="height: 52px; padding: 0 28px; border: 0; border-radius: 9999px; background: {{accent}}; opacity: {{ createOpacity }}; color: #ffffff; font-family: inherit; font-size: 16px; font-weight: 600; white-space: nowrap">Create folders in my Drive</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- one person's photos -->
+  <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; overflow: auto; background: rgba(31,37,64,0.5); padding: 48px 16px">
+      <div role="dialog" aria-label="Photos of one person" style="max-width: 1000px; margin: 0 auto; background: #ffffff; border-radius: 32px; box-shadow: 0 20px 60px rgba(31,37,64,0.25)">
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 20px 28px; border-bottom: 1px solid #ececf2">
+          <img src="/_blob/82f5dbf4b090da47fa626a722043643d" alt="FaceFinder mascot holding a photo" style="width: 72px; height: 72px; flex: 0 0 72px; object-fit: contain">
+          <div style="flex: 1; min-width: 160px">
+            <div style="font-family: 'Mitr', 'Noto Sans Thai', sans-serif; font-size: 26px; font-weight: 600; line-height: 1.2; color: {{accent}}">{{ reviewName }}</div>
+            <div style="font-size: 14px; color: #5b6178">{{ reviewCount }}</div>
+          </div>
+          <button type="button" onClick="{{ closeReview }}" style="height: 48px; padding: 0 28px; border: 0; border-radius: 9999px; background: {{accent}}; color: #ffffff; font-family: inherit; font-size: 15px; font-weight: 600">Done</button>
+        </div>
+        <div style="padding: 24px 28px 28px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px">
+          <sc-for list="{{ reviewPhotos }}" as="ph" hint-placeholder-count="8">
+            <button type="button" onClick="{{ ph.toggle }}" style="display: flex; flex-direction: column; gap: 8px; padding: 0; border: 0; background: transparent; color: #1f2540; font-family: inherit; text-align: left; min-width: 0">
+              <span style="position: relative; display: grid; place-items: center; width: 100%; aspect-ratio: 1; border-radius: 24px; background: {{ ph.tint }}; color: {{ ph.ink }}; opacity: {{ ph.opacity }}"><svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.5" r="4"></circle><path d="M4.5 21c.8-4.2 3.8-6.2 7.5-6.2s6.7 2 7.5 6.2z"></path></svg>
+                <span style="position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; box-sizing: border-box; border-radius: 9999px; display: grid; place-items: center; background: {{ ph.tickBg }}; border: 2px solid {{ ph.tickBorder }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="opacity: {{ ph.checkOpacity }}"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></path></svg></span>
+                <sc-if value="{{ ph.unsure }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 9999px; background: #ffffff; font-size: 12px; font-weight: 600">Not sure</span></sc-if>
+              </span>
+              <span style="display: flex; gap: 4px; font-size: 14px"><span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600">{{ ph.file }}</span><span style="color: #5b6178">{{ ph.score }}</span></span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#d6336c","options":["#d6336c","#6b4fd8","#0f7b6c","#c2410c"]},"$preview":{"width":1440,"height":1300}}'>
+class Component extends DCLogic {
+state = {
+  step: 'start',            // start | scan | choose | export | done
+  tab: 'everyone',          // everyone | people
+  pct: 0,
+  review: null,             // index of the person whose photos are open
+  found: false,             // named-people search has been run
+  album: 'https://drive.google.com/drive/folders/[ALBUM LINK]',
+  dest: '',
+  done: [],
+  people: [
+    { name: '', on: false, count: 38, tint: '#fde3ec', ink: '#f7a8c4', removed: {} },
+    { name: '', on: false, count: 31, tint: '#e7ecff', ink: '#b9c4ff', removed: {} },
+    { name: '', on: false, count: 27, tint: '#fff1d6', ink: '#ffd166', removed: {} },
+    { name: '', on: false, count: 24, tint: '#e2f5ec', ink: '#9fd9bf', removed: {} },
+    { name: '', on: false, count: 22, tint: '#e7ecff', ink: '#b9c4ff', removed: {} },
+    { name: '', on: false, count: 19, tint: '#e2f5ec', ink: '#9fd9bf', removed: {} },
+    { name: '', on: false, count: 17, tint: '#fde3ec', ink: '#f7a8c4', removed: {} },
+    { name: '', on: false, count: 11, tint: '#fff1d6', ink: '#ffd166', removed: {} }
+  ],
+  roster: ['Nan', 'Beam']   // names typed on the "I know who" tab, for people 0 and 1
+};
+
+componentWillUnmount() { clearInterval(this.timer); }
+
+patch(i, change) {
+  this.setState({ people: this.state.people.map((p, k) => (k === i ? Object.assign({}, p, change) : p)) });
+}
+
+run(key, next) {            // animate a progress bar, then move on
+  clearInterval(this.timer);
+  this.setState({ pct: 0 });
+  this.timer = setInterval(() => {
+    const pct = Math.min(100, this.state.pct + 6);
+    this.setState({ pct: pct });
+    if (pct >= 100) { clearInterval(this.timer); next(); }
+  }, 140);
+}
+
+kept(p) { return p.count - Object.keys(p.removed).length; }
+
+groups() {                  // who gets a folder right now, as [{label, photos}]
+  const s = this.state;
+  if (s.tab === 'people') {
+    if (!s.found) return [];
+    return s.roster.map((n, i) => ({ label: n.trim() || 'Person ' + (i + 1), photos: this.kept(s.people[i]) }));
+  }
+  return s.people
+    .map((p, i) => ({ on: p.on, label: p.name.trim() || 'Person ' + (i + 1), photos: this.kept(p) }))
+    .filter((g) => g.on);
+}
+
+renderVals() {
+  const s = this.state;
+  const accent = this.props.accent ?? '#d6336c';
+  const groups = this.groups();
+  const total = groups.reduce((n, g) => n + g.photos, 0);
+  const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
+
+  const people = s.people.map((p, i) => ({
+    name: p.name,
+    tint: p.tint,
+    ink: p.ink,
+    countText: plural(this.kept(p), 'photo', 'photos'),
+    tickBg: p.on ? accent : '#ffffff',
+    tickBorder: p.on ? '#ffffff' : '#dcdde6',
+    checkOpacity: p.on ? 1 : 0,
+    nameBorder: p.on ? '#f3bcd0' : '#dcdde6',
+    toggle: () => this.patch(i, { on: !p.on }),
+    setName: (e) => this.patch(i, { name: e.target.value, on: p.on || e.target.value.trim() !== '' }),
+    open: () => this.setState({ review: i })
+  }));
+
+  const roster = s.roster.map((n, i) => ({
+    name: n,
+    tint: s.people[i].tint,
+    ink: s.people[i].ink,
+    found: s.found,
+    countText: plural(this.kept(s.people[i]), 'photo', 'photos') + ' found',
+    setName: (e) => this.setState({ roster: s.roster.map((x, k) => (k === i ? e.target.value : x)) }),
+    open: () => this.setState({ review: i })
+  }));
+
+  const r = s.review === null ? null : s.people[s.review];
+  const rName = r === null ? '' : (s.tab === 'people' ? s.roster[s.review] : r.name).trim() || 'Person ' + (s.review + 1);
+  const reviewPhotos = r === null ? [] : [0.93, 0.9, 0.87, 0.82, 0.76, 0.69, 0.48, 0.44].map((score, k) => {
+    const off = !!r.removed[k];
+    return {
+      file: 'DSC_' + (1180 + s.review * 53 + k * 37) + '.JPG',
+      score: score.toFixed(2),
+      unsure: score < 0.5,
+      tint: r.tint,
+      ink: r.ink,
+      opacity: off ? 0.35 : 1,
+      tickBg: off ? '#ffffff' : accent,
+      tickBorder: off ? '#dcdde6' : '#ffffff',
+      checkOpacity: off ? 0 : 1,
+      toggle: () => {
+        const removed = Object.assign({}, r.removed);
+        if (off) delete removed[k]; else removed[k] = true;
+        this.patch(s.review, { removed: removed });
+      }
+    };
+  });
+
+  const everyone = s.tab === 'everyone';
+  return {
+    accent: accent,
+    isStart: s.step === 'start',
+    isScan: s.step === 'scan',
+    isChoose: s.step === 'choose',
+    isExport: s.step === 'export',
+    isDone: s.step === 'done',
+    isEveryone: everyone,
+    isPeopleTab: !everyone,
+    isReview: s.review !== null,
+
+    scanPct: s.pct + '%',
+    scanText: Math.round(812 * s.pct / 100) + ' of 812 photos, ' + Math.round(1186 * s.pct / 100) + ' faces found',
+    exportPct: s.pct + '%',
+    exportText: 'Copying ' + Math.round(total * s.pct / 100) + ' of ' + plural(total, 'photo', 'photos'),
+
+    tabEveryoneBg: everyone ? accent : 'transparent',
+    tabEveryoneInk: everyone ? '#ffffff' : '#5b6178',
+    tabPeopleBg: everyone ? 'transparent' : accent,
+    tabPeopleInk: everyone ? '#5b6178' : '#ffffff',
+
+    people: people,
+    roster: roster,
+    found: s.found,
+    notFound: !s.found,
+
+    album: s.album,
+    setAlbum: (e) => this.setState({ album: e.target.value }),
+    dest: s.dest,
+    setDest: (e) => this.setState({ dest: e.target.value }),
+    summary: groups.length ? plural(groups.length, 'folder', 'folders') + ' · ' + plural(total, 'photo', 'photos')
+                           : (everyone ? 'Tick or name someone' : 'Find their photos first'),
+    createOpacity: groups.length ? 1 : 0.4,
+
+    reviewName: rName,
+    reviewCount: r === null ? '' : this.kept(r) + ' of ' + r.count + ' photos selected. Tap a photo to leave it out.',
+    reviewPhotos: reviewPhotos,
+    closeReview: () => this.setState({ review: null }),
+
+    doneTitle: plural(s.done.reduce((n, g) => n + g.photos, 0), 'photo', 'photos') + ' in ' + plural(s.done.length, 'folder', 'folders'),
+    doneRoot: s.dest.trim() && s.dest.indexOf('drive.google.com') < 0 ? s.dest.trim() : 'FaceFinder - Graduation 2026',
+    doneFolders: s.done.map((g) => ({ label: g.label + ' · ' + g.photos })),
+
+    openAlbum: () => { this.setState({ step: 'scan' }); this.run('scan', () => this.setState({ step: 'choose' })); },
+    goEveryone: () => this.setState({ tab: 'everyone' }),
+    goPeople: () => this.setState({ tab: 'people' }),
+    findThem: () => this.setState({ found: true }),
+    createFolders: () => {
+      if (!groups.length) return;
+      this.setState({ step: 'export', done: groups });
+      this.run('export', () => this.setState({ step: 'done' }));
+    },
+    backToChoose: () => this.setState({ step: 'choose' }),
+    startOver: () => { clearInterval(this.timer); this.setState({ step: 'start', review: null, pct: 0 }); }
+  };
+}
+}
+</script>
+</body>
+</html>
