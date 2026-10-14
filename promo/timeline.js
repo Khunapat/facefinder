@@ -1,6 +1,6 @@
 // The one timeline the picture and the sound both read. Seconds; 120 BPM, so a
 // beat is 0.5 s and a bar is 2 s. Shared by index.html (window.TL) and the
-// audio scripts (require).
+// audio script (require).
 
 (function (root) {
   const BPM = 120, BEAT = 60 / BPM, DUR = 20;
@@ -10,37 +10,36 @@
     BPM, BEAT, DUR, W: 1080, H: 1920,
 
     // Shot boundaries
-    hook:     [0, b(8)],     // 0-4    the wall of 4,000 photos
-    brand:    [b(8), b(12)], // 4-6    logo lockup
-    paste:    [b(12), b(16)],// 6-8    paste the link
-    scan:     [b(16), b(21)],// 8-10.5 every face scanned once
-    everyone: [b(21), b(29)],// 10.5-14.5 tick and name
-    folders:  [b(29), b(35)],// 14.5-17.5 one folder each
-    end:      [b(35), DUR],  // 17.5-20 end card
+    hook:     [0, b(6)],      // 0-3     a wall of 800 camp photos
+    brand:    [b(6), b(10)],  // 3-5     mascot + wordmark + promise
+    scan:     [b(10), b(15)], // 5-7.5   faces found, every photo checked
+    everyone: [b(15), b(20)], // 7.5-10  a folder for each person
+    cull:     [b(20), b(27)], // 10-13.5 keep the best, see why, one tap
+    sort:     [b(27), b(32)], // 13.5-16 describe it (in Thai), Gemini sorts
+    exp:      [b(32), b(36)], // 16-18   straight into Drive
+    end:      [b(36), DUR],   // 18-20   lockup
 
-    // Moments
-    hookWord1: b(0) + 0.08, hookWord2: b(1),
-    hookSwap: b(4),
-    lockOn: b(5.5),          // face box snaps onto Mint
-    zoom: b(6.25),
-    reveal: b(7.25),
-    logo: b(8),
-    tagline: b(9),
-    pasteIn: b(12),
-    typeFrom: b(12.75), typeTo: b(14.5),
-    orbTap: b(15),
-    scanFrom: b(16), scanTo: b(20.25),
-    detect: [b(16.5), b(17), b(17.5), b(18), b(18.5), b(19)],
-    cardIn: b(21),
-    ticks: [b(22.5), b(23), b(24.5), b(25), b(26.5), b(27)],
-    barIn: b(29),
-    exportTap: b(30),
-    copy: [b(30.5), b(31), b(31.5), b(32)],
-    done: b(32.5),
-    doneRows: [b(33), b(33.25), b(33.5), b(33.75), b(34), b(34.25)],
-    endIn: b(35),
-    endLine: b(36),
-    endSub: b(37),
+    // Hook
+    hookWord1: 0.08, hookWord2: b(1), hookSwap: b(3),
+    zoom: b(4.5),             // riser starts (the name the audio script reads)
+    reveal: b(5.25),          // page-pink circle opens from the middle
+    // Brand
+    logo: b(6), word: b(6.75), tagline: b(7.75),
+    // Scan: the nine captured states, then the stage changes that get a tick
+    scanIn: b(10), scanFrom: b(10.75), scanTo: b(14.25),
+    stages: [b(11.5), b(13), b(14.25)],
+    // Everyone
+    cardIn: b(15), ticks: [b(16), b(17), b(18), b(19)],
+    // Cull
+    cullIn: b(20), tapTile: b(22), previewOpen: b(22.25), cap2: b(23),
+    tapOut: b(24.5), previewClose: b(25.75),
+    // Sort
+    sortIn: b(27), typeFrom: b(27.75), typeTo: b(29.5), tapSort: b(30), sortRes: b(30.5),
+    // Export
+    barIn: b(32), exportTap: b(32.75), copy: [b(33.25), b(33.75), b(34.25), b(34.75)],
+    done: b(35), doneRows: [b(35.5), b(35.75)],
+    // End
+    endIn: b(36), endLine: b(37), endSub: b(38),
   };
 
   // Sound cues, in the order they happen.
@@ -49,15 +48,22 @@
   at(0, 'impact', 1);
   at(TL.hookWord2, 'thump', 0.7);
   at(TL.hookSwap, 'whoosh', 0.8);
-  at(TL.lockOn, 'lock', 0.9);
   at(TL.zoom, 'riser', 0.8);
   at(TL.logo, 'impact', 0.9);
-  at(TL.pasteIn, 'whoosh', 0.6);
-  for (let i = 0; i < 10; i++) at(TL.typeFrom + (TL.typeTo - TL.typeFrom) * (i + 0.5) / 10, 'key', 0.5);
-  at(TL.orbTap, 'click', 1);
-  TL.detect.forEach((t) => at(t, 'pop', 0.6));
+  at(TL.word, 'pop', 0.6);
+  at(TL.scanIn, 'whoosh', 0.6);
+  TL.stages.forEach((t) => at(t, 'tick', 0.8));
   at(TL.cardIn, 'whoosh', 0.6);
   TL.ticks.forEach((t) => at(t, 'tick', 0.9));
+  at(TL.cullIn, 'whoosh', 0.6);
+  at(TL.tapTile, 'click', 1);
+  at(TL.previewOpen, 'pop', 0.5);
+  at(TL.tapOut, 'click', 1);
+  at(TL.previewClose, 'whoosh', 0.4);
+  at(TL.sortIn, 'whoosh', 0.6);
+  for (let i = 0; i < 6; i++) at(TL.typeFrom + (TL.typeTo - TL.typeFrom) * (i + 0.5) / 6, 'key', 0.5);
+  at(TL.tapSort, 'click', 1);
+  at(TL.sortRes, 'pop', 0.6);
   at(TL.barIn, 'whoosh', 0.5);
   at(TL.exportTap, 'click', 1);
   TL.copy.forEach((t) => at(t, 'pop', 0.4));

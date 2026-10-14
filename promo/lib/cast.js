@@ -1,4 +1,4 @@
-// Illustrated graduates, drawn in code. Stand-ins for real people's photos so
+// Illustrated graduates and camp kids, drawn in code. Stand-ins for real people's photos so
 // the promo never shows a real face. Pure functions of a seed: same seed, same
 // drawing, every render.
 
@@ -107,10 +107,14 @@
     // features
     const eyeY = y + h * 0.04, eyeDX = w * 0.19;
     g.fillStyle = '#1A1412';
-    g.beginPath(); g.ellipse(x - eyeDX, eyeY, w * 0.045, h * 0.05, 0, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.ellipse(x + eyeDX, eyeY, w * 0.045, h * 0.05, 0, 0, Math.PI * 2); g.fill();
     g.strokeStyle = '#1A1412'; g.lineCap = 'round';
     g.lineWidth = Math.max(1, h * 0.03);
+    if (opt.eyesClosed) {     // a blink: two short arcs
+      for (const s of [-1, 1]) { g.beginPath(); g.arc(x + s * eyeDX, eyeY - h * 0.02, w * 0.06, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke(); }
+    } else {
+      g.beginPath(); g.ellipse(x - eyeDX, eyeY, w * 0.045, h * 0.05, 0, 0, Math.PI * 2); g.fill();
+      g.beginPath(); g.ellipse(x + eyeDX, eyeY, w * 0.045, h * 0.05, 0, 0, Math.PI * 2); g.fill();
+    }
     const smile = opt.smile ?? (0.6 + r() * 0.6);
     g.beginPath(); g.arc(x, y + h * 0.16, w * 0.15 * smile, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
     g.fillStyle = 'rgba(220,110,100,0.22)';

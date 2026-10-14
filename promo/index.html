@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <title>FaceFinder promo</title>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Nunito+Sans:opsz,wght@6..12,600;6..12,700;6..12,800&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600&family=Noto+Sans+Thai:wght@500;600;700&display=block" rel="stylesheet">
 <style>
-html,body{margin:0;background:#121318}
+html,body{margin:0;background:#1f2540}
 canvas{display:block;height:100vh;width:auto;margin:0 auto}
 body.render canvas{height:auto}
 </style>
@@ -13,6 +13,7 @@ body.render canvas{height:auto}
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script src="lib/cast.js"></script>
+<script src="lib/photos.js"></script>
 <script src="timeline.js"></script>
 <script>
 // A 20-second promo for FaceFinder, as a pure function of time:
@@ -21,10 +22,11 @@ body.render canvas{height:auto}
 const { W, H, DUR } = TL;
 const cv = document.getElementById('c'), g = cv.getContext('2d');
 
-const INK = '#121318', PAPER = '#FFFFFF', SOFT = '#EEF0F6', ACCENT = '#2E4BE8',
-      MUTED = '#5E6170', GOLD = '#E9B23C';
-const DISPLAY = '"Bricolage Grotesque", "Nunito Sans", sans-serif';
-const UI = '"Nunito Sans", sans-serif';
+// The app's own tokens (app/static/index.html)
+const INK = '#1f2540', PAGE = '#fdf0f5', PAPER = '#FFFFFF', ACCENT = '#d6336c',
+      ACCENT_DEEP = '#b9255a', SOFT = '#f6dbe6', MUTED = '#5b6178';
+const DISPLAY = 'Mitr, "Noto Sans Thai", sans-serif';
+const UI = '"Noto Sans Thai", sans-serif';
 
 // ------------------------------------------------------------- motion kit
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -48,7 +50,7 @@ function track(t, keys, k = 170, d = 26) {
   for (let i = 1; i < keys.length; i++) v += (keys[i][1] - keys[i - 1][1]) * spring(t - keys[i][0], k, d);
   return v;
 }
-const SNAPPY = [320, 30], SOFTS = [170, 26], HEAVY = [120, 24];
+const SNAPPY = [320, 30], SOFTS = [170, 26], HEAVY = [120, 24], BOUNCY = [260, 16];
 
 function rrect(x, y, w, h, r) {
   g.beginPath();
@@ -56,59 +58,50 @@ function rrect(x, y, w, h, r) {
   g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
 }
 function shadow(blur, dy, a) {
-  g.shadowColor = `rgba(18,19,24,${a})`; g.shadowBlur = blur; g.shadowOffsetY = dy;
+  g.shadowColor = `rgba(31,37,64,${a})`; g.shadowBlur = blur; g.shadowOffsetY = dy;
 }
 function noShadow() { g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; }
 
 // ----------------------------------------------------------------- assets
 const IMG = {};
-const NAMES = ['nav', 'hero', 'modes', 'done',
-  ...Array.from({ length: 11 }, (_, i) => 'pill_' + i),
-  ...Array.from({ length: 11 }, (_, i) => 'scan_' + i),
-  ...Array.from({ length: 7 }, (_, i) => 'everyone_' + i),
-  ...Array.from({ length: 7 }, (_, i) => 'bar_' + i),
+const UI_NAMES = ['chip', 'tabs_everyone', 'tabs_cull', 'tabs_sort', 'preview_0', 'preview_1', 'cull_0', 'cull_1',
+  'sortres', 'sortmsg', 'bar_0', 'done',
+  ...Array.from({ length: 9 }, (_, i) => 'scan_' + i),
+  ...Array.from({ length: 5 }, (_, i) => 'everyone_' + i),
+  ...Array.from({ length: 6 }, (_, i) => 'sortform_' + i),
   ...Array.from({ length: 5 }, (_, i) => 'copy_' + i)];
+const MASCOTS = ['cam-wave', 'cam-search', 'cam-celebrate'];
 let SPOTS = null;
 
-// Photo tiles for the wall and the scan grid, drawn once, deterministically.
-const TILE = 252, TGAP = 16, TCOLS = 4, TSTEP = TILE + TGAP;
-const tiles = [];
-function makeTile(seed, opt) {
-  const c = document.createElement('canvas'); c.width = c.height = TILE * 2;
-  const faces = Cast.photo(c.getContext('2d'), TILE * 2, TILE * 2, seed, opt);
-  return { c, faces: faces.map((f) => ({ x: f.x / 2, y: f.y / 2, w: f.w / 2, h: f.h / 2 })) };
-}
-const HERO_ROW = 13, HERO_COL = 1;            // the tile Mint is in
-const C = Cast.CREW;
-const heroTile = () => makeTile(901, { n: 3, bg: 0, cast: [C[3], C[0], C[4]] });
-const scanTiles = [];
+// The wall of camp photos for the hook: 4:3 tiles, drawn once.
+const TW = 340, TH = 255, TG = 16, TCOLS = 3, TX0 = (W - (TW * TCOLS + TG * 2)) / 2;
+const wall = [];
 
+const load = (key, src) => new Promise((res, rej) => {
+  const im = new Image(); im.onload = res; im.onerror = () => rej(src); im.src = src; IMG[key] = im;
+});
 window.ready = (async () => {
-  for (let i = 0; i < 24; i++) tiles.push(makeTile(i + 1));
-  tiles.hero = heroTile();
-  const groups = [[C[0], C[1]], [C[2], C[3], C[5]], [C[4]], [C[1], C[2], C[0], C[5]], [C[3], C[4]], [C[5], C[0], C[2]]];
-  groups.forEach((cast, i) => scanTiles.push(makeTile(500 + i, { n: cast.length, bg: i % 5, cast })));
-  await Promise.all(NAMES.map((n) => new Promise((res, rej) => {
-    const im = new Image(); im.onload = res; im.onerror = () => rej(n); im.src = 'assets/ui/' + n + '.png'; IMG[n] = im;
-  })));
-  SPOTS = await new Promise((res) => {   // manifest is inlined by a script tag below when served from file://
-    res(window.UI_MANIFEST.spots);
-  });
-  await document.fonts.load('800 100px "Bricolage Grotesque"');
-  await document.fonts.load('700 100px "Bricolage Grotesque"');
-  await document.fonts.load('700 40px "Nunito Sans"');
-  await document.fonts.load('800 40px "Nunito Sans"');
-  await document.fonts.load('600 40px "Nunito Sans"');
+  for (let i = 0; i < 30; i++) {
+    const c = document.createElement('canvas'); c.width = TW * 2; c.height = TH * 2;
+    Photos.draw(c.getContext('2d'), c.width, c.height, 'w-' + i); wall.push(c);
+  }
+  await Promise.all([
+    ...UI_NAMES.map((n) => load(n, 'assets/ui/' + n + '.png')),
+    ...MASCOTS.map((n) => load(n, '../design-canvas/assets/' + n + '.png')),
+  ]);
+  SPOTS = window.UI_MANIFEST.spots;
+  for (const f of ['600 100px Mitr', '500 100px Mitr', '500 40px "Noto Sans Thai"', '600 40px "Noto Sans Thai"', '700 40px "Noto Sans Thai"'])
+    await document.fonts.load(f);
   return true;
 })();
 
 // ------------------------------------------------------------ type helpers
-// Words rise in on a stagger and leave upward before the next line arrives.
+// Words rise in on a stagger behind a clip, and leave upward.
 function words(lines, x, y, size, t, tIn, tOut, color, opt = {}) {
-  const lh = size * (opt.lh || 1.02);
-  g.font = `${opt.weight || 800} ${size}px ${opt.font || DISPLAY}`;
+  const lh = size * (opt.lh || 1.08);
+  g.font = `${opt.weight || 600} ${size}px ${opt.font || DISPLAY}`;
   g.textBaseline = 'alphabetic'; g.textAlign = 'left';
-  if ('letterSpacing' in g) g.letterSpacing = (opt.track ?? -0.035) * size + 'px';
+  if ('letterSpacing' in g) g.letterSpacing = (opt.track ?? -0.02) * size + 'px';
   let i = 0;
   lines.forEach((line, li) => {
     let cx = x;
@@ -120,10 +113,10 @@ function words(lines, x, y, size, t, tIn, tOut, color, opt = {}) {
       const out = tOut == null ? 0 : smooth(inv(tOut, tOut + 0.22, t + (lines.length * 2 - i) * 0.012));
       const a = clamp(s * 1.6) * (1 - out) * (opt.alpha ?? 1);
       if (a > 0.001) {
-        const dy = (1 - s) * size * 0.55 - out * size * 0.5;
+        const dy = (1 - s) * size * 0.6 - out * size * 0.55;
         g.save();
-        g.beginPath(); g.rect(cx - 10, y + li * lh - size * 1.0, w + 40, size * 1.32); g.clip();
-        g.globalAlpha = a; g.fillStyle = (opt.accentWord === wd) ? ACCENT : color;
+        g.beginPath(); g.rect(cx - 10, y + li * lh - size * 1.05, w + 40, size * 1.45); g.clip();
+        g.globalAlpha = a; g.fillStyle = (opt.accent || []).includes(wd) ? (opt.accentColor || ACCENT) : color;
         g.fillText(ws, cx, y + li * lh + dy);
         g.restore();
       }
@@ -133,342 +126,345 @@ function words(lines, x, y, size, t, tIn, tOut, color, opt = {}) {
   if ('letterSpacing' in g) g.letterSpacing = '0px';
 }
 
-// A UI screenshot on a white panel. Image px -> screen with scale s.
-function panel(im, x, y, s, r, opt = {}) {
-  const w = im.width * s, h = (opt.h ?? im.height) * s;
+// A UI screenshot. Image px -> screen with scale s; optional source crop.
+function ui(im, x, y, s, r, opt = {}) {
+  const sy = opt.sy || 0, sh = opt.sh ?? (im.height - sy);
+  const w = im.width * s, h = sh * s;
   g.save();
-  if (opt.shadow !== false) { shadow(60, 24, 0.14); rrect(x, y, w, h, r); g.fillStyle = PAPER; g.fill(); noShadow(); }
+  if (opt.shadow !== false) { shadow(60, 24, 0.12); rrect(x, y, w, h, r); g.fillStyle = PAPER; g.fill(); noShadow(); }
   rrect(x, y, w, h, r); g.clip();
-  g.fillStyle = PAPER; g.fillRect(x, y, w, h);
-  if (opt.clipH != null) { g.beginPath(); g.rect(x, y, w, opt.clipH * s); g.clip(); }
-  g.drawImage(im, 0, opt.sy || 0, im.width, opt.h ?? im.height, x, y, w, h);
+  g.drawImage(im, 0, sy, im.width, sh, x, y, w, h);
   g.restore();
   return { x, y, w, h, s };
 }
 
-// A fingertip: a soft ring that presses on tap.
+// A fingertip: a soft disc that presses on tap, with a pink ripple.
 function finger(x, y, tTap, t, alpha = 1) {
+  if (alpha <= 0) return;
   const p = t - tTap;
   const press = p > -0.08 && p < 0.16 ? Math.sin(clamp((p + 0.08) / 0.24) * Math.PI) : 0;
   g.save(); g.globalAlpha = alpha;
-  if (p > 0 && p < 0.6) {                      // ripple
+  if (p > 0 && p < 0.6) {
     const u = p / 0.6;
-    g.strokeStyle = `rgba(46,75,232,${0.5 * (1 - u)})`; g.lineWidth = 6;
+    g.strokeStyle = `rgba(214,51,108,${0.55 * (1 - u)})`; g.lineWidth = 7;
     g.beginPath(); g.arc(x, y, 40 + u * 90, 0, Math.PI * 2); g.stroke();
   }
   shadow(24, 8, 0.25);
-  g.fillStyle = 'rgba(255,255,255,0.92)';
+  g.fillStyle = 'rgba(255,255,255,0.94)';
   g.beginPath(); g.arc(x, y, 44 * (1 - 0.18 * press), 0, Math.PI * 2); g.fill();
   noShadow();
-  g.strokeStyle = 'rgba(18,19,24,0.35)'; g.lineWidth = 4; g.stroke();
-  g.fillStyle = `rgba(18,19,24,${0.18 + 0.3 * press})`;
+  g.strokeStyle = 'rgba(31,37,64,0.35)'; g.lineWidth = 4; g.stroke();
+  g.fillStyle = `rgba(31,37,64,${0.18 + 0.3 * press})`;
   g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill();
   g.restore();
 }
+// A finger that glides in from below-right, taps, and leaves.
+function tapAt(x, y, tTap, t) {
+  const a = smooth(inv(tTap - 0.55, tTap - 0.25, t)) * (1 - smooth(inv(tTap + 0.3, tTap + 0.55, t)));
+  if (a > 0) finger(x + (1 - a) * 150, y + 18 + (1 - a) * 240, tTap, t, a);
+}
 
-// The FaceFinder mark (same paths as the app's nav icon), size px wide.
-function mark(x, y, size, ring, face) {
+// The FaceFinder mark (same paths as the app's nav icon) and wordmark.
+function mark(x, y, size, ring) {
   const s = size / 24;
   g.save(); g.translate(x, y); g.scale(s, s);
-  g.lineCap = 'round';
-  g.strokeStyle = ring; g.lineWidth = 2.2;
+  g.lineCap = 'round'; g.strokeStyle = ring; g.fillStyle = ring; g.lineWidth = 2.2;
   g.beginPath(); g.arc(10.5, 10.5, 7, 0, Math.PI * 2); g.stroke();
   g.beginPath(); g.moveTo(15.8, 15.8); g.lineTo(21, 21); g.stroke();
-  g.fillStyle = face; g.strokeStyle = face;
   g.beginPath(); g.arc(8, 9.2, 1, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.arc(13, 9.2, 1, 0, Math.PI * 2); g.fill();
   g.lineWidth = 1.6;
   g.beginPath(); g.moveTo(8, 12.6); g.bezierCurveTo(9.5, 13.9, 11.5, 13.9, 13, 12.6); g.stroke();
   g.restore();
 }
-function wordmark(x, y, size, faceColor, finderColor, align = 'left') {
-  g.font = `800 ${size}px ${UI}`; g.textBaseline = 'alphabetic';
-  if ('letterSpacing' in g) g.letterSpacing = (-0.02 * size) + 'px';
-  const a = g.measureText('Face').width, b = g.measureText('Finder').width;
-  let x0 = align === 'center' ? x - (a + b) / 2 : x;
-  g.textAlign = 'left';
-  g.fillStyle = faceColor; g.fillText('Face', x0, y);
-  g.fillStyle = finderColor; g.fillText('Finder', x0 + a, y);
+function wordmark(cx, y, size, color) {
+  g.font = `600 ${size}px ${DISPLAY}`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  if ('letterSpacing' in g) g.letterSpacing = (-0.01 * size) + 'px';
+  const w = g.measureText('FaceFinder').width, m = size * 0.95, gap = size * 0.25;
+  const x0 = cx - (w + m + gap) / 2;
+  g.fillStyle = PAPER; shadow(30, 10, 0.08);
+  g.beginPath(); g.arc(x0 + m / 2, y - size * 0.36, m / 2, 0, Math.PI * 2); g.fill(); noShadow();
+  mark(x0 + m * 0.2, y - size * 0.36 - m * 0.3, m * 0.6, ACCENT);
+  g.fillStyle = color; g.fillText('FaceFinder', x0 + m + gap, y);
   if ('letterSpacing' in g) g.letterSpacing = '0px';
-  return a + b;
 }
 
-function faceBox(x, y, w, h, u, color = ACCENT, lw = 6) {
-  if (u <= 0) return;
-  const k = 1.35 - 0.35 * u;                     // snaps in from slightly larger
-  const cx = x + w / 2, cy = y + h / 2, W2 = w * k, H2 = h * k;
-  g.save(); g.globalAlpha = clamp(u * 2);
-  g.strokeStyle = color; g.lineWidth = lw; g.lineJoin = 'round';
-  rrect(cx - W2 / 2, cy - H2 / 2, W2, H2, Math.min(W2, H2) * 0.18); g.stroke();
+// The camera mascot, springing in with a squash and a gentle bob after.
+function mascot(name, cx, cy, size, t, tIn, opt = {}) {
+  const s = spring(t - tIn, ...BOUNCY);
+  if (s <= 0.001) return;
+  const bob = opt.bob === false ? 0 : Math.sin((t - tIn) * Math.PI * 2 / 2.4) * size * 0.025 * clamp(t - tIn - 0.3);
+  const sq = 1 + (1 - s) * 0.25;
+  g.save(); g.globalAlpha = clamp(s * 3);
+  g.translate(cx, cy + (1 - s) * size * 0.4 + bob);
+  g.scale(s / sq * (opt.flip ? -1 : 1), s * sq);
+  if (opt.tilt) g.rotate(opt.tilt);
+  g.drawImage(IMG[name], -size / 2, -size / 2, size, size);
   g.restore();
 }
 
 // ================================================================== SHOTS
+// shared frame for the app shots: page-pink, caption on top, UI below
+const S = 1000 / 1029, PX = (W - 1029 * S) / 2;
+const CAP_Y = 250, APP_Y = 470;
+function caption(t, lines, tIn, tOut, accent) {
+  words(lines, 64, CAP_Y, 100, t, tIn, tOut, INK, { accent });
+}
 
-// 0-4 s: the wall of photos. "4,000 photos." "Which ones are you?"
-function wallOffset(t) { return 2600 * (1 - Math.exp(-t / 0.9)); }
+// 0-3 s: the wall of photos. "800 camp photos." "Now sort them."
 function drawHook(t) {
-  const T = TL;
   g.fillStyle = INK; g.fillRect(0, 0, W, H);
-
-  // camera: zoom into Mint's face from TL.zoom
-  const hero = tiles.hero, off = wallOffset(t);
-  const hx = 12 + HERO_COL * TSTEP, hy = HERO_ROW * TSTEP - off;
-  const mf = hero.faces[1];
-  const fx = hx + mf.x + mf.w / 2, fy = hy + mf.y + mf.h / 2;
-  const z = 1 + 7 * spring(t - T.zoom, ...HEAVY);
-  g.save();
-  g.translate(fx, fy); g.scale(z, z); g.translate(-fx, -fy);
-  // pull the target toward screen centre while zooming
-  const pull = spring(t - T.zoom, ...HEAVY);
-  g.translate((W / 2 - fx) * pull / z, (H * 0.5 - fy) * pull / z);
-
-  const r0 = Math.floor((off - TSTEP) / TSTEP), r1 = r0 + Math.ceil(H / TSTEP) + 2;
-  const lock = spring(t - T.lockOn, ...SNAPPY);
-  for (let r = r0; r <= r1; r++) for (let c = 0; c < TCOLS; c++) {
-    const isHero = r === HERO_ROW && c === HERO_COL;
-    const tile = isHero ? hero : tiles[((r * TCOLS + c) % 24 + 24) % 24];
-    const x = 12 + c * TSTEP, y = r * TSTEP - off;
-    if (y > H + TILE || y < -TILE * 2) continue;
-    g.save(); rrect(x, y, TILE, TILE, 22); g.clip();
-    g.drawImage(tile.c, x, y, TILE, TILE);
-    g.fillStyle = `rgba(18,19,24,${isHero ? 0.5 * (1 - lock) : 0.5 + 0.35 * lock})`;
-    g.fillRect(x, y, TILE, TILE);
+  // The wall streams up fast, slows, then speeds again into the reveal.
+  const off = 2200 * (1 - Math.exp(-t / 0.7)) + 900 * Math.pow(inv(TL.zoom - 0.5, TL.reveal + 0.4, t), 2.2);
+  const step = TH + TG;
+  const r0 = Math.floor(off / step) - 1;
+  for (let r = r0; r < r0 + Math.ceil(H / step) + 2; r++) for (let c = 0; c < TCOLS; c++) {
+    const x = TX0 + c * (TW + TG) + (r % 2 ? 0 : 0), y = r * step - off + 60;
+    const tile = wall[((r * TCOLS + c) % wall.length + wall.length) % wall.length];
+    g.save(); rrect(x, y, TW, TH, 22); g.clip();
+    g.drawImage(tile, x, y, TW, TH);
+    g.fillStyle = 'rgba(31,37,64,0.62)'; g.fillRect(x, y, TW, TH);
     g.restore();
-    if (isHero) faceBox(x + mf.x, y + mf.y, mf.w, mf.h, lock, ACCENT, 5);
   }
-  g.restore();
+  // "800" counts up as it lands
+  const n = Math.round(800 * smooth(inv(TL.hookWord1, TL.hookWord1 + 0.75, t)));
+  words([String(n)], 60, 640, 360, t, TL.hookWord1, TL.hookSwap - 0.3, PAPER, { track: -0.04 });
+  words(['camp photos.'], 70, 820, 150, t, TL.hookWord2, TL.hookSwap - 0.3, PAPER, { accent: ['photos.'], accentColor: '#ff8fb5' });
+  words(['Now sort', 'them.'], 70, 640, 190, t, TL.hookSwap, TL.reveal - 0.2, PAPER, { accent: ['them.'], accentColor: '#ff8fb5' });
 
-  // type, with a scrim band so it reads over the wall
-  const out = smooth(inv(T.zoom - 0.1, T.zoom + 0.25, t));
-  words(['4,000'], 64, 520, 300, t, T.hookWord1, T.hookSwap - 0.25, PAPER, { track: -0.05 });
-  words(['photos.'], 72, 700, 190, t, T.hookWord2, T.hookSwap - 0.25, PAPER);
-  words(['Which ones', 'are you?'], 72, 440, 170, t, T.hookSwap, null, PAPER, { alpha: 1 - out });
-
-  // circular reveal to white, from the face
-  const rv = spring(t - T.reveal, 140, 26);
+  // page-pink circle opens from the middle into the brand shot
+  const rv = spring(t - TL.reveal, 130, 24);
   if (rv > 0) {
-    g.fillStyle = PAPER;
-    const rx = fx + (W / 2 - fx) * pull, ry = fy + (H * 0.5 - fy) * pull;   // the face, on screen
-    g.beginPath(); g.arc(rx, ry, rv * 1500, 0, Math.PI * 2); g.fill();
+    g.fillStyle = PAGE;
+    g.beginPath(); g.arc(W / 2, H * 0.45, rv * 1400, 0, Math.PI * 2); g.fill();
   }
 }
 
-// 4-6 s: the brand
+// 3-5 s: the brand. The mascot waves in; the wordmark and the promise follow.
 function drawBrand(t) {
-  const T = TL;
-  g.fillStyle = PAPER; g.fillRect(0, 0, W, H);
-  const s = spring(t - T.logo, 220, 20);
-  const size = 300 * (0.6 + 0.4 * s);
-  g.save(); g.globalAlpha = clamp(s * 2);
-  mark(W / 2 - size / 2, 700 - size / 2 + (1 - s) * 60, size, ACCENT, INK);
+  g.fillStyle = PAGE; g.fillRect(0, 0, W, H);   // first after the hook: always on its own page
+  g.save(); g.translate(0, -1900 * spring(t - (TL.scanIn - 0.2), ...SOFTS));
+  mascot('cam-wave', W / 2, 760, 560, t, TL.logo);
+  const s2 = spring(t - TL.word, ...SNAPPY);
+  g.save(); g.globalAlpha = clamp(s2 * 2); g.translate(0, (1 - s2) * 50);
+  wordmark(W / 2, 1180, 120, ACCENT);
   g.restore();
-  const s2 = spring(t - T.logo - 0.18, ...SNAPPY);
-  g.save(); g.globalAlpha = clamp(s2 * 2);
-  g.translate(0, (1 - s2) * 40);
-  wordmark(W / 2, 1075, 150, ACCENT, INK, 'center');
+  words(['Sort your album', 'any way you', 'can describe it.'], 120, 1410, 96, t, TL.tagline, null, INK, { accent: ['describe'] });
   g.restore();
-  g.textAlign = 'left';
-  // tagline, centred under the lockup
-  g.save();
-  const lines = ['Sort a shared album', 'by who is in it.'];
-  g.font = `700 76px ${DISPLAY}`;
-  lines.forEach((ln, i) => {
-    const u = spring(t - T.tagline - i * 0.12, ...SNAPPY);
-    g.globalAlpha = clamp(u * 2) * (1 - smooth(inv(TL.pasteIn - 0.3, TL.pasteIn, t)));
-    g.textAlign = 'center'; g.fillStyle = MUTED;
-    g.fillText(ln, W / 2, 1290 + i * 92 + (1 - u) * 50);
+}
+
+// 5-7.5 s: scanning. The real card, the real stage names, and the mascot
+// animated beside the progress, the way the app does it.
+function scanArt(x, y, s, t) {
+  // spot is the centre of the app's .scanart box (240x190 css, so 720x570 here)
+  const bx = x + (SPOTS.scanart.x - 360) * s, by = y + (SPOTS.scanart.y - 285) * s;
+  const stackX = bx + (720 - 210) * s, stackY = by + (570 - 18 - 162) * s;
+  const cols = ['#fff1d6', '#e2f5ec', '#fde3ec'];
+  [[-8, 0, 0], [5, -18, -24], [0, -42, -54]].forEach(([deg, dx, dy], i) => {
+    g.save(); g.translate(stackX + (105 + dx) * s, stackY + (81 + dy) * s); g.rotate(deg * Math.PI / 180);
+    shadow(12, 6, 0.12); rrect(-105 * s, -81 * s, 210 * s, 162 * s, 30 * s); g.fillStyle = cols[i]; g.fill(); noShadow();
+    g.lineWidth = 9 * s; g.strokeStyle = PAPER; g.stroke(); g.restore();
   });
-  g.restore();
+  const bob = -18 * s * (0.5 - 0.5 * Math.cos((t - TL.scanIn) * Math.PI * 2 / 2.4));
+  g.drawImage(IMG['cam-search'], bx + 90 * s, by + 12 * s + bob, 540 * s, 540 * s);
+  const beam = -210 * s * (0.5 + 0.5 * Math.cos((t - TL.scanIn) * Math.PI * 2 / 1.8));
+  g.save(); g.globalAlpha = 0.55; g.fillStyle = ACCENT;
+  rrect(bx + (720 + 12 - 258) * s, by + (570 - 12) * s + beam, 258 * s, 12 * s, 6 * s); g.fill(); g.restore();
+}
+function drawScan(t, bg = true) {
+  if (bg) { g.fillStyle = PAGE; g.fillRect(0, 0, W, H); }
+  caption(t, ['Every face found.', 'Every photo checked.'], TL.scanIn + 0.05, TL.cardIn - 0.35, ['face', 'photo']);
+  const u = spring(t - TL.scanIn, ...SOFTS);
+  const out = spring(t - (TL.cardIn - 0.25), ...SOFTS);
+  const k = Math.min(8, Math.floor(9 * inv(TL.scanFrom, TL.scanTo, t)));
+  const im = IMG['scan_' + k];
+  const y = lerp(H + 50, APP_Y + 60, u) - out * 1900;
+  const card = ui(im, PX, y, S, 40);
+  scanArt(PX, y, S, t);
+  // a small pulse on the step chip when a stage completes
+  TL.stages.forEach((ts) => {
+    const p = t - ts;
+    if (p > 0 && p < 0.5) {
+      g.save(); g.globalAlpha = 0.35 * (1 - p / 0.5); g.fillStyle = ACCENT;
+      g.beginPath(); g.arc(W / 2, y + card.h * 0.86, 60 + p * 500, 0, Math.PI * 2); g.fill(); g.restore();
+    }
+  });
 }
 
-// shared app frame for 6-17.5 s
-const S = 1010 / 1074, PX = (W - 1010) / 2;   // UI image scale and left edge
-
-function caption(t, lines, tIn, tOut, accentWord) {
-  words(lines, 72, 270, 112, t, tIn, tOut, INK, { accentWord });
-}
-
-// 6-10.5 s: paste + scan
-function drawPasteScan(t) {
-  const T = TL;
-  g.fillStyle = SOFT; g.fillRect(0, 0, W, H);
-  const exitUp = spring(t - (T.cardIn - 0.2), ...SOFTS);     // whole group leaves upward
-  g.save(); g.translate(0, -exitUp * 1900);
-
-  caption(t, ['Paste the', 'album link.'], T.pasteIn + 0.05, T.scanFrom - 0.3, 'album');
-  caption(t, ['Every face,', 'scanned once.'], T.scanFrom, T.cardIn - 0.45, 'once.');
-
-  // pill rises in
-  const pin = spring(t - T.pasteIn - 0.1, ...SOFTS);
-  const k = Math.round(10 * clamp((t - T.typeFrom) / (T.typeTo - T.typeFrom)));
-  const pillY = lerp(H + 100, 860, pin) + track(t, [[0, 0], [T.scanFrom - 0.1, -340]], ...SOFTS);
-  const press = t > T.orbTap - 0.05 && t < T.orbTap + 0.15 ? 0.03 : 0;
-  const pill = panel(IMG['pill_' + k], PX, pillY, S, 60);
-  if (press) {   // the orb dims while pressed, as :active would
-    g.save(); g.fillStyle = 'rgba(18,19,24,0.12)';
-    g.beginPath(); g.arc(PX + SPOTS.orb.x * S, pillY + SPOTS.orb.y * S, 72 * S, 0, Math.PI * 2); g.fill(); g.restore();
-  }
-
-  // scanning status panel
-  const sin = spring(t - T.scanFrom, ...SOFTS);
-  if (sin > 0.001) {
-    const sk = Math.round(10 * smooth(clamp((t - T.scanFrom - 0.2) / (T.scanTo - T.scanFrom - 0.2))));
-    const sy = pillY + pill.h + 32 + (1 - sin) * 80;
-    g.save(); g.globalAlpha = clamp(sin * 2);
-    panel(IMG['scan_' + sk], PX, sy, S, 42, { h: 350 });
-    g.restore();
-
-    // the photos being scanned: boxes pop onto each face on the beat
-    const gy = sy + 350 * S + 40, ts = 300, gap = 25, gx = (W - (ts * 3 + gap * 2)) / 2;
-    scanTiles.forEach((tile, i) => {
-      const c = i % 3, r = Math.floor(i / 3);
-      const u = spring(t - T.scanFrom - 0.15 - i * 0.07, ...SNAPPY);
-      const x = gx + c * (ts + gap), y = gy + r * (ts + gap) + (1 - u) * 120;
-      g.save(); g.globalAlpha = clamp(u * 2);
-      rrect(x, y, ts, ts, 30); g.clip();
-      g.drawImage(tile.c, x, y, ts, ts);
-      g.restore();
-      const f = ts / TILE;
-      const pu = spring(t - T.detect[i], ...SNAPPY);
-      tile.faces.forEach((fc, j) => faceBox(x + fc.x * f, y + fc.y * f, fc.w * f, fc.h * f, spring(t - T.detect[i] - j * 0.05, ...SNAPPY) * (pu > 0 ? 1 : 0), ACCENT, 5));
-    });
-  }
-
-  // fingertip: arrives, taps the orb, leaves
-  const fx = PX + SPOTS.orb.x * S, fy = pillY + SPOTS.orb.y * S;
-  const fa = smooth(inv(T.orbTap - 0.6, T.orbTap - 0.3, t)) * (1 - smooth(inv(T.orbTap + 0.3, T.orbTap + 0.6, t)));
-  if (fa > 0) finger(fx + (1 - fa) * 160, fy + 20 + (1 - fa) * 260, T.orbTap, t, fa);
-  g.restore();
-}
-
-// 10.5-17.5 s: everyone, then folders
-const CARD_TOP = 520;
+// 7.5-10 s: Everyone. Tick four faces; names appear; the card pans to row two.
 function drawEveryone(t, bg = true) {
-  const T = TL;
-  if (bg) { g.fillStyle = SOFT; g.fillRect(0, 0, W, H); }
-
-  caption(t, ['Tick who you', 'want. Name them.'], T.cardIn + 0.1, T.barIn - 0.3, 'Tick');
-  caption(t, ['One folder each,', 'in your Drive.'], T.barIn + 0.05, T.endIn - 0.4, 'folder');
-
-  const k = T.ticks.filter((x) => t >= x).length;
+  if (bg) { g.fillStyle = PAGE; g.fillRect(0, 0, W, H); }
+  caption(t, ['A folder for', 'each person.'], TL.cardIn + 0.1, TL.cullIn - 0.35, ['folder']);
+  const k = TL.ticks.filter((x) => t >= x).length;
   const im = IMG['everyone_' + k];
-  // pan so the row being ticked sits in view
-  const rowY = (i) => SPOTS['tick_' + i].y * S;
-  const pan = track(t, [[0, 0],
-    [T.ticks[0] - 0.55, -(rowY(0) - 380)],
-    [T.ticks[2] - 0.55, -(rowY(2) - 380)],
-    [T.ticks[4] - 0.55, -(rowY(4) - 380)]], ...SOFTS);
-  const cin = spring(t - T.cardIn, ...SOFTS);
-  const top = CARD_TOP + (1 - cin) * 1500 + pan;
+  // a scroll view onto the card: row one, then it scrolls to row two
+  const src = track(t, [[0, SPOTS.tick_0.y - 600], [TL.ticks[1] + 0.2, SPOTS.tick_2.y - 600]], ...SOFTS);
+  const u = spring(t - TL.cardIn, ...SOFTS), out = spring(t - (TL.cullIn - 0.25), ...SOFTS);
+  const top = APP_Y + 40 + (1 - u) * 1500 - out * 1900;
+  ui(im, PX, top, S, 40, { sy: src, sh: (H - 90 - APP_Y - 40) / S });
+  const pan = -src;
+  // fingertip moves tick to tick on the beat
+  if (t > TL.ticks[0] - 0.6 && t < TL.ticks[3] + 0.6) {
+    let i = TL.ticks.findIndex((x) => t < x + 0.25); if (i < 0) i = 3;
+    const pos = (j) => [PX + SPOTS['tick_' + j].x * S, top + (SPOTS['tick_' + j].y + pan) * S];
+    const mv = spring(t - (TL.ticks[i] - 0.4), ...SNAPPY);
+    const [ax, ay] = pos(Math.max(0, i - 1)), [bx, by] = pos(i);
+    const x = i ? lerp(ax, bx, mv) : bx, y = i ? lerp(ay, by, mv) : by;
+    const a = smooth(inv(TL.ticks[0] - 0.6, TL.ticks[0] - 0.3, t)) * (1 - smooth(inv(TL.ticks[3] + 0.25, TL.ticks[3] + 0.55, t)));
+    finger(x, y + 16, TL.ticks[i], t, a);
+  }
+}
 
-  g.save(); g.beginPath(); g.rect(0, CARD_TOP - 40, W, H); g.clip();
-  panel(im, PX, top, S, 42);
+// 10-13.5 s: Cull. The Review pile; tap a photo, see why, exclude it.
+function drawCull(t, bg = true) {
+  if (bg) { g.fillStyle = PAGE; g.fillRect(0, 0, W, H); }
+  const u = spring(t - TL.cullIn, ...SOFTS), out = spring(t - (TL.sortIn - 0.25), ...SOFTS);
+  // show the card from the pile switcher down
+  const SY = SPOTS.pileReview.y - 120;
+  const top = APP_Y + 40 + (1 - u) * 1500 - out * 1900;
+  const im = t >= TL.previewClose ? IMG.cull_1 : IMG.cull_0;
+  g.save(); g.beginPath(); g.rect(0, APP_Y - 10, W, H); g.clip();
+  ui(im, PX, top, S, 40, { sy: SY, sh: Math.min(im.height - SY, 1600 / S) });
   g.restore();
+  const tile = SPOTS.tile0;
+  const tx = PX + tile.x * S, ty = top + (tile.y - SY) * S;
+  tapAt(tx, ty, TL.tapTile, t);
 
-  // fingertip taps each tick on its beat
-  if (t >= T.ticks[0] - 0.6 && t < T.ticks[5] + 0.5) {
-    let i = T.ticks.findIndex((x) => t < x + 0.25); if (i < 0) i = 5;
-    const prev = Math.max(0, i - 1);
-    const tx = (j) => PX + SPOTS['tick_' + j].x * S, ty = (j) => top + SPOTS['tick_' + j].y * S;
-    const mv = spring(t - (T.ticks[i] - 0.4), ...SNAPPY);
-    const x = i === 0 ? tx(0) : lerp(tx(prev), tx(i), mv), y = i === 0 ? ty(0) : lerp(ty(prev), ty(i), mv);
-    const fa = smooth(inv(T.ticks[0] - 0.6, T.ticks[0] - 0.3, t)) * (1 - smooth(inv(T.ticks[5] + 0.2, T.ticks[5] + 0.5, t)));
-    finger(x, y + 14, T.ticks[i], t, fa);
-  }
-
-  // action bar rises from the bottom, then copies, then the result card
-  const bin = spring(t - T.barIn, ...SOFTS);
-  if (bin > 0.001) {
-    const ck = T.copy.filter((x) => t >= x).length;
-    const copying = t >= T.exportTap + 0.25;
-    const bim = copying ? IMG['copy_' + ck] : IMG['bar_6'];
-    const bs = W / bim.width, bh = bim.height * bs;
-    const by = H - bh * bin;
-    g.save();
-    shadow(50, -10, 0.12);
-    g.fillStyle = PAPER; rrect(0, by, W, bh + 60, 40); g.fill(); noShadow();
-    rrect(0, by, W, bh + 60, 40); g.clip();
-    g.drawImage(bim, 0, by, W, bh);
+  // the preview grows out of the tile, and back into it
+  const o = spring(t - TL.previewOpen, 200, 26) - spring(t - TL.previewClose, 220, 28);
+  if (o > 0.002) {
+    const pim = t >= TL.tapOut + 0.05 ? IMG.preview_1 : IMG.preview_0;
+    g.save(); g.fillStyle = `rgba(31,37,64,${0.5 * clamp(o)})`; g.fillRect(0, 0, W, H); g.restore();
+    const ps = 1000 / pim.width, pw = pim.width * ps, ph = pim.height * ps;
+    const fx = (W - pw) / 2, fy = 520;
+    // interpolate the dialog rect between the tile and its full place
+    const tw = tile.w * S, sc = lerp(tw / pw, 1, o);
+    const cx = lerp(tx, fx + pw / 2, o), cy = lerp(ty, fy + ph / 2, o);
+    g.save(); g.globalAlpha = clamp(o * 2.5);
+    g.translate(cx - pw * sc / 2, cy - ph * sc / 2); g.scale(sc, sc);
+    ui(pim, 0, 0, ps, 40 / sc * sc);
     g.restore();
-    const ex = SPOTS.export.x * bs, ey = by + (copying ? (bim.height - IMG.bar_6.height) * bs : 0) + SPOTS.export.y * bs;
-    const fa = smooth(inv(T.exportTap - 0.5, T.exportTap - 0.25, t)) * (1 - smooth(inv(T.exportTap + 0.3, T.exportTap + 0.55, t)));
-    if (fa > 0) finger(ex + (1 - fa) * 120, ey + 10 + (1 - fa) * 200, T.exportTap, t, fa);
+    if (o > 0.95) {
+      const bx = fx + SPOTS.pOut.x * ps, by = fy + SPOTS.pOut.y * ps;
+      tapAt(bx, by, TL.tapOut, t);
+    }
   }
+  // captions last, so the preview's backdrop never dims them
+  caption(t, ['Keep the best.', 'Drop the misses.'], TL.cullIn + 0.1, TL.cap2 - 0.3, ['best.']);
+  caption(t, ['See why.', 'Decide in one tap.'], TL.cap2, TL.sortIn - 0.35, ['why.']);
+}
 
-  const din = spring(t - T.done, 200, 24);
-  if (din > 0.001) {
-    g.save(); g.fillStyle = `rgba(238,240,246,${0.82 * clamp(din * 1.5)})`; g.fillRect(0, CARD_TOP - 40, W, H); g.restore();
-    const dim = IMG.done;
-    const rows = T.doneRows.filter((x) => t >= x).length;
-    const firstRowTop = SPOTS.doneRows[0] - 87;
-    const visible = rows ? SPOTS.doneRows[rows - 1] + 30 : firstRowTop;
-    const y = CARD_TOP + 60 + (1 - din) * 300;
-    g.save(); g.globalAlpha = clamp(din * 2);
-    const sc = S * (0.94 + 0.06 * din);
-    panel(dim, (W - dim.width * sc) / 2, y, sc, 42, { clipH: Math.min(dim.height, visible + 40) });
+// 13.5-16 s: Sort by description. A Thai rule is typed; the folders appear.
+function drawSort(t, bg = true) {
+  if (bg) { g.fillStyle = PAGE; g.fillRect(0, 0, W, H); }
+  caption(t, ['Describe it.', 'Gemini sorts it.'], TL.sortIn + 0.1, TL.barIn - 0.35, ['Gemini']);
+  const u = spring(t - TL.sortIn, ...SOFTS);
+  const k = Math.min(5, Math.floor(6 * inv(TL.typeFrom, TL.typeTo, t)));
+  const form = IMG['sortform_' + k];
+  // the folder rows only: skip the heading block of the panel
+  const SY = 330;
+  const fu = spring(t - TL.sortRes, ...SOFTS);
+  const top = APP_Y + 40 + (1 - u) * 1500 - fu * 760;
+  g.save(); g.beginPath(); g.rect(0, APP_Y - 10, W, H); g.clip();
+  const f = ui(form, PX, top, S, 40, { sy: SY });
+  tapAt(PX + SPOTS.runSort.x * S, top + (SPOTS.runSort.y - SY) * S, TL.tapSort, t);
+  if (fu > 0.001) {
+    const mim = IMG.sortmsg;
+    const res = IMG.sortres;
+    const ry = top + f.h + 30;
+    g.save(); g.globalAlpha = clamp(fu * 2);
+    ui(res, PX, ry + (1 - fu) * 200, S, 40);
     g.restore();
-    // portraits pop beside each row as it appears
-    T.doneRows.forEach((tr, i) => {
-      const u = spring(t - tr, ...SNAPPY);
-      if (u <= 0.001) return;
-      const cx = (W - dim.width * sc) / 2 + dim.width * sc - 120, cy = y + (SPOTS.doneRows[i] - 30) * sc;
-      g.save(); g.globalAlpha = clamp(u * 2);
-      g.translate(cx, cy); g.scale(0.6 + 0.4 * u, 0.6 + 0.4 * u);
-      g.beginPath(); g.arc(0, 0, 36, 0, Math.PI * 2); g.clip();
-      drawPortrait(i, -36, -36, 72);
-      g.restore();
-    });
+  }
+  g.restore();
+  // a small "Thai or English" badge next to the typing
+  const bu = spring(t - TL.typeFrom - 0.3, ...BOUNCY) - spring(t - TL.tapSort, ...SNAPPY);
+  if (bu > 0.01) {
+    g.save(); g.globalAlpha = clamp(bu * 2);
+    const bx = W - 420, by = top + 420 * S;
+    g.translate(bx, by); g.scale(bu, bu); g.rotate(-0.05);
+    shadow(20, 8, 0.15); rrect(0, -60, 340, 96, 48); g.fillStyle = INK; g.fill(); noShadow();
+    g.font = `600 44px ${UI}`; g.fillStyle = PAPER; g.textAlign = 'center';
+    g.fillText('ภาษาไทย ✓', 170, 4);
+    g.restore(); g.textAlign = 'left';
   }
 }
 
-const portraits = [];
-function drawPortrait(i, x, y, s) {
-  if (!portraits[i]) {
-    const c = document.createElement('canvas'); c.width = c.height = 240;
-    Cast.portrait(c.getContext('2d'), 240, Cast.CREW[i]); portraits[i] = c;
+// 16-18 s: Export. The bar rises, the tap, the copy, the done card.
+function drawExport(t, bg = true) {
+  if (bg) { g.fillStyle = PAGE; g.fillRect(0, 0, W, H); }
+  caption(t, ['Straight into', 'your Drive.'], TL.barIn + 0.1, TL.endIn - 0.3, ['Drive.']);
+  // the sorted folders stay in view behind the bar
+  const res = IMG.sortres;
+  const back = spring(t - TL.done, ...SOFTS);
+  g.save(); g.globalAlpha = 1 - 0.85 * back;
+  ui(res, PX, APP_Y + 60, S, 40);
+  g.restore();
+  const bu = spring(t - TL.barIn, ...SOFTS);
+  const ck = TL.copy.filter((x) => t >= x).length;
+  const copying = t >= TL.exportTap + 0.2;
+  const bim = copying ? IMG['copy_' + ck] : IMG.bar_0;
+  const bs = 1040 / bim.width, bh = bim.height * bs;
+  const by = H - 40 - bh * bu - (1 - bu) * 40;
+  if (bu > 0.001 && back < 0.99) {
+    g.save(); g.globalAlpha = 1 - back;
+    ui(bim, (W - 1040) / 2, by + back * 300, bs, 40);
+    g.restore();
+    const ex = (W - 1040) / 2 + SPOTS.export.x * bs, ey = by + (copying ? (bim.height - IMG.bar_0.height) * bs : 0) + SPOTS.export.y * bs;
+    tapAt(ex, ey, TL.exportTap, t);
   }
-  g.drawImage(portraits[i], x, y, s, s);
+  if (back > 0.001) {
+    const d = IMG.done, ds = 960 / d.width;
+    const rows = TL.doneRows.filter((x) => t >= x).length;
+    g.save(); g.globalAlpha = clamp(back * 2);
+    const y = APP_Y + 80 + (1 - back) * 260;
+    ui(d, (W - 960) / 2, y, ds * (0.94 + 0.06 * back), 40, rows < 2 ? { sh: d.height - (2 - rows) * 110 } : {});
+    g.restore();
+  }
 }
 
-// 17.5-20 s: end card on ink, rising from the bottom
+// 18-20 s: lockup on accent, the mascot celebrating.
 function drawEnd(t) {
-  const T = TL;
-  const u = spring(t - T.endIn, 160, 26);
+  const u = spring(t - TL.endIn, 160, 26);
   const top = H * (1 - u);
-  g.fillStyle = INK; g.fillRect(0, top, W, H - top + 2);
+  g.fillStyle = ACCENT; g.fillRect(0, top, W, H - top + 2);
   g.save(); g.translate(0, top * 0.35);
-  const s = spring(t - T.endIn - 0.15, 220, 22);
-  g.globalAlpha = clamp(s * 2);
-  mark(W / 2 - 110, 430, 220, ACCENT, PAPER);
-  wordmark(W / 2, 790, 120, '#8EA0FF', PAPER, 'center');
-  g.globalAlpha = 1;
-  words(['Find yourself', 'in the album.'], 92, 1100, 128, t, T.endLine, null, PAPER);
-  const s3 = spring(t - T.endSub, ...SNAPPY);
+  mascot('cam-celebrate', W / 2, 560, 520, t, TL.endIn + 0.15);
+  const s = spring(t - TL.endIn - 0.3, ...SNAPPY);
+  g.save(); g.globalAlpha = clamp(s * 2); g.translate(0, (1 - s) * 40);
+  wordmark(W / 2, 960, 112, PAPER);
+  g.restore();
+  words(['Sort your album', 'any way you can', 'describe it.'], 96, 1210, 100, t, TL.endLine, null, PAPER, { accent: ['describe'], accentColor: INK });
+  const s3 = spring(t - TL.endSub, ...SNAPPY);
   g.globalAlpha = clamp(s3 * 2);
-  g.font = `700 50px ${UI}`; g.textAlign = 'left'; g.fillStyle = '#B9BCCB';
-  ['Sign in with Google.', 'Paste the link.', 'Get a folder for everyone.'].forEach((ln, i) => {
-    const v = spring(t - T.endSub - i * 0.12, ...SNAPPY);
-    g.globalAlpha = clamp(v * 2);
-    g.fillText(ln, 96, 1420 + i * 76 + (1 - v) * 30);
-  });
+  g.font = `600 46px ${UI}`; g.textAlign = 'left'; g.fillStyle = '#ffe3ee';
+  g.fillText('Google Drive · Gemini · Cloud Run', 100, 1610 + (1 - s3) * 30);
   g.restore();
 }
 
 // ================================================================== frame
+// Each shot leaves upward while the next rises from below, both on the same
+// page colour, so a handover draws the incoming shot without its background.
+const SHOTS = [            // [start, draw, when it starts rising in]
+  [TL.brand[0], drawBrand, TL.brand[0]],
+  [TL.scan[0], drawScan, TL.scanIn - 0.2],
+  [TL.everyone[0], drawEveryone, TL.cardIn - 0.25],
+  [TL.cull[0], drawCull, TL.cullIn - 0.25],
+  [TL.sort[0], drawSort, TL.sortIn - 0.25],
+  [TL.exp[0], drawExport, TL.barIn - 0.25],
+];
 function draw(t) {
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.globalAlpha = 1; noShadow();
-  const T = TL;
-  if (t < T.brand[0]) drawHook(t);
-  else if (t < T.paste[0]) drawBrand(t);
-  else if (t < T.cardIn + 0.9) {
-    drawPasteScan(t);
-    if (t >= T.cardIn - 0.2) {       // the card slides up under the departing group
-      drawEveryone(t, false);
-    }
-  } else drawEveryone(t);
-  if (t >= T.endIn) drawEnd(t);
+  if (t < TL.brand[0]) drawHook(t);
+  else {
+    let i = 0;
+    while (i + 1 < SHOTS.length && t >= SHOTS[i + 1][2]) i++;
+    const [start, fn] = SHOTS[i];
+    if (i > 0 && t < start + 0.7) { SHOTS[i - 1][1](t); fn(t, false); }   // handover
+    else fn(t);
+  }
+  if (t >= TL.endIn) drawEnd(t);
 }
 window.seek = (t) => { draw(Math.max(0, Math.min(DUR - 1e-6, t))); return true; };
 
