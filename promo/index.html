@@ -244,7 +244,7 @@ function drawHook(t) {
 function drawBrand(t) {
   g.fillStyle = PAGE; g.fillRect(0, 0, W, H);   // first after the hook: always on its own page
   g.save(); g.translate(0, -1900 * spring(t - (TL.scanIn - 0.2), ...SOFTS));
-  mascot('cam-wave', W / 2, 760, 560, t, TL.logo);
+  mascot('cam-wave', W / 2, 760, 560, t, TL.logo - 0.22);   // lands on the impact
   const s2 = spring(t - TL.word, ...SNAPPY);
   g.save(); g.globalAlpha = clamp(s2 * 2); g.translate(0, (1 - s2) * 50);
   wordmark(W / 2, 1180, 120, ACCENT);
