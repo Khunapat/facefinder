@@ -89,8 +89,8 @@ def main_test():
     check("the near-copy and the original are one burst", r["bursts"] == 1, r["bursts"])
     check("only one frame of the burst is kept", len({"obama.jpg", "obama-b.jpg"} & kept) == 1, kept)
     burst_loser = ({"obama.jpg", "obama-b.jpg"} - kept).pop()
-    check("the other, a near-identical copy, is rejected as the weaker frame",
-          "better frame" in rejected.get(burst_loser, {}).get("reason", ""), rejected.get(burst_loser))
+    check("the other, scored about the same, goes to review to compare",
+          "Looks like" in review.get(burst_loser, {}).get("reason", ""), review.get(burst_loser))
     check("the blurred photo is rejected for being blurry",
           "Blurry" in rejected.get("zz_blur.jpg", {}).get("reason", ""), rejected.get("zz_blur.jpg"))
     check("every photo is in exactly one pile", len(kept) + len(review) + len(rejected) == 7)
@@ -113,12 +113,32 @@ def main_test():
     near = curate.cull([ph("x1", 8, dh="0000000000000000"), ph("x2", 7, dh="00000000000001ff")])
     check("a similar but different frame of a burst goes to review",
           [x["file_id"] for x in near["review"]] == ["x2"], near)
+    copy = curate.cull([ph("y1", 8, dh="0000000000000000"), ph("y2", 5, dh="0000000000000003")])
+    check("a near-identical, clearly weaker copy of a kept frame is rejected",
+          [x["file_id"] for x in copy["reject"]] == ["y2"] and "better copy" in copy["reject"][0]["reason"], copy)
+    weak = curate.cull([ph("z1", 5, dh="0000000000000000"), ph("z2", 3, dh="0000000000000003")])
+    check("a copy is not rejected when the better frame is itself only in review",
+          not weak["reject"], weak)
+    mixed = curate.cull([ph("u1", None, dh="0000000000000000"), ph("u2", 9, dh="0000000000000001", unsure=True),
+                         ph("u3", 6, dh="0000000000000003")])
+    check("unchecked and unsure frames in a burst go to review, never reject",
+          {x["file_id"] for x in mixed["review"]} >= {"u1", "u2"} and not mixed["reject"], mixed)
     picks = curate.best_shots(["p%d" % i for i in range(6)],
                               {"p%d" % i: {"keeper": 9, "flaws": [], "reason": "r", "scene": "stage"} for i in range(6)},
                               {}, 3, {"p%d" % i: ("0" * 16 if i < 4 else "f" * 16) for i in range(6)})
     ids = [p["file_id"] for p in picks]
     check("best shots mix different-looking photos instead of near-copies",
           any(i in ids for i in ("p4", "p5")) and any(i in ids for i in ("p0", "p1", "p2", "p3")), ids)
+
+    weakest = curate.best_shots(["w1", "w2", "w3", "w4"],
+                                {"w1": {"keeper": 2, "flaws": ["blurry"], "reason": "r", "scene": "s"},
+                                 "w2": {"keeper": 9, "flaws": [], "reason": "r", "scene": "s", "unsure": True},
+                                 "w3": {"keeper": 3, "flaws": [], "reason": "r", "scene": "s"}},
+                                {}, 10)
+    check("Best 10 never picks a weak, unsure or unchecked photo, even as the first pick",
+          weakest == [], weakest)
+    good = curate.best_shots(["g1", "g2"], {"g1": {"keeper": 8, "flaws": [], "reason": "r", "scene": "s"}}, {}, 10)
+    check("Best 10 returns fewer than 10 rather than pad the list", [p["file_id"] for p in good] == ["g1"], good)
 
     print("Best shots")
     people = c.post("/api/people", json={"folder_id": fid}).json()["people"]
@@ -141,7 +161,7 @@ def main_test():
     check("at least one group has photos", any(g["file_ids"] for g in res["groups"]))
     other = TestClient(main.app)
     other.get("/dev/login", follow_redirects=False)
-    check("another session cannot read the result", other.get("/api/sort/" + job["job_id"]).status_code == 403)
+    check("another session cannot read the result", other.get("/api/sort/" + job["job_id"]).status_code in (403, 404))
 
     groups = [{"name": g["name"], "file_ids": g["file_ids"]} for g in res["groups"] if g["file_ids"]]
     r = c.post("/api/export", json={"folder_id": fid, "groups": groups}).json()
@@ -150,6 +170,31 @@ def main_test():
     check("each group became a Drive folder with its photos",
           all(sorted(g["file_ids"]) == tree.get("%s/%s" % (exp["root_name"], g["name"])) for g in groups),
           (groups, tree))
+
+    print("Access and retries")
+    r = c.post("/api/export", json={"folder_id": fid, "groups": [{"name": "x", "file_ids": ["not-in-album"]}]})
+    check("export refuses photos from outside the album", r.status_code == 400, r.status_code)
+    check("another session cannot read an export", other.get("/api/export/" + exp["job_id"] if "job_id" in exp
+                                                             else "/api/export/x").status_code in (403, 404))
+    check("album status needs an opened album", other.get("/api/album/%s/status" % fid).status_code == 403)
+
+    real_fetch = main.gd.fetch_image_bytes
+
+    def flaky(creds, svc, meta, size=None):
+        if meta["name"] == "biden.jpg":
+            raise OSError("network dropped")
+        return real_fetch(creds, svc, meta, size)
+    main.gd.fetch_image_bytes = flaky
+    try:
+        c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    finally:
+        main.gd.fetch_image_bytes = real_fetch
+    check("a photo that could not be read is not counted as done",
+          st["done"] == st["total"] - 1 and "could not be read" in st["message"], st)
+    c.post("/api/index", json={"folder_id": fid})
+    st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    check("scanning again picks it up", st["done"] == st["total"] == 7, st)
 
     print()
     print("%d of %d checks passed" % (sum(checks), len(checks)))

@@ -42,11 +42,11 @@ def _distance(a, b) -> int:
 
 
 def bursts(photos: list) -> list:
-    """Group neighbouring, near-identical frames. photos must be in shooting
-    order (camera file names sort that way). Returns lists of indexes."""
+    """Visual-similarity groups, not proof of a temporal burst."""
     groups, cur = [], []
-    for i, p in enumerate(photos):
-        if cur and _distance(photos[cur[-1]].get("dhash"), p.get("dhash")) <= BURST_BITS:
+    for i, photo in enumerate(photos):
+        # Anchor to the first image to avoid chaining dissimilar endpoints.
+        if cur and _distance(photos[cur[0]].get("dhash"), photo.get("dhash")) <= BURST_BITS:
             cur.append(i)
         else:
             if cur:
@@ -64,60 +64,57 @@ def _rank(ai) -> tuple:
     return (ai["keeper"], -len(ai["flaws"]))
 
 
+def _alone(ai, strictness: str):
+    """The pile and reason for one checked photo, judged on its own."""
+    bad = [f for f in ai["flaws"] if f in SERIOUS[strictness]]
+    if ai["keeper"] < REJECT_BELOW[strictness] and (bad or ai["keeper"] <= 2):
+        return "reject", "; ".join(FLAWS[f] for f in bad) or ai.get("reason") or "Low quality score"
+    if bad or ai["keeper"] < REVIEW_BELOW[strictness]:
+        return "review", ai.get("reason") or "Needs a look"
+    return "keep", ai.get("reason") or "Usable for the album"
+
+
 def cull(photos: list, strictness: str = "normal") -> dict:
     """photos: [{file_id, name, ai (dict or None), dhash}] for one album.
 
-    Three piles, each photo with a reason:
-      keep    good frames, and the best frame of each burst
-      review  borderline frames, flawed frames that are the only shot of their
-              moment, near-duplicates that differ a little, anything Gemini was
-              unsure about or could not check
-      reject  clear mistakes, and copies of a better frame in the same burst
-    Nothing is rejected unseen: a photo Gemini has not checked goes to review."""
+    Suggestions in three piles, each photo with a reason. Nothing unseen or
+    uncertain is rejected: a photo Gemini did not check, or was unsure about,
+    goes to review. Of near-identical frames, a copy is rejected only when a
+    clearly better copy is in keep; other look-alikes go to review."""
     strictness = strictness if strictness in SERIOUS else "normal"
     photos = sorted(photos, key=lambda p: (p.get("name") or "", p["file_id"]))
     out = {"keep": [], "review": [], "reject": []}
-    n_bursts = 0
+    n_groups = 0
     for group in bursts(photos):
-        best = max(group, key=lambda i: _rank(photos[i].get("ai")))
-        if len(group) > 1:
-            n_bursts += 1
+        n_groups += int(len(group) > 1)
+        checked = [i for i in group if photos[i].get("ai") and not photos[i]["ai"].get("unsure")]
+        best = max(checked, key=lambda i: _rank(photos[i]["ai"])) if checked else None
+        best_pile = _alone(photos[best]["ai"], strictness)[0] if best is not None else None
         for i in group:
             p, ai = photos[i], photos[i].get("ai")
             row = {"file_id": p["file_id"], "name": p.get("name")}
-            if ai:
-                row["keeper"], row["flaws"] = ai["keeper"], ai["flaws"]
-            if i != best:
-                b = photos[best]
-                row["similar_to"] = b["file_id"]
-                same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
-                close = _rank(ai)[0] >= _rank(b.get("ai"))[0] - 1
-                if same or not close:
-                    row["reason"] = "A better frame of the same shot is kept (%s)" % b.get("name")
-                    out["reject"].append(row)
-                else:
-                    row["reason"] = "Similar to %s; keep it too if the moment differs" % b.get("name")
-                    out["review"].append(row)
-                continue
             if not ai:
                 row["reason"] = "Gemini could not check this photo"
                 out["review"].append(row)
                 continue
-            bad = [f for f in ai["flaws"] if f in SERIOUS[strictness]]
-            k = ai["keeper"]
-            if k < REJECT_BELOW[strictness] and (bad or k <= 2):
-                row["reason"] = "; ".join(FLAWS[f] for f in bad) or ai["reason"] or "Low score"
-                out["reject"].append(row)
-            elif bad or k < REVIEW_BELOW[strictness] or ai.get("unsure"):
-                row["reason"] = ("; ".join(FLAWS[f] for f in bad) + " - but it may be the only shot"
-                                 if bad else ai["reason"] or "Borderline")
+            row.update(keeper=ai["keeper"], flaws=ai["flaws"])
+            if ai.get("unsure"):
+                row["reason"] = "Gemini was not sure: " + (ai.get("reason") or "details are unclear")
                 out["review"].append(row)
-            else:
-                row["reason"] = ai["reason"]
-                out["keep"].append(row)
+                continue
+            pile, row["reason"] = _alone(ai, strictness)
+            if best is not None and i != best and pile != "reject":
+                b = photos[best]
+                row["similar_to"] = b["file_id"]
+                same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
+                if same and best_pile == "keep" and ai["keeper"] <= b["ai"]["keeper"] - 2:
+                    pile, row["reason"] = "reject", "A clearly better copy is kept (%s)" % b.get("name")
+                else:
+                    pile, row["reason"] = "review", "Looks like %s; keep both if the moment differs" % b.get("name")
+            out[pile].append(row)
     for pile in out.values():
-        pile.sort(key=lambda r: -r.get("keeper", 5))
-    out.update(bursts=n_bursts, strictness=strictness)
+        pile.sort(key=lambda row: -row.get("keeper", 5))
+    out.update(bursts=n_groups, strictness=strictness)
     return out
 
 
@@ -163,9 +160,14 @@ def best_shots(file_ids: list, ai: dict, faces: dict, n: int = 10, prints: dict 
         j = ai.get(f)
         side, det = faces.get(f, (0.0, 0.0))
         presence = min(1.0, side / 0.18) * 2 + det       # 0..3
-        keeper = j["keeper"] if j else 5
-        serious = len([x for x in (j or {}).get("flaws", []) if x in SERIOUS["normal"]])
-        pool.append({"f": f, "j": j, "base": keeper - 3 * serious + presence,
+        if not j or j.get("unsure") or j["keeper"] < 4:
+            continue
+        keeper = j["keeper"]
+        serious = len([x for x in j.get("flaws", []) if x in SERIOUS["normal"]])
+        base_score = keeper - 3 * serious + presence
+        if base_score < 4:
+            continue
+        pool.append({"f": f, "j": j, "base": base_score,
                      "scene": ((j or {}).get("scene") or "").strip().lower()})
     picks = []
     while pool and len(picks) < n:
@@ -178,14 +180,12 @@ def best_shots(file_ids: list, ai: dict, faces: dict, n: int = 10, prints: dict 
                     s -= 0.75                             # same kind of moment
             return s
         c = max(pool, key=score)
-        if picks and c["base"] < 4:                       # do not pad the list with weak photos
-            break
         c["score"] = score(c)
         picks.append(c)
         pool.remove(c)
     return [{
         "file_id": c["f"],
         "score": round(c["score"], 2),
-        "reason": (c["j"] or {}).get("reason") or "Clear, large face (Gemini has not checked this photo)",
+        "reason": (c["j"] or {}).get("reason") or "Quality reason unavailable; review this photo",
         "checked": bool(c["j"]),
     } for c in picks]

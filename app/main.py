@@ -71,11 +71,38 @@ def _creds(request: Request):
     return creds
 
 
+ALBUM_RECHECK = 300   # seconds between Drive checks that this user still has the album
+
+
 def _need_album(request: Request, folder_id: str):
     """The index is shared between users, so a session may only read an album
-    it has itself opened through Drive (which is where access is checked)."""
+    it has opened through Drive, and Drive is asked again every few minutes in
+    case the album was unshared since. The time sits in the signed session, so
+    face crops and thumbnails do not cost a Drive call each."""
+    creds = _creds(request)
     if not folder_id or folder_id not in request.session.get("albums", []):
         raise HTTPException(403, "Open the album first")
+    checked = request.session.get("album_checked") or {}
+    if time.time() - checked.get(folder_id, 0) < ALBUM_RECHECK:
+        return
+    try:
+        meta = gd.folder_meta(gd.service(creds), folder_id)
+    except HttpError as exc:
+        if exc.resp.status in (401, 403, 404):
+            raise HTTPException(403, "Album access is no longer available. Reopen it with an authorised account.") from exc
+        raise HTTPException(503, "Cannot verify album access. Try again.") from exc
+    if meta.get("mimeType") != gd.FOLDER_MIME:
+        raise HTTPException(403, "Album access is no longer available")
+    checked = {k: v for k, v in checked.items() if k in request.session.get("albums", [])}
+    checked[folder_id] = time.time()
+    request.session["album_checked"] = checked
+
+
+def _job_owner(request: Request):
+    _creds(request)
+    if "job_owner" not in request.session:
+        request.session["job_owner"] = secrets.token_urlsafe(24)
+    return request.session["job_owner"]
 
 
 @app.get("/oauth2/login")
@@ -95,6 +122,8 @@ def login(request: Request):
 
 @app.get("/oauth2/callback")
 def callback(request: Request):
+    if not request.session.get("oauth_state") or not request.session.get("code_verifier"):
+        raise HTTPException(400, "Sign-in expired. Start sign-in again.")
     flow = _flow(state=request.session.get("oauth_state"))
     flow.code_verifier = request.session.get("code_verifier")
     url = str(request.url)
@@ -103,6 +132,7 @@ def callback(request: Request):
         url = "https://" + url[len("http://"):]
     flow.fetch_token(authorization_response=url)
     creds = flow.credentials
+    request.session.clear()
     request.session["creds"] = gd.creds_to_session(creds)
     try:
         info = (
@@ -199,17 +229,21 @@ def _index_worker(folder_id: str, creds_data: dict):
                 local.svc = gd.service(creds)
             return local.svc
 
+        failed = []
+
         def one(meta):
-            data = None
             try:
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta)
                 found, size = faces.analyze(data)
             except Exception:
-                found, size = [], None
+                # Not saved, so it is not mistaken for a photo with no faces
+                # and the next scan tries it again.
+                failed.append(meta["id"])
+                return
             store.save_photo(folder_id, meta["id"], meta["name"], found, size,
-                             curate.dhash(data) if data else None)
+                             curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
-            if gem and data:
+            if gem:
                 gem.submit(judge, meta["id"], data)
 
         def rejudge(meta):
@@ -230,6 +264,8 @@ def _index_worker(folder_id: str, creds_data: dict):
 
         row = store.album(folder_id)
         msg = "%d faces across %d photos" % (row["faces"], row["done"])
+        if failed:
+            msg += "; %d could not be read (scan again to retry)" % len(failed)
         if gem:
             missed = row["done"] - store.judged_count(folder_id)
             if missed:
@@ -250,12 +286,21 @@ async def start_index(request: Request):
     folder_id = body.get("folder_id")
     _creds(request)
     _need_album(request, folder_id)
-    if body.get("rebuild"):
-        store.clear_album(folder_id)
-        store.set_album(folder_id, status="pending")
     with _jobs_lock:
         if folder_id in _jobs:
             return {"started": False, "reason": "already running"}
+        if body.get("rebuild"):
+            store.clear_album(folder_id)
+            _mat_cache.pop(folder_id, None)
+            for key in list(_people_cache):
+                if key[0] == folder_id:
+                    _people_cache.pop(key, None)
+            for key in list(_face_cache):
+                if key[0] == folder_id:
+                    _face_cache.pop(key, None)
+        # Say so before the thread starts, so a status poll right after this
+        # never sees the previous scan's "ready".
+        store.set_album(folder_id, status="pending")
         t = threading.Thread(
             target=_index_worker,
             args=(folder_id, request.session["creds"]),
@@ -267,7 +312,8 @@ async def start_index(request: Request):
 
 
 @app.get("/api/album/{folder_id}/status")
-def album_status(folder_id: str):
+def album_status(request: Request, folder_id: str):
+    _need_album(request, folder_id)
     row = store.album(folder_id)
     if row is None:
         raise HTTPException(404, "Unknown album")
@@ -342,7 +388,7 @@ def search(
         "count": len(hits),
         "scanned": len(best),
         "threshold": threshold,
-        "matches": hits[:2000],
+        "matches": hits,
     }
 
 
@@ -454,7 +500,9 @@ def best(request: Request, body: dict = Body(...)):
     _creds(request)
     folder_id = body.get("folder_id")
     _need_album(request, folder_id)
-    file_ids = [f for f in (body.get("file_ids") or []) if isinstance(f, str)][:3000]
+    file_ids = list(dict.fromkeys(f for f in (body.get("file_ids") or []) if isinstance(f, str)))
+    if len(file_ids) > 5000:
+        raise HTTPException(413, "Select at most 5,000 photos for one shortlist")
     if not file_ids:
         raise HTTPException(400, "No photos given")
     n = max(1, min(int(body.get("n") or 10), 50))
@@ -485,8 +533,10 @@ def best(request: Request, body: dict = Body(...)):
 
 def _sample_lines(photos: list, limit: int) -> list:
     judged = [p for p in photos if p["ai"]]
-    step = max(1, len(judged) // limit)
-    return [gemini.as_text(p["ai"]) for p in judged[::step][:limit]]
+    if len(judged) <= limit:
+        return [gemini.as_text(p["ai"]) for p in judged]
+    indexes = [round(i * (len(judged) - 1) / (limit - 1)) for i in range(limit)]
+    return [gemini.as_text(judged[i]["ai"]) for i in indexes]
 
 
 @app.post("/api/groups/suggest")
@@ -528,8 +578,11 @@ def _sort_worker(job: dict, photos: list, groups: list):
 
         with ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS) as pool:
             list(pool.map(one, batches))
-        job["check"].extend(p["file_id"] for p in photos if not p["ai"])
-        job["status"] = "done"
+        with job["lock"]:
+            unchecked = [p["file_id"] for p in photos if not p["ai"]]
+            job["check"].extend(unchecked)
+            job["done"] += len(unchecked)
+            job["status"] = "done"
     except Exception as e:
         job["status"] = "error"
         job["message"] = str(e)[:300]
@@ -562,6 +615,7 @@ def sort_album(request: Request, body: dict = Body(...)):
         "names": {p["file_id"]: p["name"] for p in photos},
         "message": None, "lock": threading.Lock(),
     }
+    job["owner"] = _job_owner(request)
     job_id = secrets.token_urlsafe(12)
     _sorts[job_id] = job
     threading.Thread(target=_sort_worker, args=(job, photos, groups), daemon=True).start()
@@ -573,8 +627,11 @@ def sort_status(request: Request, job_id: str):
     job = _sorts.get(job_id)
     if job is None:
         raise HTTPException(404, "Unknown sort")
+    if job.get("owner") != _job_owner(request):
+        raise HTTPException(404, "Unknown sort")
     _need_album(request, job["folder_id"])
-    return {k: v for k, v in job.items() if k != "lock"}
+    with job["lock"]:
+        return {k: v for k, v in job.items() if k not in ("lock", "owner")}
 
 
 # ------------------------------------------------------------- export -----
@@ -677,12 +734,15 @@ def export(request: Request, body: dict = Body(...)):
     folder_id = body.get("folder_id")
     _need_album(request, folder_id)
 
+    allowed_ids = {p["file_id"] for p in _ready_photos(folder_id)}
     merged = {}                 # two groups with one name are one person
     for g in (body.get("groups") or [])[:300]:
         name = _clean_name(g.get("name"))
         ids = [f for f in (g.get("file_ids") or []) if isinstance(f, str)]
         if not name or not ids:
             continue
+        if any(fid not in allowed_ids for fid in ids):
+            raise HTTPException(400, "Export contains photos outside this album")
         slot = merged.setdefault(name.casefold(), {"name": name, "ids": {}})
         slot["ids"].update(dict.fromkeys(ids))
     if not merged:
@@ -718,6 +778,8 @@ def export(request: Request, body: dict = Body(...)):
         "note": None,
         "message": None,
     }
+    job["folder_id"] = folder_id
+    job["owner"] = _job_owner(request)
     job_id = secrets.token_urlsafe(12)
     _exports[job_id] = job
     threading.Thread(
@@ -734,11 +796,12 @@ def export(request: Request, body: dict = Body(...)):
 
 
 @app.get("/api/export/{job_id}")
-def export_status(job_id: str):
+def export_status(request: Request, job_id: str):
     job = _exports.get(job_id)
-    if job is None:
+    if job is None or job.get("owner") != _job_owner(request):
         raise HTTPException(404, "Unknown export")
-    out = {k: v for k, v in job.items() if k not in ("people", "failed")}
+    _need_album(request, job["folder_id"])
+    out = {k: v for k, v in job.items() if k not in ("people", "failed", "owner")}
     out["failed"] = len(job["failed"])
     out["people"] = [
         {k: v for k, v in p.items() if k != "file_ids"} for p in job["people"]
