@@ -30,8 +30,8 @@ cd promo && node audio.cjs out/mix.wav
 # 4. picture: frame by frame in headless Chromium -> out/silent.mp4
 node render.cjs --fps 60 --sub 4            # --sub = subframes blended for motion blur
 
-# 5. mux, loudness-normalised to -14 LUFS
-ffmpeg -i out/silent.mp4 -i out/mix.wav -filter:a loudnorm=I=-14:TP=-1.5:LRA=11 \
+# 5. mux: about -15.7 LUFS, peaks limited to -3.9 dBFS (no clipping after AAC)
+ffmpeg -i out/silent.mp4 -i out/mix.wav -filter:a "loudnorm=I=-15:TP=-2:LRA=11,alimiter=limit=0.6:level=false" \
   -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart out/facefinder-promo.mp4
 ```
 
