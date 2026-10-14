@@ -3,259 +3,231 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FaceFinder — sort a shared album by who is in it</title>
+<title>FaceFinder — sort a shared photo album in minutes</title>
+<link rel="icon" href="/static/img/cam-wave.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ---------------------------------------------------------------------------
-   Visual system adapted from the community DESIGN.md for Airbnb
-   (github.com/VoltAgent/awesome-design-md). Structure kept: one shadow tier,
-   4px spacing scale, pill search surface, photography-forward cards.
-   The accent below is the one token to change for your own brand.
+   FaceFinder's own playful pink system: pale pink page, large rounded white
+   panels, one strong pink accent, pill buttons, and the camera mascot in a
+   different pose for each step. Mitr for headings, Noto Sans Thai for text
+   (both cover Thai and Latin).
 --------------------------------------------------------------------------- */
 :root{
-  /* colour */
-  --accent:#ff385c; --accent-active:#e00b41; --accent-disabled:#ffd1da;
-  --error:#c13515;
-  --ink:#222222; --body:#3f3f3f; --muted:#6a6a6a; --muted-soft:#929292;
-  --hairline:#dddddd; --hairline-soft:#ebebeb; --border-strong:#c1c1c1;
-  --canvas:#ffffff; --surface-soft:#f7f7f7; --surface-strong:#f2f2f2;
-  --on-accent:#ffffff;
-
-  /* radius */
-  --r-xs:4px; --r-sm:8px; --r-md:14px; --r-lg:20px; --r-xl:32px; --r-full:9999px;
-
-  /* spacing */
-  --s-xxs:2px; --s-xs:4px; --s-sm:8px; --s-md:12px; --s-base:16px;
-  --s-lg:24px; --s-xl:32px; --s-xxl:48px; --s-section:64px;
-
-  /* the single shadow in the system */
-  --float:rgba(0,0,0,.02) 0 0 0 1px, rgba(0,0,0,.04) 0 2px 6px 0,
-          rgba(0,0,0,.1) 0 4px 8px 0;
-
-  --font:'Nunito Sans','Airbnb Cereal VF',Circular,-apple-system,
-         'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+  --page:#fdf0f5; --panel:#ffffff; --ink:#1f2540; --muted:#5b6178; --muted-soft:#8a8fa3;
+  --accent:#d6336c; --accent-active:#b9255a; --accent-soft:#f6dbe6; --tint:#f3bcd0;
+  --line:#ececf2; --line-strong:#dcdde6; --error:#b42318; --error-bg:#fff4f2;
+  --tile-1:#fde3ec; --tile-2:#e7ecff; --tile-3:#fff1d6; --tile-4:#e2f5ec;
+  --shadow:0 10px 30px rgba(31,37,64,.06); --shadow-lift:0 12px 36px rgba(31,37,64,.14);
+  --r-panel:32px; --r-tile:24px; --r-sm:14px; --r-full:9999px;
+  --head:'Mitr','Noto Sans Thai',system-ui,sans-serif;
+  --body:'Noto Sans Thai','Segoe UI',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font);
-     font-size:16px;line-height:1.5;font-weight:400}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
 h1,h2,h3,p{margin:0}
-a{color:var(--ink)}
-button,input,select{font-family:var(--font)}
-:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+h1,h2,h3{font-family:var(--head);font-weight:600;color:var(--accent);line-height:1.2}
+a{color:var(--ink)} a:hover{color:#000}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 
-/* ---------------------------------------------------------------- top nav */
-.nav{height:80px;display:flex;align-items:center;gap:var(--s-base);
-     padding:0 var(--s-xl);border-bottom:1px solid var(--hairline-soft);
-     position:sticky;top:0;background:var(--canvas);z-index:20}
-.brand{font-size:21px;font-weight:700;letter-spacing:-.4px;color:var(--accent);
-       display:flex;align-items:center;gap:var(--s-sm)}
-.brand svg{display:block}
-.brand b{color:var(--ink);font-weight:700}
+/* ------------------------------------------------------------------- nav */
+.nav{display:flex;align-items:center;gap:16px;padding:20px 40px}
+.brand{display:flex;align-items:center;gap:12px;padding:0;border:0;background:transparent;color:var(--accent);
+       font-family:var(--head);font-size:24px;font-weight:600;text-decoration:none}
+.brand .logo{width:44px;height:44px;border-radius:var(--r-full);background:var(--panel);display:grid;place-items:center;
+       box-shadow:0 6px 18px rgba(31,37,64,.08)}
 .grow{flex:1}
-.acct{display:flex;align-items:center;gap:var(--s-md);border:1px solid var(--hairline);
-      border-radius:var(--r-full);padding:var(--s-sm) var(--s-sm) var(--s-sm) var(--s-base);
-      background:var(--canvas);cursor:pointer;font-size:14px;font-weight:600;color:var(--ink)}
-.acct:hover{box-shadow:var(--float)}
-.acct .dot{width:32px;height:32px;border-radius:var(--r-full);background:var(--ink);
-      color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
-.email{font-size:13px;color:var(--muted);font-weight:400}
+.email{font-size:14px;color:var(--muted)}
 
-/* ------------------------------------------------------------------- page */
-main{max-width:1080px;margin:0 auto;padding:var(--s-xxl) var(--s-lg) 160px}
-.hero{text-align:center;margin-bottom:var(--s-xl)}
-.hero h1{font-size:32px;font-weight:700;line-height:1.18;letter-spacing:-.6px;
-     text-wrap:balance}
-.hero p{margin-top:var(--s-md);font-size:16px;color:var(--muted);
-        max-width:560px;margin-left:auto;margin-right:auto;text-wrap:balance}
-
-/* --------------------------------------------------- signature search pill */
-.pill{display:flex;align-items:center;background:var(--canvas);
-      border:1px solid var(--hairline);border-radius:var(--r-full);
-      box-shadow:var(--float);height:64px;padding:0 var(--s-sm) 0 var(--s-lg);
-      max-width:760px;margin:0 auto}
-.pill .seg{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;
-      text-align:left}
-.pill label{font-size:12px;font-weight:700;color:var(--ink);line-height:1.33}
-.pill input{border:0;outline:0;background:transparent;
-      font-size:14px;color:var(--ink);padding:0;width:100%}
-.pill input::placeholder{color:var(--muted-soft)}
-.orb{width:48px;height:48px;flex:0 0 48px;border-radius:var(--r-full);border:0;
-     background:var(--accent);color:var(--on-accent);cursor:pointer;
-     display:grid;place-items:center}
-.orb:hover{background:var(--accent-active)}
-.narrow{max-width:760px;margin:0 auto}
-
-/* ------------------------------------------------------- mode switch */
-.work[data-locked="1"]{opacity:.4;pointer-events:none}
-.modes{display:flex;gap:var(--s-xs);padding:var(--s-xs);margin:var(--s-xl) auto 0;
-       width:fit-content;max-width:100%;background:var(--surface-strong);
-       border-radius:var(--r-full)}
-.modes button{border:0;background:transparent;color:var(--muted);cursor:pointer;
-       font-size:14px;font-weight:600;line-height:1.29;padding:10px 20px;
-       border-radius:var(--r-full)}
-.modes button:hover{color:var(--ink)}
-.modes button[aria-selected="true"]{background:var(--ink);color:#fff}
-
-/* ------------------------------------------------------------------ cards */
-.card{border:1px solid var(--hairline-soft);border-radius:var(--r-md);
-      padding:var(--s-lg);margin-top:var(--s-lg);background:var(--canvas)}
-.card h2{font-size:20px;font-weight:600;letter-spacing:-.18px;line-height:1.2}
-.card .hint{margin-top:var(--s-xs);font-size:14px;color:var(--muted)}
-
-/* ----------------------------------------------------------------- inputs */
-.field{width:100%;height:56px;padding:var(--s-md);border:1px solid var(--border-strong);
-       border-radius:var(--r-sm);background:var(--canvas);color:var(--ink);font-size:16px}
-.field:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-select.field{height:48px;width:auto;font-size:14px;padding:0 var(--s-md);cursor:pointer}
-.btn{height:48px;padding:14px 24px;border:0;border-radius:var(--r-sm);
-     background:var(--accent);color:var(--on-accent);
-     font-size:16px;font-weight:500;line-height:1.25;cursor:pointer;white-space:nowrap}
+/* ------------------------------------------------------------- buttons */
+.btn{height:52px;padding:0 28px;border:0;border-radius:var(--r-full);background:var(--accent);color:#fff;
+     font-size:16px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .btn:hover{background:var(--accent-active)}
-.btn:disabled{background:var(--accent-disabled);cursor:not-allowed}
-.btn.secondary{background:var(--canvas);color:var(--ink);border:1px solid var(--ink)}
-.btn.secondary:hover{background:var(--surface-strong)}
-.btn.text{background:transparent;color:var(--ink);padding:14px 0;height:auto;
-     text-decoration:underline}
-.btn.text:hover{background:transparent;color:#000}
-.btn.sm{height:auto;padding:10px 20px;font-size:14px;border-radius:var(--r-full)}
-.row{display:flex;gap:var(--s-md);flex-wrap:wrap;align-items:center}
-.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r-full);border:0;
-     background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center}
-.iconbtn:hover{background:var(--surface-strong);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{height:44px;padding:0 20px;font-size:14px}
+.btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--ink)}
+.btn.ghost:hover{background:var(--page)}
+.btn.soft{background:var(--accent-soft);color:var(--accent-active)}
+.btn.soft:hover{background:var(--tint)}
+.linkbtn{border:0;background:transparent;padding:8px 0;color:var(--ink);text-decoration:underline;font-size:14px;font-weight:500}
+.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r-full);border:0;background:transparent;color:var(--muted);
+     display:grid;place-items:center}
+.iconbtn:hover{background:var(--page);color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 
-/* -------------------------------------------------- the people to look for */
-.roster{display:flex;flex-direction:column;margin-top:var(--s-base)}
-.person{display:flex;align-items:center;gap:var(--s-base);padding:var(--s-md) 0;
-     border-top:1px solid var(--hairline-soft)}
-.person:first-child{border-top:0}
-.person.drag{background:var(--surface-soft)}
-.shots{display:flex;gap:var(--s-sm);flex:0 0 auto}
-.shots img,.addshot{width:64px;height:64px;border-radius:var(--r-md)}
+/* ---------------------------------------------------------------- page */
+main{max-width:1160px;margin:0 auto;padding:16px 24px 200px}
+.panel{background:var(--panel);border-radius:var(--r-panel);box-shadow:var(--shadow);padding:40px}
+.panel.center{max-width:640px;margin:32px auto 0;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+.mascot{display:block;object-fit:contain}
+.mirror{transform:scaleX(-1)}
+.hint{font-size:15px;color:var(--muted)}
+
+/* hero */
+.hero{display:flex;flex-wrap:wrap;gap:32px;align-items:center;margin-top:24px}
+.hero .copy{flex:999 1 480px;min-width:0}
+.hero h1{font-size:52px;line-height:1.15;text-wrap:balance}
+.hero p{margin-top:16px;max-width:560px;font-size:18px;font-weight:500}
+.hero .art{flex:1 1 260px;max-width:320px;margin:0 auto}
+.hero .art img{width:100%;aspect-ratio:1}
+.pill{display:flex;align-items:center;height:72px;margin-top:32px;max-width:640px;padding:0 10px 0 28px;
+      background:var(--panel);border-radius:var(--r-full);box-shadow:0 10px 30px rgba(31,37,64,.08)}
+.pill .seg{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.pill label{font-size:12px;font-weight:700;color:var(--muted)}
+.pill input{border:0;outline:0;padding:0;width:100%;background:transparent;font-size:15px;color:var(--ink)}
+.pill input::placeholder{color:var(--muted-soft)}
+
+/* progress */
+.bar{width:100%;height:10px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
+.bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:var(--r-full);transition:width .4s ease}
+
+/* album chip + tabs */
+.chip{padding:12px 22px;background:var(--panel);border-radius:var(--r-full);box-shadow:0 6px 18px rgba(31,37,64,.06);
+      font-size:15px;margin-top:24px}
+.work[data-locked="1"]{display:none}
+.tabs{display:flex;gap:4px;padding:6px;margin:24px auto 0;width:fit-content;max-width:100%;overflow-x:auto;
+      background:var(--panel);border-radius:var(--r-full);box-shadow:0 6px 18px rgba(31,37,64,.06)}
+.tabs button{border:0;background:transparent;color:var(--muted);font-size:15px;font-weight:600;padding:10px 20px;
+      border-radius:var(--r-full);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{background:var(--accent);color:#fff}
+.tabs .ai{font-size:11px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:var(--r-full);
+      background:var(--accent-soft);color:var(--accent-active)}
+.tabs button[aria-selected="true"] .ai{background:rgba(255,255,255,.22);color:#fff}
+
+/* a mode: side column with the mascot, then the work */
+.mode{display:flex;flex-wrap:wrap;gap:32px;margin-top:24px}
+.mode .side{flex:1 1 240px;max-width:300px;display:flex;flex-direction:column;gap:12px}
+.mode .side h2{font-size:30px}
+.mode .side img{width:180px;height:180px;margin:8px auto 0}
+.mode .main{flex:999 1 520px;min-width:0;display:flex;flex-direction:column;gap:12px}
+
+/* inputs */
+.field{width:100%;height:48px;padding:0 18px;border:1.5px solid var(--line-strong);border-radius:var(--r-full);
+       background:var(--panel);color:var(--ink);font-size:16px}
+.field:focus{outline:0;border-color:var(--ink)}
+select.field{width:auto;font-size:14px;padding:0 16px;cursor:pointer}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+
+/* named people */
+.person{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);
+        border-radius:20px}
+.person.drag{background:var(--page)}
+.shots{display:flex;gap:8px;flex:0 0 auto}
+.shots img,.addshot{width:64px;height:64px;border-radius:20px}
 .shots img{object-fit:cover;display:block}
-.addshot{border:1px dashed var(--border-strong);background:var(--surface-soft);
-     color:var(--muted);cursor:pointer;display:flex;flex-direction:column;
-     align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600}
-.addshot:hover{border-color:var(--ink);color:var(--ink);background:var(--canvas)}
-.person .field{flex:1;min-width:0}
+.addshot{border:1.5px dashed var(--tint);background:var(--page);color:var(--accent-active);display:flex;flex-direction:column;
+         align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600}
+.addshot:hover{border-color:var(--accent)}
+.person .field{flex:1;min-width:160px}
+.slider-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.slider-head b{color:var(--ink);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
 
-.slider-head{display:flex;align-items:baseline;gap:var(--s-sm);flex-wrap:wrap;
-      margin-top:var(--s-lg);font-size:14px;color:var(--muted)}
-.slider-head b{color:var(--ink);font-size:16px;font-weight:600;
-      font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;margin-top:var(--s-sm);accent-color:var(--accent)}
-
-/* --------------------------------------------------------------- progress */
-.bar{height:4px;border-radius:var(--r-full);background:var(--surface-strong);
-     overflow:hidden;margin:var(--s-base) 0 var(--s-sm)}
-.bar > i{display:block;height:100%;background:var(--accent);width:0;
-     transition:width .4s ease}
-
-/* ----------------------------------------------------- one person's result */
-.rhead{display:flex;align-items:center;gap:var(--s-base);flex-wrap:wrap}
-.avatar{width:56px;height:56px;flex:0 0 56px;border-radius:var(--r-full);
-     object-fit:cover;background:var(--surface-strong)}
-.rname{font-size:20px;font-weight:600;letter-spacing:-.18px;line-height:1.2;
-     overflow-wrap:anywhere}
+/* result card for one person / group */
+.card{background:var(--panel);border-radius:var(--r-panel);box-shadow:var(--shadow);padding:28px 32px;margin-top:20px}
+.card h2{font-size:26px}
+.rhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.avatar{width:56px;height:56px;flex:0 0 56px;border-radius:var(--r-full);object-fit:cover;background:var(--tile-1)}
+.rname{font-family:var(--head);font-size:24px;font-weight:600;color:var(--accent);line-height:1.2;overflow-wrap:anywhere}
 .rcount{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* ---------------------------------------------------------- photo grid */
-.grid{display:grid;gap:var(--s-base);margin-top:var(--s-base);
-      grid-template-columns:repeat(4,minmax(0,1fr))}
-.tile{position:relative;cursor:pointer}
-.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-md);
-      overflow:hidden;background:var(--surface-strong)}
+/* photo grid */
+.grid{display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tile{position:relative;cursor:pointer;min-width:0}
+.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--tile-2)}
+.tile:nth-child(4n+2) .ph{background:var(--tile-1)} .tile:nth-child(4n+3) .ph{background:var(--tile-3)}
+.tile:nth-child(4n) .ph{background:var(--tile-4)}
 .tile img{width:100%;height:100%;object-fit:cover;display:block}
-.tile:hover .ph{box-shadow:var(--float)}
-.tile:not(.sel) img{opacity:.45}
-.tick{position:absolute;top:var(--s-md);right:var(--s-md);width:32px;height:32px;
-      border-radius:var(--r-full);display:grid;place-items:center;padding:0;
-      background:rgba(0,0,0,.4);color:transparent;
-      border:1.5px solid rgba(255,255,255,.85)}
-.sel > .ph > .tick,.tick[aria-pressed="true"]{background:var(--accent);
-      border-color:var(--accent);color:#fff}
-.tile .meta{display:flex;align-items:center;gap:var(--s-xs);
-      margin-top:var(--s-sm);font-size:14px;line-height:1.43}
-.tile .meta .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
-      white-space:nowrap;color:var(--ink);font-weight:600}
+.tile:not(.sel) img{opacity:.4}
+.tick{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:var(--r-full);display:grid;place-items:center;
+      padding:0;background:rgba(31,37,64,.35);color:transparent;border:2px solid rgba(255,255,255,.9)}
+.sel > .ph > .tick,.tick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tag{position:absolute;top:12px;left:12px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:600;
+     border-radius:var(--r-full);padding:3px 10px}
+.tag.best{background:var(--accent);color:#fff}
+.tile .meta{display:flex;gap:4px;margin-top:8px;font-size:14px}
+.tile .meta .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .tile .meta .sc{color:var(--muted);font-variant-numeric:tabular-nums}
-.tag{position:absolute;top:var(--s-md);left:var(--s-md);background:var(--canvas);
-      color:var(--ink);font-size:11px;font-weight:600;line-height:1.18;
-      border-radius:var(--r-full);padding:4px 10px;box-shadow:var(--float)}
+.tile .why{font-size:13px;color:var(--muted);line-height:1.4;margin-top:2px;
+     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
-/* ------------------------------------------- everyone in the album */
-.faces{display:grid;gap:var(--s-lg) var(--s-base);margin-top:var(--s-lg);
-      grid-template-columns:repeat(6,minmax(0,1fr))}
-.fcard{display:flex;flex-direction:column;gap:var(--s-sm);min-width:0}
+/* everyone in the album */
+.faces{display:grid;gap:20px 16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+.fcard{display:flex;flex-direction:column;gap:8px;min-width:0}
 .fwrap{position:relative}
-.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;cursor:pointer;
-      border-radius:var(--r-md);overflow:hidden;background:var(--surface-strong)}
+.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:var(--r-tile);overflow:hidden;background:var(--tile-1)}
+.fcard:nth-child(4n+2) .fpic{background:var(--tile-2)} .fcard:nth-child(4n+3) .fpic{background:var(--tile-3)}
+.fcard:nth-child(4n) .fpic{background:var(--tile-4)}
 .fpic img{width:100%;height:100%;object-fit:cover;display:block}
-.fpic:hover{box-shadow:var(--float)}
-.fcard .tick{cursor:pointer;top:var(--s-sm);right:var(--s-sm)}
-.fname{width:100%;height:44px;padding:0 var(--s-md);border:1px solid var(--hairline);
-      border-radius:var(--r-sm);font-size:14px;color:var(--ink);background:var(--canvas)}
-.fname:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-.fmeta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fname{width:100%;height:44px;padding:0 16px;border:1.5px solid var(--line-strong);border-radius:var(--r-full);
+       font-size:15px;font-weight:600;color:var(--ink);background:var(--panel)}
+.fname:focus{outline:0;border-color:var(--ink)}
+.fmeta{padding-left:4px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* ------------------------------------------------- one person's photos */
-dialog{border:0;padding:0;border-radius:var(--r-lg);background:var(--canvas);
-      color:var(--ink);width:min(1040px,calc(100vw - 32px));
-      max-height:calc(100vh - 48px);box-shadow:var(--float)}
+/* sort by description */
+.grow-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:20px}
+.grow-row .gname{flex:1 1 160px;min-width:0}
+.grow-row .gdesc{flex:3 1 280px;min-width:0}
+.stat{display:flex;flex-wrap:wrap;gap:10px}
+.stat span{padding:8px 16px;border-radius:var(--r-full);background:var(--page);font-size:14px;font-weight:600}
+
+/* messages */
+.msg{font-size:15px;line-height:1.45;border-radius:20px;padding:12px 18px}
+.msg.err{background:var(--error-bg);color:var(--error)}
+.msg.ok{background:var(--page);color:var(--ink)}
+.msg.info{background:var(--page);color:var(--muted)}
+
+/* one person's photos */
+dialog{border:0;padding:0;border-radius:var(--r-panel);background:var(--panel);color:var(--ink);
+       width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 20px 60px rgba(31,37,64,.25)}
 dialog[open]{display:flex;flex-direction:column}
-dialog::backdrop{background:rgba(0,0,0,.5)}
-.dhead{display:flex;align-items:center;gap:var(--s-base);flex-wrap:wrap;
-      padding:var(--s-base) var(--s-lg);border-bottom:1px solid var(--hairline-soft)}
-.dhead .field{flex:1;min-width:160px;height:48px}
-.dbody{padding:0 var(--s-lg) var(--s-lg);overflow:auto}
+dialog::backdrop{background:rgba(31,37,64,.5)}
+.dhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:20px 28px;border-bottom:1px solid var(--line)}
+.dhead .field{flex:1;min-width:160px}
+.dbody{padding:0 28px 28px;overflow:auto}
 
-/* --------------------------------------------------------------- messages */
-.msg{margin-top:var(--s-base);font-size:14px;line-height:1.43;
-     border-radius:var(--r-sm);padding:var(--s-md) var(--s-base)}
-.msg.err{background:#fff8f6;color:var(--error);border:1px solid #f7d6ce}
-.msg.ok{background:var(--surface-soft);color:var(--ink);border:1px solid var(--hairline-soft)}
-.msg.info{background:var(--surface-soft);color:var(--muted);border:1px solid var(--hairline-soft)}
-.donelist{list-style:none;padding:0;margin:var(--s-base) 0 0;display:grid;
-     grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--s-sm) var(--s-lg)}
-.donelist li{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
-.donelist a{font-weight:600}
+/* done */
+.donelist{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:8px;padding:0;list-style:none}
+.donelist a{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--r-full);background:var(--page);
+       font-size:15px;font-weight:600;text-decoration:none}
 
-/* ------------------------------------------------------- sticky action bar */
-.actionbar{position:fixed;left:0;right:0;bottom:0;background:var(--canvas);
-     border-top:1px solid var(--hairline);padding:var(--s-md) var(--s-lg);
-     z-index:30;box-shadow:rgba(0,0,0,.06) 0 -2px 8px}
-.actionbar .inner{max-width:1080px;margin:0 auto;display:flex;gap:var(--s-md);
-     align-items:center}
-.actionbar .field{flex:1;min-width:180px;height:48px;font-size:15px}
+/* floating action bar */
+.actionbar{position:fixed;left:0;right:0;bottom:0;padding:0 24px 20px;z-index:30;pointer-events:none}
+.actionbar .inner{pointer-events:auto;max-width:1112px;margin:0 auto;display:flex;gap:12px;flex-wrap:wrap;align-items:center;
+       padding:12px 12px 12px 24px;background:var(--panel);border-radius:28px;box-shadow:var(--shadow-lift)}
+.actionbar .dest{flex:1;min-width:180px;height:48px;padding:0 4px;border:0;outline:0;background:transparent;color:var(--ink);font-size:15px}
 .actionbar .count{font-size:14px;color:var(--muted);white-space:nowrap}
-.actionbar .count b{color:var(--ink);font-weight:700;font-size:16px;
-     font-variant-numeric:tabular-nums}
-.xprog{max-width:1080px;margin:0 auto var(--s-sm);font-size:14px;color:var(--muted)}
-.xprog .bar{margin:0 0 var(--s-xs)}
+.actionbar .count b{color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums}
+.xprog{width:100%;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px;padding-right:12px}
 
-@media (max-width:1128px){
+@media (max-width:1000px){
   .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .faces{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .faces{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width:744px){
-  .nav{height:64px;padding:0 var(--s-base)}
+  .nav{padding:16px}
   .email{display:none}
-  main{padding:var(--s-lg) var(--s-base) 200px}
-  .hero h1{font-size:26px}
-  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .faces{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pill{height:auto;padding:var(--s-md);border-radius:var(--r-lg)}
-  .pill .seg{padding-right:var(--s-sm)}
-  .modes{width:100%}
-  .modes button{flex:1;padding:10px 8px}
-  .person{flex-wrap:wrap}
-  .person .field{flex:1 1 60%}
-  .shots{flex:1 1 100%}
-  .actionbar .inner{flex-wrap:wrap}
-  .actionbar .field{flex:1 1 100%}
+  main{padding:8px 16px 220px}
+  .panel,.card{padding:24px 20px;border-radius:24px}
+  .hero h1{font-size:36px}
+  .hero .art{max-width:200px}
+  .pill{height:auto;flex-wrap:wrap;gap:10px;padding:14px 14px 14px 22px;border-radius:28px}
+  .pill .seg{flex:1 1 100%}
+  .pill .btn{width:100%}
+  .tabs{width:100%;justify-content:flex-start}
+  .mode .side{max-width:none}
+  .mode .side img{display:none}
+  .grid,.faces{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .actionbar{padding:0 12px 12px}
+  .actionbar .dest{flex:1 1 100%}
   .actionbar .btn{flex:1}
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
@@ -264,110 +236,167 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <body>
 
 <nav class="nav">
-  <div class="brand">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"/>
-      <path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-      <circle cx="8" cy="9.2" r="1" fill="currentColor"/>
-      <circle cx="13" cy="9.2" r="1" fill="currentColor"/>
-      <path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-    Face<b>Finder</b>
-  </div>
+  <a class="brand" href="/" aria-label="FaceFinder, back to the start">
+    <span class="logo">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="8" cy="9.2" r="1" fill="currentColor"/>
+        <circle cx="13" cy="9.2" r="1" fill="currentColor"/>
+        <path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+    </span>
+    FaceFinder
+  </a>
   <div class="grow"></div>
   <span class="email" id="who"></span>
-  <button class="acct" id="auth"><span id="authLabel">Sign in</span><span class="dot" id="authDot">G</span></button>
+  <button class="btn sm" id="auth"><span id="authLabel">Sign in with Google</span></button>
 </nav>
 
 <main>
   <div id="setupWarn"></div>
 
-  <section class="hero">
-    <h1>Give everyone their own folder of photos</h1>
-    <p>Paste the album the photographer shared. Tell us who to look for, or let us
-       show you everyone who is in it. Each person gets a folder in your Drive.</p>
+  <!-- 1. start -->
+  <section class="hero" id="hero">
+    <div class="copy">
+      <h1>Sort a whole photo album in minutes</h1>
+      <p>Paste the Google Drive album. FaceFinder finds every face and Gemini checks every
+         photo, so each person gets their own folder, the album sorts itself into groups,
+         and the bad shots are culled for you.</p>
+      <div class="pill">
+        <div class="seg">
+          <label for="album">Shared album</label>
+          <input type="text" id="album" placeholder="Paste the Google Drive folder link">
+        </div>
+        <button class="btn" id="openAlbum">Open album</button>
+      </div>
+      <div id="albumMsg" style="margin-top:12px;max-width:640px"></div>
+    </div>
+    <div class="art"><img class="mascot" src="/static/img/cam-wave.png" alt="FaceFinder's camera mascot waving hello"></div>
   </section>
 
-  <!-- the album -->
-  <div class="pill">
-    <div class="seg">
-      <label for="album">Shared album</label>
-      <input type="text" id="album" placeholder="Paste the Google Drive folder link">
-    </div>
-    <button class="orb" id="openAlbum" title="Open album" aria-label="Open album">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.4"/>
-        <path d="M16 16l5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-      </svg>
-    </button>
-  </div>
-  <div class="narrow">
-    <div id="albumMsg"></div>
-    <div id="indexBox" hidden>
-      <div class="bar"><i id="pbar"></i></div>
-      <div class="row">
-        <span style="font-size:14px;color:var(--muted)" id="pstat"></span>
-        <div class="grow"></div>
-        <button class="btn text" id="rebuild" style="font-size:14px">Rescan from scratch</button>
-      </div>
-    </div>
-  </div>
+  <!-- 2. scanning -->
+  <section class="panel center" id="scanCard" hidden>
+    <img class="mascot" src="/static/img/cam-search.png" alt="The mascot searching with a magnifying glass" width="200" height="200">
+    <h2 style="font-size:30px">Looking through the album</h2>
+    <div class="bar"><i id="pbar"></i></div>
+    <div id="pstat" style="font-size:15px;color:var(--muted)">Starting…</div>
+    <div class="hint" style="font-size:14px">This is the only slow step, and each album needs it only once.</div>
+  </section>
 
-  <section class="card" id="doneCard" hidden></section>
+  <div class="chip" id="albumInfo" hidden></div>
+  <section class="panel center" id="doneCard" hidden></section>
 
   <div class="work" id="work" data-locked="1">
-    <div class="modes" role="tablist" aria-label="How to find people">
-      <button role="tab" id="tabPeople" aria-selected="true">I know who I'm looking for</button>
-      <button role="tab" id="tabEveryone" aria-selected="false">Show me everyone in the album</button>
+    <div class="tabs" role="tablist" aria-label="What to do with the album">
+      <button role="tab" id="tabPeople" aria-selected="true">People I'm looking for</button>
+      <button role="tab" id="tabEveryone" aria-selected="false">Everyone in the album</button>
+      <button role="tab" id="tabSort" aria-selected="false" data-ai>Sort by description <span class="ai">GEMINI</span></button>
+      <button role="tab" id="tabCull" aria-selected="false" data-ai>Cull for photographers <span class="ai">GEMINI</span></button>
     </div>
 
-    <!-- mode 1: named people -->
+    <!-- mode: people I'm looking for -->
     <div id="modePeople">
-      <section class="card">
-        <h2>Who are we looking for</h2>
-        <p class="hint">Add one to three clear photos of each person and give them a name.
-           The name becomes their folder. Two or three angles finds more than one shot.</p>
-        <div class="roster" id="roster"></div>
-        <div class="row" style="margin-top:var(--s-md)">
-          <button class="btn secondary sm" id="addPerson">Add another person</button>
+      <section class="panel mode">
+        <div class="side">
+          <h2>Who are we looking for?</h2>
+          <p class="hint">Add one to three clear photos of each person and give them a name.
+             The name becomes their folder.</p>
+          <img class="mascot" src="/static/img/cam-stand.png" alt="The mascot standing by">
         </div>
-        <div class="row" style="margin-top:var(--s-lg)">
-          <button class="btn" id="go">Find their photos</button>
-        </div>
-        <div id="searchMsg"></div>
-        <div id="strict" hidden>
-          <div class="slider-head">Match strictness <b id="thVal">0.38</b>
-            <span>— lower finds more photos but lets in the wrong people</span></div>
-          <input type="range" id="th" min="0.20" max="0.70" step="0.01" value="0.38"
-                 aria-label="Match strictness">
+        <div class="main">
+          <div id="roster" style="display:flex;flex-direction:column;gap:12px"></div>
+          <div class="row">
+            <button class="btn ghost sm" id="addPerson">Add another person</button>
+            <button class="btn" id="go">Find their photos</button>
+          </div>
+          <div id="searchMsg"></div>
+          <div id="strict" hidden>
+            <div class="slider-head">Match strictness <b id="thVal">0.38</b>
+              <span>— lower finds more photos but lets in the wrong people</span></div>
+            <input type="range" id="th" min="0.20" max="0.70" step="0.01" value="0.38" aria-label="Match strictness">
+          </div>
         </div>
       </section>
       <div id="results"></div>
     </div>
 
-    <!-- mode 2: everyone -->
+    <!-- mode: everyone in the album -->
     <div id="modeEveryone" hidden>
-      <section class="card">
-        <div class="row">
-          <div style="flex:1;min-width:240px">
-            <h2>Everyone in this album</h2>
-            <p class="hint">Tick the people you want a folder for and type their name.
-               Tap a face to check their photos. Same person twice? Give both the same name.</p>
-          </div>
-          <label class="row" style="font-size:14px;color:var(--muted);gap:var(--s-sm)">Grouping
+      <section class="panel mode">
+        <div class="side">
+          <h2>Who gets a folder?</h2>
+          <p class="hint">Tick the people you want and type their name. Tap a face to check
+             their photos and pick their best shots. Same person twice? Give both the same name.</p>
+          <label class="check" style="flex-wrap:wrap">Grouping
             <select class="field" id="grouping">
               <option value="loose">Looser — fewer, bigger groups</option>
               <option value="balanced" selected>Balanced</option>
               <option value="strict">Stricter — never mix two people</option>
             </select>
           </label>
+          <img class="mascot mirror" src="/static/img/cam-point.png" alt="The mascot pointing at the people">
         </div>
-        <div id="everyMsg"></div>
-        <div class="faces" id="faces"></div>
-        <div class="row" style="margin-top:var(--s-base)">
-          <button class="btn text" id="toggleSingles" style="font-size:14px" hidden></button>
+        <div class="main">
+          <div id="everyMsg"></div>
+          <div class="faces" id="faces"></div>
+          <div><button class="linkbtn" id="toggleSingles" hidden></button></div>
         </div>
       </section>
+    </div>
+
+    <!-- mode: sort by description (Gemini) -->
+    <div id="modeSort" hidden>
+      <section class="panel mode">
+        <div class="side">
+          <h2>Sort by description</h2>
+          <p class="hint">Describe the groups in plain words, Thai or English: who they are,
+             what they wear, or what is happening. Gemini puts every photo in the folders it
+             fits. Not sure what to write? Let Gemini suggest groups from the album.</p>
+          <img class="mascot" src="/static/img/cam-search.png" alt="The mascot looking closely">
+        </div>
+        <div class="main">
+          <div id="groupRows" style="display:flex;flex-direction:column;gap:10px"></div>
+          <div class="row">
+            <button class="btn soft sm" id="suggest">Let Gemini suggest groups</button>
+            <button class="btn ghost sm" id="addGroup">Add a group</button>
+            <button class="btn" id="runSort">Sort the photos</button>
+          </div>
+          <div class="bar" id="sbarBox" hidden><i id="sbar"></i></div>
+          <div id="sortMsg"></div>
+        </div>
+      </section>
+      <div id="sortResults"></div>
+    </div>
+
+    <!-- mode: cull (Gemini) -->
+    <div id="modeCull" hidden>
+      <section class="panel mode">
+        <div class="side">
+          <h2>Cull the album</h2>
+          <p class="hint">Gemini checked every photo for blur, closed eyes, people cut off by
+             the frame and bad light, and FaceFinder keeps only the best frame of each burst.
+             Nothing is deleted: the keepers are copied into a new folder.</p>
+          <img class="mascot" src="/static/img/cam-photo.png" alt="The mascot holding a photo">
+        </div>
+        <div class="main">
+          <div class="row">
+            <label class="check">How strict
+              <select class="field" id="strictness">
+                <option value="gentle">Gentle — only drop clear mistakes</option>
+                <option value="normal" selected>Normal</option>
+                <option value="strict">Strict — only the strongest frames</option>
+              </select>
+            </label>
+            <button class="btn" id="runCull">Cull the album</button>
+          </div>
+          <div id="cullMsg"></div>
+          <label class="check" id="alsoRejectedBox" hidden>
+            <input type="checkbox" id="alsoRejected"> Also copy the rejected photos into a "Rejected" folder
+          </label>
+        </div>
+      </section>
+      <div id="cullResults"></div>
     </div>
   </div>
 </main>
@@ -375,20 +404,21 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <dialog id="dlg" aria-label="Photos of one person">
   <div class="dhead">
     <img class="avatar" id="dlgFace" alt="">
-    <input type="text" class="field" id="dlgName" placeholder="Name — becomes the folder name" maxlength="100">
+    <input type="text" class="field" id="dlgName" placeholder="Name — becomes the folder name" maxlength="100" aria-label="Name">
     <span class="rcount" id="dlgCount"></span>
-    <button class="btn secondary sm" id="dlgAll">All</button>
-    <button class="btn secondary sm" id="dlgNone">None</button>
-    <button class="btn secondary sm" id="dlgSure">Confident only</button>
+    <button class="btn soft sm" id="dlgBest" data-ai>Best 10</button>
+    <button class="btn ghost sm" id="dlgAll">All</button>
+    <button class="btn ghost sm" id="dlgNone">None</button>
+    <button class="btn ghost sm" id="dlgSure">Confident only</button>
     <button class="btn sm" id="dlgDone">Done</button>
   </div>
-  <div class="dbody"><div class="grid" id="dlgGrid"></div></div>
+  <div class="dbody"><div id="dlgMsg" style="margin-top:16px"></div><div class="grid" id="dlgGrid"></div></div>
 </dialog>
 
 <div class="actionbar" id="actionbar" hidden>
-  <div class="xprog" id="xprog" hidden><div class="bar"><i id="xbar"></i></div><span id="xtext"></span></div>
   <div class="inner">
-    <input type="text" id="dest" class="field"
+    <div class="xprog" id="xprog" hidden><div class="bar"><i id="xbar"></i></div><span id="xtext"></span></div>
+    <input type="text" id="dest" class="dest"
            placeholder="Where to put the folders: a Drive folder link, or a name for a new one"
            aria-label="Destination folder">
     <span class="count" id="summary"></span>
@@ -400,15 +430,19 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
 const CLOSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const FOLDER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 
 const state = {
-  signedIn:false, folderId:null, ready:false, mode:"people", thr:0.38,
+  signedIn:false, gemini:false, folderId:null, albumName:"", ready:false, mode:"people", thr:0.38,
   roster:[],        // people the user described: {id, name, files, urls}
   results:[],       // one group per searched person
   crowd:null,       // one group per face cluster, when "everyone" was loaded
+  sortDefs:[],      // groups to sort by: {name, description}
+  sorted:[],        // one group per sorted folder, after sorting
+  culled:null,      // {keep, reject} groups, after culling
   showSingles:false, open:null, poll:null, seq:0, exporting:false,
 };
 
@@ -423,29 +457,30 @@ async function api(url, opts={}){
 }
 const postJSON = (url, data) => api(url, {
   method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plural = (n, one, many) => `${n.toLocaleString("en")} ${n === 1 ? one : many}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-/* A "group" is one person's photos, whichever way it was found:
+/* A "group" is a set of photos that becomes one folder, however it was found:
    kind "search"  -> all = every match down to 0.20, filtered live by the slider
-   kind "cluster" -> all = the photos grouped under one face                    */
+   kind "cluster" -> all = the photos grouped under one face
+   kind "set"     -> all = photos Gemini sorted or culled into this group
+   Rows are {file_id, name, score?, confident?, why?}; g.removed holds unticked ones. */
 const visible = g => g.kind === "search" ? g.all.filter(m => m.score >= state.thr) : g.all;
-const isSure  = (g, m) => g.kind === "search" ? m.score >= state.thr + 0.12 : m.confident;
+const isSure  = (g, m) => g.kind === "search" ? m.score >= state.thr + 0.12 : m.confident !== false;
 const picked  = g => visible(g).filter(m => !g.removed.has(m.file_id));
 
 // ---- auth ----
 async function refreshMe(){
   const me = await api("/api/me");
   state.signedIn = me.signed_in;
-  if(!me.configured){
-    msg($("#setupWarn"),
-      "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
-  }
-  const email = me.user?.emailAddress || "";
-  $("#who").textContent = email;
-  $("#authLabel").textContent = me.signed_in ? "Sign out" : "Sign in";
-  $("#authDot").textContent = email ? email[0].toUpperCase() : "G";
+  state.gemini = !!me.gemini;
+  if(!me.configured)
+    msg($("#setupWarn"), "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
+  $("#who").textContent = me.user?.emailAddress || "";
+  $("#authLabel").textContent = me.signed_in ? "Sign out" : "Sign in with Google";
   state.thr = Number(me.default_threshold) || 0.38;
   $("#th").value = state.thr; $("#thVal").textContent = state.thr.toFixed(2);
+  document.querySelectorAll("[data-ai]").forEach(el => el.hidden = !state.gemini);
 }
 $("#auth").onclick = async () => {
   if(state.signedIn){ await api("/api/logout",{method:"POST"}); location.reload(); }
@@ -461,17 +496,15 @@ $("#openAlbum").onclick = async () => {
   msg($("#albumMsg"), "Opening…");
   try{
     const a = await postJSON("/api/album", {folder:v});
-    state.folderId = a.folder_id;
-    state.results = []; state.crowd = null; state.ready = false;
-    renderResults(); renderCrowd(); $("#doneCard").hidden = true;
-    msg($("#albumMsg"), `Album <b>${esc(a.name)}</b> is open.`, "ok");
-    $("#indexBox").hidden = false;
+    state.folderId = a.folder_id; state.albumName = a.name;
+    state.results = []; state.crowd = null; state.sorted = []; state.culled = null; state.ready = false;
+    renderResults(); renderCrowd(); renderSorted(); renderCull(); $("#doneCard").hidden = true;
+    msg($("#albumMsg"), "");
     if(a.status.status !== "ready") await startIndex(false);
     pollStatus();
   }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
 };
 $("#album").addEventListener("keydown", e => { if(e.key === "Enter") $("#openAlbum").click(); });
-$("#rebuild").onclick = () => startIndex(true);
 
 async function startIndex(rebuild){
   state.ready = false; $("#work").dataset.locked = "1"; updateBar();
@@ -480,72 +513,140 @@ async function startIndex(rebuild){
 }
 function pollStatus(){
   clearInterval(state.poll);
+  $("#hero").hidden = true; $("#scanCard").hidden = false; $("#albumInfo").hidden = true;
   const tick = async () => {
     let s;
     try { s = await api(`/api/album/${state.folderId}/status`); }
     catch(e){ $("#pstat").textContent = "Lost contact with the server: " + e.message; return; }
     const pct = s.total ? Math.round(100*s.done/s.total) : 0;
     $("#pbar").style.width = pct + "%";
+    const ai = s.gemini ? ` · Gemini checked ${s.judged.toLocaleString("en")}` : "";
     if(s.status === "indexing")
-      $("#pstat").textContent = `Scanning faces — ${s.done} of ${s.total} photos, ${s.faces} faces found`;
+      $("#pstat").textContent = `${s.done.toLocaleString("en")} of ${plural(s.total, "photo", "photos")} scanned, ${plural(s.faces, "face", "faces")} found${ai}`;
     else if(s.status === "ready"){
-      $("#pstat").textContent = `Ready — ${s.message}.`;
-      $("#pbar").style.width = "100%";
+      clearInterval(state.poll);
       state.ready = true; $("#work").dataset.locked = "0";
-      clearInterval(state.poll);
+      $("#scanCard").hidden = true;
+      const info = $("#albumInfo"); info.hidden = false;
+      info.innerHTML = `Album <b>${esc(state.albumName || s.name)}</b> is ready: ${esc(s.message)}.
+        <button class="linkbtn" id="rebuild" style="margin-left:8px">Scan again</button>`;
+      $("#rebuild").onclick = () => startIndex(true);
       if(state.mode === "everyone" && !state.crowd) loadCrowd();
+      updateBar();
     } else if(s.status === "error"){
-      $("#pstat").textContent = "Error: " + s.message;
       clearInterval(state.poll);
+      $("#pstat").textContent = "Something went wrong: " + s.message;
     } else $("#pstat").textContent = "Starting…";
   };
   tick(); state.poll = setInterval(tick, 1500);
 }
 
 // ---- mode switch ----
+const MODES = {people:"#tabPeople", everyone:"#tabEveryone", sort:"#tabSort", cull:"#tabCull"};
 function setMode(mode){
   state.mode = mode;
-  $("#tabPeople").setAttribute("aria-selected", mode === "people");
-  $("#tabEveryone").setAttribute("aria-selected", mode === "everyone");
-  $("#modePeople").hidden = mode !== "people";
-  $("#modeEveryone").hidden = mode !== "everyone";
+  for(const [m, tab] of Object.entries(MODES)){
+    $(tab).setAttribute("aria-selected", m === mode);
+    $("#mode" + m[0].toUpperCase() + m.slice(1)).hidden = m !== mode;
+  }
   if(mode === "everyone" && state.ready && !state.crowd) loadCrowd();
+  if(mode === "sort" && !state.sortDefs.length) addGroup();
   updateBar();
 }
-$("#tabPeople").onclick = () => setMode("people");
-$("#tabEveryone").onclick = () => setMode("everyone");
+for(const [m, tab] of Object.entries(MODES)) $(tab).onclick = () => setMode(m);
 
-// ---- shared: a grid of one person's photos ----
+// ---- shared: a grid of photos with ticks ----
 function fillGrid(el, g, onChange){
   el.innerHTML = "";
-  for(const m of visible(g)){
+  const rows = visible(g);
+  const limit = g.limit && !g.showAll ? g.limit : rows.length;
+  for(const m of rows.slice(0, limit)){
     const d = document.createElement("div");
     d.className = "tile" + (g.removed.has(m.file_id) ? "" : " sel");
     d.tabIndex = 0; d.setAttribute("role", "button");
+    d.setAttribute("aria-pressed", !g.removed.has(m.file_id));
+    const best = g.best?.get(m.file_id);
+    const why = best || m.why || "";
     d.innerHTML =
       `<div class="ph">
          <img loading="lazy" src="/api/thumb/${encodeURIComponent(m.file_id)}?s=400" alt="${esc(m.name)}">
-         ${isSure(g, m) ? "" : '<span class="tag">Not sure</span>'}
+         ${best ? '<span class="tag best">Best</span>' : isSure(g, m) ? "" : '<span class="tag">Not sure</span>'}
          <span class="tick">${CHECK}</span>
        </div>
        <div class="meta"><span class="nm">${esc(m.name)}</span>
-         <span class="sc">${m.score.toFixed(2)}</span></div>`;
+         ${typeof m.score === "number" ? `<span class="sc">${m.score.toFixed(2)}</span>` : ""}</div>
+       ${why ? `<div class="why" title="${esc(why)}">${esc(why)}</div>` : ""}`;
     const flip = () => {
       g.removed.has(m.file_id) ? g.removed.delete(m.file_id) : g.removed.add(m.file_id);
-      d.classList.toggle("sel"); onChange();
+      d.classList.toggle("sel"); d.setAttribute("aria-pressed", !g.removed.has(m.file_id)); onChange();
     };
     d.onclick = flip;
     d.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); flip(); } };
     el.appendChild(d);
   }
+  if(limit < rows.length){
+    const more = document.createElement("button");
+    more.className = "btn ghost sm"; more.style.gridColumn = "1 / -1"; more.style.justifySelf = "center";
+    more.textContent = `Show all ${plural(rows.length, "photo", "photos")}`;
+    more.onclick = () => { g.showAll = true; fillGrid(el, g, onChange); };
+    el.appendChild(more);
+  }
 }
 function choose(g, which){
+  g.best = null;
   if(which === "all") g.removed.clear();
   else g.removed = new Set(visible(g)
     .filter(m => which === "none" || !isSure(g, m)).map(m => m.file_id));
 }
+// Gemini's pick of this person's best photos: tick only those, say why.
+async function pickBest(g, n, msgEl){
+  msg(msgEl, "Gemini is picking the best shots…");
+  try{
+    const r = await postJSON("/api/best",
+      {folder_id:state.folderId, file_ids:visible(g).map(m => m.file_id), n});
+    g.best = new Map(r.best.map(b => [b.file_id, b.reason]));
+    g.removed = new Set(visible(g).map(m => m.file_id).filter(f => !g.best.has(f)));
+    // the picks first, in Gemini's order
+    const order = new Map(r.best.map((b, i) => [b.file_id, i]));
+    g.all.sort((a, b) => (order.get(a.file_id) ?? 1e9) - (order.get(b.file_id) ?? 1e9));
+    msg(msgEl, `Picked the best ${plural(r.best.length, "photo", "photos")} out of ${r.of.toLocaleString("en")}. Tick or untick any photo to change the pick.`, "ok");
+  }catch(e){ msg(msgEl, esc(e.message), "err"); }
+}
 
-// ---- mode 1: the people to look for ----
+// A result card: name, count, pick buttons, grid. Used by search, sort and cull.
+function groupCard(g, {title, avatar, nameId, extraButtons = "", best = false, note = ""}){
+  const sec = document.createElement("section");
+  sec.className = "card";
+  sec.innerHTML =
+    `<div class="rhead">
+       ${avatar ? `<img class="avatar" src="${avatar}" alt="">` : ""}
+       <div style="flex:1;min-width:140px">
+         <div class="rname" ${nameId ? `data-rname="${nameId}"` : ""}>${esc(title)}</div>
+         <div class="rcount"></div>
+       </div>
+       ${best && state.gemini ? '<button class="btn soft sm" data-pick="best">Best 10</button>' : ""}
+       ${extraButtons}
+       <button class="btn ghost sm" data-pick="all">All</button>
+       <button class="btn ghost sm" data-pick="none">None</button>
+     </div>
+     ${note ? `<p class="hint" style="margin-top:8px">${note}</p>` : ""}
+     <div class="gmsg" style="margin-top:12px"></div>
+     <div class="grid"></div>`;
+  const grid = sec.querySelector(".grid"), cnt = sec.querySelector(".rcount");
+  const tally = () => {
+    cnt.textContent = `${picked(g).length.toLocaleString("en")} of ${plural(visible(g).length, "photo", "photos")} selected`;
+    updateBar();
+  };
+  sec.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+    if(b.dataset.pick === "best") await pickBest(g, 10, sec.querySelector(".gmsg"));
+    else { choose(g, b.dataset.pick); msg(sec.querySelector(".gmsg"), ""); }
+    fillGrid(grid, g, tally); tally();
+  });
+  fillGrid(grid, g, tally); tally();
+  return sec;
+}
+
+// ---- mode: the people to look for ----
 const nameOf = p => p.name.trim() || `Person ${state.roster.indexOf(p) + 1}`;
 
 function addPerson(){
@@ -621,7 +722,7 @@ $("#go").onclick = async () => {
   }
   const found = state.results.reduce((n, g) => n + visible(g).length, 0);
   msg($("#searchMsg"),
-    `Found <b>${found}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then create the folders.`, "ok");
+    `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then create the folders.`, "ok");
   $("#strict").hidden = false;
   $("#go").disabled = false;
 };
@@ -635,44 +736,22 @@ $("#th").oninput = e => {
 function renderResults(){
   const box = $("#results"); box.innerHTML = "";
   for(const g of state.results){
-    const sec = document.createElement("section");
-    sec.className = "card";
-    const head =
-      `<div class="rhead">
-         <img class="avatar" src="${g.person.urls[0] || ""}" alt="">
-         <div style="flex:1;min-width:140px">
-           <div class="rname" data-rname="${g.person.id}">${esc(nameOf(g.person))}</div>
-           <div class="rcount"></div>
-         </div>
-         <button class="btn secondary sm" data-pick="all">All</button>
-         <button class="btn secondary sm" data-pick="none">None</button>
-         <button class="btn secondary sm" data-pick="sure">Confident only</button>
-       </div>`;
-    if(g.error){
-      sec.innerHTML = head + `<div class="msg err">${esc(g.error)}</div>`;
-      sec.querySelectorAll("[data-pick]").forEach(b => b.hidden = true);
-    } else if(!visible(g).length){
-      sec.innerHTML = head + `<div class="msg info">No photos at this strictness. Lower the
-        slider above, or add a clearer photo of this person and search again.</div>`;
-      sec.querySelectorAll("[data-pick]").forEach(b => b.hidden = true);
-    } else {
-      sec.innerHTML = head + '<div class="grid"></div>';
-      const grid = sec.querySelector(".grid"), cnt = sec.querySelector(".rcount");
-      const tally = () => {
-        cnt.textContent = `${picked(g).length} of ${plural(visible(g).length, "photo", "photos")} selected`;
-        updateBar();
-      };
-      sec.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
-        choose(g, b.dataset.pick); fillGrid(grid, g, tally); tally();
-      });
-      fillGrid(grid, g, tally); tally();
-    }
-    box.appendChild(sec);
+    const opts = {title:nameOf(g.person), avatar:g.person.urls[0], nameId:g.person.id, best:true,
+                  extraButtons:'<button class="btn ghost sm" data-pick="sure">Confident only</button>'};
+    if(g.error || !visible(g).length){
+      const sec = document.createElement("section");
+      sec.className = "card";
+      sec.innerHTML = `<div class="rhead"><img class="avatar" src="${g.person.urls[0] || ""}" alt="">
+          <div class="rname" data-rname="${g.person.id}">${esc(nameOf(g.person))}</div></div>
+        <div class="msg ${g.error ? "err" : "info"}" style="margin-top:12px">${g.error ? esc(g.error) :
+          "No photos at this strictness. Lower the slider above, or add a clearer photo of this person and search again."}</div>`;
+      box.appendChild(sec);
+    } else box.appendChild(groupCard(g, opts));
   }
   updateBar();
 }
 
-// ---- mode 2: everyone in the album ----
+// ---- mode: everyone in the album ----
 const NAMES_KEY = () => "ff.names." + state.folderId;
 function savedNames(){
   try { return JSON.parse(localStorage.getItem(NAMES_KEY()) || "{}"); } catch(e){ return {}; }
@@ -722,7 +801,7 @@ function renderCrowd(){
        </div>
        <input class="fname" type="text" maxlength="100" placeholder="Name"
               value="${esc(g.name)}" aria-label="Name">
-       <div class="fmeta">${plural(g.all.length, "photo", "photos")}</div>`;
+       <div class="fmeta">${plural(picked(g).length, "photo", "photos")}${g.best ? " · best picked" : ""}</div>`;
     const tick = card.querySelector(".tick");
     const setOn = on => { g.on = on; tick.setAttribute("aria-pressed", on); saveNames(); updateBar(); };
     card.querySelector(".fpic").onclick = () => openPerson(g);
@@ -746,12 +825,14 @@ function openPerson(g){
   state.open = g;
   $("#dlgFace").src = faceUrl(g);
   $("#dlgName").value = g.name;
+  msg($("#dlgMsg"), "");
   const tally = () => $("#dlgCount").textContent =
-    `${picked(g).length} of ${g.all.length} selected`;
+    `${picked(g).length.toLocaleString("en")} of ${g.all.length.toLocaleString("en")} selected`;
   const refill = () => { fillGrid($("#dlgGrid"), g, tally); tally(); };
   $("#dlgAll").onclick  = () => { choose(g, "all");  refill(); };
   $("#dlgNone").onclick = () => { choose(g, "none"); refill(); };
   $("#dlgSure").onclick = () => { choose(g, "sure"); refill(); };
+  $("#dlgBest").onclick = async () => { await pickBest(g, 10, $("#dlgMsg")); refill(); };
   refill();
   $("#dlg").showModal();
 }
@@ -762,24 +843,153 @@ $("#dlgName").oninput = e => {
 $("#dlgDone").onclick = () => $("#dlg").close();
 $("#dlg").addEventListener("close", () => { saveNames(); renderCrowd(); });
 
+// ---- mode: sort by description ----
+function addGroup(def = {name:"", description:""}){
+  state.sortDefs.push(def); renderGroupRows();
+}
+function renderGroupRows(){
+  const box = $("#groupRows"); box.innerHTML = "";
+  state.sortDefs.forEach((d, i) => {
+    const row = document.createElement("div");
+    row.className = "grow-row";
+    row.innerHTML =
+      `<input class="field gname" type="text" maxlength="60" placeholder="Folder name, e.g. Staff"
+              value="${esc(d.name)}" aria-label="Folder name">
+       <input class="field gdesc" type="text" maxlength="300"
+              placeholder="Who or what goes in it, e.g. people in blue staff shirts"
+              value="${esc(d.description)}" aria-label="What goes in this folder">
+       <button class="iconbtn" type="button" aria-label="Remove this group">${CLOSE}</button>`;
+    row.querySelector(".gname").oninput = e => d.name = e.target.value;
+    row.querySelector(".gdesc").oninput = e => d.description = e.target.value;
+    row.querySelector(".iconbtn").onclick = () => { state.sortDefs.splice(i, 1); renderGroupRows(); };
+    box.appendChild(row);
+  });
+}
+$("#addGroup").onclick = () => addGroup();
+$("#suggest").onclick = async () => {
+  const b = $("#suggest"); b.disabled = true;
+  msg($("#sortMsg"), "Gemini is reading the album…");
+  try{
+    const r = await postJSON("/api/groups/suggest", {folder_id:state.folderId});
+    state.sortDefs = state.sortDefs.filter(d => d.name.trim() || d.description.trim()).concat(r.groups);
+    renderGroupRows();
+    msg($("#sortMsg"), r.groups.length
+      ? `Gemini suggests ${plural(r.groups.length, "group", "groups")}. Rename, edit or remove any of them, then sort.`
+      : "Gemini did not find clear groups. Describe your own.", r.groups.length ? "ok" : "info");
+  }catch(e){ msg($("#sortMsg"), esc(e.message), "err"); }
+  b.disabled = false;
+};
+$("#runSort").onclick = async () => {
+  const groups = state.sortDefs
+    .map(d => ({name:d.name.trim(), description:(d.description.trim() || d.name.trim())}))
+    .filter(d => d.name);
+  if(!groups.length) return msg($("#sortMsg"), "Give at least one group a name.", "err");
+  $("#runSort").disabled = true; $("#sbarBox").hidden = false; $("#sbar").style.width = "0%";
+  msg($("#sortMsg"), "Sorting…");
+  try{
+    const {job_id} = await postJSON("/api/sort", {folder_id:state.folderId, groups});
+    let job;
+    while(true){
+      job = await api("/api/sort/" + job_id);
+      $("#sbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
+      msg($("#sortMsg"), `Sorting — ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}`);
+      if(job.status !== "running") break;
+      await sleep(1000);
+    }
+    if(job.status === "error") throw new Error(job.message || "Sorting failed");
+    const row = f => ({file_id:f, name:job.names[f] || f});
+    state.sorted = job.groups.map(gr => ({kind:"set", name:gr.name, note:gr.description,
+                                           all:gr.file_ids.map(row), removed:new Set(), limit:24}));
+    if(job.check.length)
+      state.sorted.push({kind:"set", name:"Check these", check:true, all:job.check.map(row),
+                         removed:new Set(job.check), limit:24,
+                         note:"Gemini was not sure where these go. Tick any you want in a \"Check these\" folder."});
+    const placed = job.groups.reduce((n, gr) => n + gr.file_ids.length, 0);
+    const notes = [];
+    if(job.none.length) notes.push(`${plural(job.none.length, "photo fits", "photos fit")} none of the groups`);
+    if(job.check.length) notes.push(`${plural(job.check.length, "photo needs", "photos need")} a look`);
+    msg($("#sortMsg"), `Done: ${plural(placed, "photo", "photos")} sorted into folders` +
+      (notes.length ? `; ${notes.join(", and ")}.` : "."), "ok");
+    renderSorted();
+  }catch(e){ msg($("#sortMsg"), esc(e.message), "err"); }
+  $("#runSort").disabled = false; $("#sbarBox").hidden = true;
+};
+function renderSorted(){
+  const box = $("#sortResults"); box.innerHTML = "";
+  for(const g of state.sorted)
+    box.appendChild(groupCard(g, {title:g.name, note:g.note ? esc(g.note) : ""}));
+  updateBar();
+}
+
+// ---- mode: cull ----
+$("#runCull").onclick = async () => {
+  $("#runCull").disabled = true;
+  msg($("#cullMsg"), "Culling…");
+  try{
+    const r = await postJSON("/api/cull", {folder_id:state.folderId, strictness:$("#strictness").value});
+    const rows = list => list.map(x => ({file_id:x.file_id, name:x.name, why:x.reason}));
+    state.culled = {
+      keep:{kind:"set", name:"Keep", all:rows(r.keep), removed:new Set(), limit:24},
+      reject:{kind:"set", name:"Rejected", all:rows(r.reject), removed:new Set(r.reject.map(x => x.file_id)), limit:48},
+    };
+    const counts = {};
+    for(const x of r.reject){
+      const k = x.similar_to ? "similar shot in a burst" : (x.flaws?.length ? x.reason.split(";")[0].toLowerCase() : "low score");
+      counts[k] = (counts[k] || 0) + 1;
+    }
+    const why = Object.entries(counts).sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `<span>${n.toLocaleString("en")} ${esc(k)}</span>`).join("");
+    $("#cullMsg").innerHTML =
+      `<div class="stat"><span>Keep ${r.keep.length.toLocaleString("en")}</span>
+         <span>Reject ${r.reject.length.toLocaleString("en")}</span>${why}</div>
+       ${r.checked < r.keep.length + r.reject.length ? `<p class="hint" style="margin-top:8px">Gemini has checked
+         ${r.checked.toLocaleString("en")} of these photos; the rest are kept until it has.</p>` : ""}`;
+    $("#alsoRejectedBox").hidden = !r.reject.length;
+    renderCull();
+  }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
+  $("#runCull").disabled = false;
+};
+$("#alsoRejected").onchange = updateBar;
+function renderCull(){
+  const box = $("#cullResults"); box.innerHTML = "";
+  if(!state.culled){ updateBar(); return; }
+  const {keep, reject} = state.culled;
+  if(reject.all.length)
+    box.appendChild(groupCard(reject, {title:`Rejected (${reject.all.length.toLocaleString("en")})`,
+      note:"Each photo says why. Tick any you want to keep after all; ticked ones go into the Keep folder."}));
+  box.appendChild(groupCard(keep, {title:`Keep (${keep.all.length.toLocaleString("en")})`}));
+  updateBar();
+}
+
 // ---- create the folders ----
 function exportGroups(){
-  const groups = state.mode === "people"
-    ? state.results.filter(g => !g.error).map(g => ({name:nameOf(g.person), g}))
-    : (state.crowd || []).filter(g => g.on).map(g => ({name:crowdName(g), g}));
+  let groups;
+  if(state.mode === "people")
+    groups = state.results.filter(g => !g.error).map(g => ({name:nameOf(g.person), ids:picked(g)}));
+  else if(state.mode === "everyone")
+    groups = (state.crowd || []).filter(g => g.on).map(g => ({name:crowdName(g), ids:picked(g)}));
+  else if(state.mode === "sort")
+    groups = state.sorted.map(g => ({name:g.name, ids:picked(g)}));
+  else if(state.culled){
+    const {keep, reject} = state.culled;
+    groups = [{name:"Keep", ids:picked(keep).concat(picked(reject))}];
+    if($("#alsoRejected").checked)
+      groups.push({name:"Rejected", ids:reject.all.filter(m => reject.removed.has(m.file_id))});
+  } else groups = [];
   return groups
-    .map(x => ({name:x.name, file_ids:picked(x.g).map(m => m.file_id)}))
+    .map(x => ({name:x.name, file_ids:x.ids.map(m => m.file_id)}))
     .filter(x => x.file_ids.length);
 }
 function updateBar(){
-  const active = state.mode === "people" ? state.results.length > 0 : !!state.crowd;
+  const active = {people:state.results.length > 0, everyone:!!state.crowd,
+                  sort:state.sorted.length > 0, cull:!!state.culled}[state.mode];
   $("#actionbar").hidden = !(state.ready && active);
   const gs = exportGroups();
   const folders = new Set(gs.map(g => g.name.toLowerCase())).size;
   const photos = gs.reduce((n, g) => n + g.file_ids.length, 0);
   $("#summary").innerHTML = gs.length
-    ? `<b>${folders}</b> ${folders === 1 ? "folder" : "folders"} · <b>${photos}</b> ${photos === 1 ? "photo" : "photos"}`
-    : (state.mode === "people" ? "No photos selected" : "Tick or name someone");
+    ? `<b>${folders}</b> ${folders === 1 ? "folder" : "folders"} · <b>${photos.toLocaleString("en")}</b> ${photos === 1 ? "photo" : "photos"}`
+    : (state.mode === "everyone" ? "Tick or name someone" : "No photos selected");
   $("#export").disabled = !gs.length || state.exporting;
 }
 
@@ -800,9 +1010,9 @@ $("#export").onclick = async () => {
     while(true){
       job = await api("/api/export/" + job_id);
       $("#xbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
-      $("#xtext").textContent = `Copying — ${job.done} of ${job.total} photos`;
+      $("#xtext").textContent = `Filling the folders — ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}`;
       if(job.status !== "running") break;
-      await new Promise(r => setTimeout(r, 1200));
+      await sleep(1200);
     }
   }catch(e){ job = {status:"error", message:e.message}; }
   state.exporting = false; $("#xprog").hidden = true; updateBar();
@@ -812,20 +1022,21 @@ $("#export").onclick = async () => {
 function showDone(job){
   const card = $("#doneCard");
   if(job.status === "error"){
-    card.innerHTML = `<h2>The folders were not created</h2>
+    card.innerHTML = `<img class="mascot" src="/static/img/cam-sad.png" alt="The mascot looking sorry" width="180" height="180">
+      <h2 style="font-size:30px">The folders were not created</h2>
       <div class="msg err">${esc(job.message || "Something went wrong.")}</div>`;
   } else {
     const made = job.people.filter(p => p.url);
     card.innerHTML =
-      `<h2>${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
+      `<img class="mascot" src="/static/img/cam-celebrate.png" alt="The mascot celebrating" width="220" height="220">
+       <h2 style="font-size:34px">${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
        <p class="hint">Inside <a href="${esc(job.root_url)}" target="_blank" rel="noopener"><b>${esc(job.root_name)}</b></a> in your Drive.
          ${job.skipped ? `${plural(job.skipped, "photo was", "photos were")} already there and left alone.` : ""}</p>
        ${job.note ? `<div class="msg info">${esc(job.note)}</div>` : ""}
        ${job.failed ? `<div class="msg err">${plural(job.failed, "photo", "photos")} could not be copied.
             Press Create folders again — it only retries the missing ones.</div>` : ""}
        <ul class="donelist">${made.map(p =>
-         `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>
-            — ${plural(p.copied + p.skipped, "photo", "photos")}</li>`).join("")}</ul>`;
+         `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${FOLDER}${esc(p.name)} · ${(p.copied + p.skipped).toLocaleString("en")}</a></li>`).join("")}</ul>`;
   }
   card.hidden = false;
   card.scrollIntoView({behavior:"smooth", block:"center"});
