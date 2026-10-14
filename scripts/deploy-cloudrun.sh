@@ -32,14 +32,23 @@ gcloud config set project "$PROJECT" >/dev/null
 
 say "1/6  Checking billing on $PROJECT"
 BILLING="$(gcloud billing projects describe "$PROJECT" --format='value(billingEnabled)' 2>/dev/null || echo unknown)"
+# A linked account that is closed or past due still reads as enabled here, but
+# Google refuses paid APIs. Check the account itself too.
+ACCOUNT="$(gcloud billing projects describe "$PROJECT" --format='value(billingAccountName)' 2>/dev/null || true)"
+if [ -n "$ACCOUNT" ] && [ "$(gcloud billing accounts describe "${ACCOUNT#billingAccounts/}" --format='value(open)' 2>/dev/null)" = "False" ]; then
+  BILLING=False
+fi
 if [ "$BILLING" = unknown ]; then
   echo "Could not read the billing status; carrying on. If a later step says billing is required, see the link below."
 elif [ "$BILLING" != "True" ]; then
   cat >&2 <<MSG
-Billing is not switched on for project $PROJECT, or this account cannot see it.
-Cloud Run, Firestore and Gemini all need it. Open
-  https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT
-link a billing account (new accounts get free credit), then run this again.
+Billing is not working for project $PROJECT: no billing account is linked,
+or the linked one is closed or has no valid payment method (Google then says
+BILLING_DISABLED). Cloud Run, Firestore, Secret Manager and Gemini all need it.
+  1. https://console.cloud.google.com/billing  ->  Payment overview: add a valid card
+  2. https://console.cloud.google.com/billing/linkedaccount?project=$PROJECT
+     -> make sure the project is linked to that billing account
+Wait two or three minutes after fixing it, then run this again.
 MSG
   exit 1
 fi
@@ -76,7 +85,10 @@ secret() {   # name, prompt; asks only if the secret does not exist yet
     else
       read -rsp "$2: " value; echo
     fi
-    printf %s "$value" | gcloud secrets create "$1" --data-file=- --replication-policy=automatic >/dev/null
+    if ! printf %s "$value" | gcloud secrets create "$1" --data-file=- --replication-policy=automatic >/dev/null; then
+      echo "Could not save the secret. If the error above says BILLING_DISABLED, fix billing (see the top of this script), wait a few minutes and run it again." >&2
+      exit 1
+    fi
   fi
 }
 secret ff-google-client-id     "Paste the OAuth client ID (APIs & Services > Credentials), then Enter"
