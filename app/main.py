@@ -476,7 +476,8 @@ def best(request: Request, body: dict = Body(...)):
                 sizes[f] = (frac, m["det_score"], float(sims[i]))
     faces_info = {f: (v[0], v[1]) for f, v in sizes.items()}
     ai = {f: p["ai"] for f, p in photos.items()}
-    picks = curate.best_shots([f for f in file_ids if f in photos], ai, faces_info, n)
+    prints = {f: p["dhash"] for f, p in photos.items()}
+    picks = curate.best_shots([f for f in file_ids if f in photos], ai, faces_info, n, prints)
     for p in picks:
         p["name"] = photos[p["file_id"]]["name"]
     return {"best": picks, "of": len(file_ids)}

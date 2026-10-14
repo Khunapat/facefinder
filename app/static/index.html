@@ -621,6 +621,10 @@ function pollStatus(){
       info.innerHTML = `Album <b>${esc(state.albumName || s.name)}</b> is ready: ${esc(s.message)}.
         <button class="linkbtn" id="rebuild" style="margin-left:8px">Scan again</button>`;
       $("#rebuild").onclick = () => startIndex(true);
+      if(s.gemini && s.judged < s.done){
+        info.insertAdjacentHTML("beforeend", ` <button class="linkbtn" id="recheck2">Check the ${s.done - s.judged} missing photos with Gemini</button>`);
+        $("#recheck2").onclick = () => startIndex(false);
+      }
       if(state.mode === "everyone" && !state.crowd) loadCrowd();
       updateBar();
     } else if(s.status === "error"){
@@ -1004,6 +1008,7 @@ $("#runSort").onclick = async () => {
     msg($("#sortMsg"), `Done: ${plural(placed, "photo", "photos")} sorted into folders` +
       (notes.length ? `; ${notes.join(", and ")}.` : "."), "ok");
     renderSorted();
+    $("#sortResults").scrollIntoView({behavior:"smooth", block:"start"});
   }catch(e){ msg($("#sortMsg"), esc(e.message), "err"); }
   $("#runSort").disabled = false; $("#sbarBox").hidden = true;
 };
@@ -1023,26 +1028,34 @@ $("#runCull").onclick = async () => {
     const SHORT = {blurry:"Out of focus", eyes_closed:"Closed eyes", cut_off:"Cut off by the frame",
                    poor_exposure:"Too dark or bright", blocked:"Something in the way",
                    awkward_moment:"Awkward moment", no_subject:"No clear subject"};
-    const short = x => x.similar_to ? "Weaker shot of a burst"
-      : x.flaws?.length ? x.flaws.map(f => SHORT[f] || f).join(" · ") : x.keeper ? "Low score" : x.reason;
-    const rows = (list, keep) => list.map(x => ({file_id:x.file_id, name:x.name,
-                                                 why: keep ? "" : short(x), long:x.reason}));
+    const short = (x, pile) =>
+        x.similar_to ? (pile === "reject" ? "Copy of a better frame" : "Similar to another frame")
+      : x.reason === "Gemini could not check this photo" ? "Not checked by Gemini"
+      : x.flaws?.length ? x.flaws.map(f => SHORT[f] || f).join(" · ") + (pile === "review" ? " · maybe the only shot" : "")
+      : pile === "keep" ? "" : pile === "review" ? "Borderline" : "Low score";
+    const rows = (list, pile) => list.map(x => ({file_id:x.file_id, name:x.name,
+                                                 why:short(x, pile), long:x.reason}));
     state.culled = {
-      keep:{kind:"set", name:"Keep", all:rows(r.keep, true), removed:new Set(), limit:24},
-      reject:{kind:"set", name:"Rejected", all:rows(r.reject, false), removed:new Set(r.reject.map(x => x.file_id)), limit:48},
+      keep:{kind:"set", name:"Keep", all:rows(r.keep, "keep"), removed:new Set(), limit:24},
+      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(), limit:24},
+      reject:{kind:"set", name:"Rejected", all:rows(r.reject, "reject"), removed:new Set(r.reject.map(x => x.file_id)), limit:48},
     };
     const counts = {};
-    for(const x of r.reject){ const k = short(x).split(" · ")[0]; counts[k] = (counts[k] || 0) + 1; }
+    for(const x of r.reject){ const k = short(x, "reject").split(" · ")[0]; counts[k] = (counts[k] || 0) + 1; }
     const why = Object.entries(counts).sort((a, b) => b[1] - a[1])
       .map(([k, n]) => `${n.toLocaleString("en")} ${esc(k.toLowerCase())}`).join(" · ");
+    const missed = r.review.filter(x => x.reason === "Gemini could not check this photo").length;
     $("#cullMsg").innerHTML =
       `<div class="stat"><span>Keep ${r.keep.length.toLocaleString("en")}</span>
+         <span>Review ${r.review.length.toLocaleString("en")}</span>
          <span>Reject ${r.reject.length.toLocaleString("en")}</span></div>
        ${why ? `<p class="whyline">Rejected: ${why}</p>` : ""}
-       ${r.checked < r.keep.length + r.reject.length ? `<p class="whyline">Gemini has checked
-         ${r.checked.toLocaleString("en")} of these photos; the rest are kept until it has.</p>` : ""}`;
-    $("#alsoRejectedBox").hidden = !r.reject.length;
+       ${missed ? `<p class="whyline">Gemini could not check ${plural(missed, "photo", "photos")}; they are in Review.
+         <button class="linkbtn" id="recheck">Check them again</button></p>` : ""}`;
+    $("#recheck")?.addEventListener("click", () => startIndex(false));
+    $("#alsoRejectedBox").hidden = !(r.reject.length || r.review.length);
     renderCull();
+    $("#cullResults").scrollIntoView({behavior:"smooth", block:"start"});
   }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
   $("#runCull").disabled = false;
 };
@@ -1050,7 +1063,10 @@ $("#alsoRejected").onchange = updateBar;
 function renderCull(){
   const box = $("#cullResults"); box.innerHTML = "";
   if(!state.culled){ updateBar(); return; }
-  const {keep, reject} = state.culled;
+  const {keep, review, reject} = state.culled;
+  if(review.all.length)
+    box.appendChild(groupCard(review, {title:`Review (${review.all.length.toLocaleString("en")})`,
+      note:"Borderline frames, near-duplicates and possibly the only shot of a moment. They go into Keep unless you untick them."}));
   if(reject.all.length)
     box.appendChild(groupCard(reject, {title:`Rejected (${reject.all.length.toLocaleString("en")})`,
       note:"Each photo says why. Tick any you want to keep after all; ticked ones go into the Keep folder."}));
@@ -1068,10 +1084,11 @@ function exportGroups(){
   else if(state.mode === "sort")
     groups = state.sorted.map(g => ({name:g.name, ids:picked(g)}));
   else if(state.culled){
-    const {keep, reject} = state.culled;
-    groups = [{name:"Keep", ids:picked(keep).concat(picked(reject))}];
+    const {keep, review, reject} = state.culled;
+    groups = [{name:"Keep", ids:picked(keep).concat(picked(review), picked(reject))}];
     if($("#alsoRejected").checked)
-      groups.push({name:"Rejected", ids:reject.all.filter(m => reject.removed.has(m.file_id))});
+      groups.push({name:"Rejected", ids:reject.all.concat(review.all).filter(m =>
+        (reject.removed.has(m.file_id) && reject.all.includes(m)) || (review.removed.has(m.file_id) && review.all.includes(m)))});
   } else groups = [];
   return groups
     .map(x => ({name:x.name, file_ids:x.ids.map(m => m.file_id)}))

@@ -10,14 +10,19 @@ import numpy as np
 
 from .gemini import FLAWS
 
-# Flaws that make a frame a reject on their own at each strictness.
+# Strictness changes where the lines are drawn, never what Gemini observed.
+# A frame with one of these flaws is a reject only if it also scores low;
+# with a good score it goes to Review, because a flawed frame can still be the
+# only record of a moment.
 SERIOUS = {
     "gentle": {"no_subject"},
     "normal": {"blurry", "eyes_closed", "no_subject"},
     "strict": set(FLAWS),
 }
-MIN_KEEPER = {"gentle": 3, "normal": 5, "strict": 6}   # keeper score below this is a reject
+REJECT_BELOW = {"gentle": 3, "normal": 4, "strict": 5}   # keeper score under this: reject
+REVIEW_BELOW = {"gentle": 4, "normal": 6, "strict": 7}   # under this (or flawed): review
 BURST_BITS = 10        # dhash distance at or below which two neighbours are one burst
+SAME_BITS = 4          # this close is the same frame twice: the weaker one is a reject
 
 
 def dhash(image_bytes: bytes):
@@ -62,12 +67,16 @@ def _rank(ai) -> tuple:
 def cull(photos: list, strictness: str = "normal") -> dict:
     """photos: [{file_id, name, ai (dict or None), dhash}] for one album.
 
-    Each burst keeps only its best frame; every other photo is kept unless
-    Gemini found a serious flaw or scored it low. Photos Gemini has not
-    checked are kept, and said so, never rejected unseen."""
+    Three piles, each photo with a reason:
+      keep    good frames, and the best frame of each burst
+      review  borderline frames, flawed frames that are the only shot of their
+              moment, near-duplicates that differ a little, anything Gemini was
+              unsure about or could not check
+      reject  clear mistakes, and copies of a better frame in the same burst
+    Nothing is rejected unseen: a photo Gemini has not checked goes to review."""
     strictness = strictness if strictness in SERIOUS else "normal"
     photos = sorted(photos, key=lambda p: (p.get("name") or "", p["file_id"]))
-    keep, reject = [], []
+    out = {"keep": [], "review": [], "reject": []}
     n_bursts = 0
     for group in bursts(photos):
         best = max(group, key=lambda i: _rank(photos[i].get("ai")))
@@ -76,26 +85,40 @@ def cull(photos: list, strictness: str = "normal") -> dict:
         for i in group:
             p, ai = photos[i], photos[i].get("ai")
             row = {"file_id": p["file_id"], "name": p.get("name")}
+            if ai:
+                row["keeper"], row["flaws"] = ai["keeper"], ai["flaws"]
             if i != best:
-                row["reason"] = "A similar shot in the same burst is better (%s)" % photos[best].get("name")
-                row["similar_to"] = photos[best]["file_id"]
-                reject.append(row)
+                b = photos[best]
+                row["similar_to"] = b["file_id"]
+                same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
+                close = _rank(ai)[0] >= _rank(b.get("ai"))[0] - 1
+                if same or not close:
+                    row["reason"] = "A better frame of the same shot is kept (%s)" % b.get("name")
+                    out["reject"].append(row)
+                else:
+                    row["reason"] = "Similar to %s; keep it too if the moment differs" % b.get("name")
+                    out["review"].append(row)
                 continue
             if not ai:
-                row["reason"] = "Not checked by Gemini yet"
-                keep.append(row)
+                row["reason"] = "Gemini could not check this photo"
+                out["review"].append(row)
                 continue
-            row["keeper"] = ai["keeper"]
             bad = [f for f in ai["flaws"] if f in SERIOUS[strictness]]
-            if bad or ai["keeper"] < MIN_KEEPER[strictness]:
+            k = ai["keeper"]
+            if k < REJECT_BELOW[strictness] and (bad or k <= 2):
                 row["reason"] = "; ".join(FLAWS[f] for f in bad) or ai["reason"] or "Low score"
-                row["flaws"] = ai["flaws"]
-                reject.append(row)
+                out["reject"].append(row)
+            elif bad or k < REVIEW_BELOW[strictness] or ai.get("unsure"):
+                row["reason"] = ("; ".join(FLAWS[f] for f in bad) + " - but it may be the only shot"
+                                 if bad else ai["reason"] or "Borderline")
+                out["review"].append(row)
             else:
                 row["reason"] = ai["reason"]
-                keep.append(row)
-    keep.sort(key=lambda r: -r.get("keeper", 5))
-    return {"keep": keep, "reject": reject, "bursts": n_bursts, "strictness": strictness}
+                out["keep"].append(row)
+    for pile in out.values():
+        pile.sort(key=lambda r: -r.get("keeper", 5))
+    out.update(bursts=n_bursts, strictness=strictness)
+    return out
 
 
 def person_vector(mat: np.ndarray, rows: list, file_ids: list):
@@ -123,29 +146,46 @@ def person_vector(mat: np.ndarray, rows: list, file_ids: list):
     return mat[best]
 
 
-def best_shots(file_ids: list, ai: dict, faces: dict, n: int = 10) -> list:
+def best_shots(file_ids: list, ai: dict, faces: dict, n: int = 10, prints: dict = None) -> list:
     """file_ids: one person's photos. ai: {file_id: judgement or None}.
     faces: {file_id: (face side / photo long side, detector score)} for this
-    person's face in each photo. Returns the top n with a reason each.
+    person's face in each photo. prints: {file_id: dhash}. Returns the top n
+    with a reason each.
 
-    Order: Gemini's keeper score first (sharp, eyes open, good moment), then
-    how big and clear this person is in the frame, so a portrait of them
-    beats a crowd shot they happen to be in."""
-    scored = []
+    Order: Gemini's keeper score first (sharp, a clear moment), then how big
+    and clear this person is in the frame, so a portrait of them beats a crowd
+    shot they happen to be in. Then variety: each pick pushes down photos that
+    look like it or come from the same scene, so ten near-identical frames of
+    one pose never fill the list. Fewer than n good photos gives fewer picks."""
+    prints = prints or {}
+    pool = []
     for f in dict.fromkeys(file_ids):
         j = ai.get(f)
         side, det = faces.get(f, (0.0, 0.0))
         presence = min(1.0, side / 0.18) * 2 + det       # 0..3
         keeper = j["keeper"] if j else 5
         serious = len([x for x in (j or {}).get("flaws", []) if x in SERIOUS["normal"]])
-        scored.append((keeper - 3 * serious + presence, f, j))
-    scored.sort(key=lambda s: -s[0])
-    out = []
-    for score, f, j in scored[:n]:
-        out.append({
-            "file_id": f,
-            "score": round(score, 2),
-            "reason": (j or {}).get("reason") or "Clear, large face (Gemini has not checked this photo)",
-            "checked": bool(j),
-        })
-    return out
+        pool.append({"f": f, "j": j, "base": keeper - 3 * serious + presence,
+                     "scene": ((j or {}).get("scene") or "").strip().lower()})
+    picks = []
+    while pool and len(picks) < n:
+        def score(c):
+            s = c["base"]
+            for p in picks:
+                if _distance(prints.get(c["f"]), prints.get(p["f"])) <= 2 * BURST_BITS:
+                    s -= 3                                # looks like a photo already picked
+                elif c["scene"] and c["scene"] == p["scene"]:
+                    s -= 0.75                             # same kind of moment
+            return s
+        c = max(pool, key=score)
+        if picks and c["base"] < 4:                       # do not pad the list with weak photos
+            break
+        c["score"] = score(c)
+        picks.append(c)
+        pool.remove(c)
+    return [{
+        "file_id": c["f"],
+        "score": round(c["score"], 2),
+        "reason": (c["j"] or {}).get("reason") or "Clear, large face (Gemini has not checked this photo)",
+        "checked": bool(c["j"]),
+    } for c in picks]

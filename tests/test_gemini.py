@@ -84,18 +84,41 @@ def main_test():
     print("Cull")
     r = c.post("/api/cull", json={"folder_id": fid}).json()
     rejected = {x["name"]: x for x in r["reject"]}
+    review = {x["name"]: x for x in r["review"]}
     kept = {x["name"] for x in r["keep"]}
     check("the near-copy and the original are one burst", r["bursts"] == 1, r["bursts"])
     check("only one frame of the burst is kept", len({"obama.jpg", "obama-b.jpg"} & kept) == 1, kept)
     burst_loser = ({"obama.jpg", "obama-b.jpg"} - kept).pop()
-    check("the other is rejected as the weaker similar shot",
-          "similar shot" in rejected.get(burst_loser, {}).get("reason", ""), rejected.get(burst_loser))
+    check("the other, a near-identical copy, is rejected as the weaker frame",
+          "better frame" in rejected.get(burst_loser, {}).get("reason", ""), rejected.get(burst_loser))
     check("the blurred photo is rejected for being blurry",
           "Blurry" in rejected.get("zz_blur.jpg", {}).get("reason", ""), rejected.get("zz_blur.jpg"))
-    check("every photo is either kept or rejected", len(kept) + len(rejected) == 7)
-    check("every decision has a reason", all(x.get("reason") for x in r["keep"] + r["reject"]))
+    check("every photo is in exactly one pile", len(kept) + len(review) + len(rejected) == 7)
+    check("every decision has a reason", all(x.get("reason") for x in r["keep"] + r["review"] + r["reject"]))
     gentle = c.post("/api/cull", json={"folder_id": fid, "strictness": "gentle"}).json()
-    check("gentle keeps the blurred photo", "zz_blur.jpg" in {x["name"] for x in gentle["keep"]})
+    check("gentle does not reject the blurred photo", "zz_blur.jpg" not in {x["name"] for x in gentle["reject"]})
+
+    print("Cull rules, without Drive or Gemini")
+    from app import curate
+    ph = lambda name, keeper, flaws=(), dh="0000000000000000", unsure=False: {
+        "file_id": name, "name": name, "dhash": dh,
+        "ai": None if keeper is None else {"keeper": keeper, "flaws": list(flaws), "reason": "r", "unsure": unsure}}
+    res = curate.cull([ph("a", 7, ["eyes_closed"], "ffffffffffffffff"), ph("b", None, dh="0f0f0f0f0f0f0f0f"),
+                       ph("c", 8, unsure=True, dh="00000000ffffffff"), ph("d", 2, ["blurry"], "ffff0000ffff0000")])
+    piles = {x["file_id"]: k for k in ("keep", "review", "reject") for x in res[k]}
+    check("a well-scored frame with closed eyes goes to review, not reject", piles.get("a") == "review", piles)
+    check("a photo Gemini could not check goes to review", piles.get("b") == "review", piles)
+    check("a photo Gemini was unsure about goes to review", piles.get("c") == "review", piles)
+    check("a low-scored blurry frame is rejected", piles.get("d") == "reject", piles)
+    near = curate.cull([ph("x1", 8, dh="0000000000000000"), ph("x2", 7, dh="00000000000001ff")])
+    check("a similar but different frame of a burst goes to review",
+          [x["file_id"] for x in near["review"]] == ["x2"], near)
+    picks = curate.best_shots(["p%d" % i for i in range(6)],
+                              {"p%d" % i: {"keeper": 9, "flaws": [], "reason": "r", "scene": "stage"} for i in range(6)},
+                              {}, 3, {"p%d" % i: ("0" * 16 if i < 4 else "f" * 16) for i in range(6)})
+    ids = [p["file_id"] for p in picks]
+    check("best shots mix different-looking photos instead of near-copies",
+          any(i in ids for i in ("p4", "p5")) and any(i in ids for i in ("p0", "p1", "p2", "p3")), ids)
 
     print("Best shots")
     people = c.post("/api/people", json={"folder_id": fid}).json()["people"]

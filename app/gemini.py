@@ -86,7 +86,10 @@ def _call(contents, schema, temperature=0.2):
     for attempt in range(5):
         try:
             r = client().models.generate_content(model=MODEL, contents=contents, config=cfg)
-            return json.loads(r.text)
+            out = json.loads(r.text)
+            if isinstance(out, dict) and getattr(r, "model_version", None):
+                out.setdefault("model", r.model_version)
+            return out
         except errors.APIError as e:
             busy = getattr(e, "code", None) in (429, 500, 502, 503, 504)
             if busy and attempt < 4:
@@ -104,26 +107,42 @@ JUDGE_SCHEMA = {
         "scene": {"type": "string"},
         "keeper": {"type": "integer", "minimum": 1, "maximum": 10},
         "flaws": {"type": "array", "items": {"type": "string", "enum": list(FLAWS)}},
+        "unsure": {"type": "boolean"},
         "reason": {"type": "string"},
     },
-    "required": ["description", "people", "scene", "keeper", "flaws", "reason"],
+    "required": ["description", "people", "scene", "keeper", "flaws", "unsure", "reason"],
 }
 
 JUDGE_PROMPT = """You are helping an event photographer (graduations, university camps, \
-ceremonies) cull and sort their photos. Look at this one photo and answer in English.
+ceremonies) cull and sort their photos. Look at this one photo and answer in English. \
+Describe only what is visible; never guess.
 
 description: one or two plain sentences: what is happening and where.
-people: one short entry per clearly visible person, left to right, focused on what \
+people: one short entry per clearly visible person, left to right, saying only what \
 tells people apart in a crowd: clothing and its colours, uniforms, gowns, sashes, \
-name tags, lanyards, props they hold. Do not guess names, ages beyond "child/teen/adult", \
-or anything about who they are. Empty list if nobody is visible.
+name tags, lanyards, props they hold. No names, no roles you cannot see written \
+(a blue shirt is "blue shirt", not "staff"), no age beyond child/teen/adult, nothing \
+about looks, body or expression quality. Empty list if nobody is visible.
 scene: a few words for the setting and moment (e.g. "stage, certificate handover", \
 "outdoor group photo", "classroom activity", "food table").
-keeper: 1-10, how likely a photographer keeps this frame. 9-10 sharp, well framed, \
-everyone's eyes open, a good expression or moment. 5-6 usable but ordinary. 1-3 a \
-reject. Judge the photo, not the people's looks.
-flaws: every flaw that applies, from the allowed list only. Empty if none.
-reason: one short line a photographer would agree with, saying why it is or is not a keeper."""
+keeper: 1-10, how likely a photographer keeps this frame for the album. 9-10 the main \
+subject is sharp, well framed, a clear moment. 5-6 usable but ordinary. 1-3 a \
+mistake. Judge the photograph, never how anyone looks.
+flaws: from the allowed list only, and only when the flaw spoils the photo:
+- blurry: the MAIN subject is unintentionally out of focus. A soft background, a \
+  soft crowd behind a sharp speaker, or deliberate motion blur is not a flaw.
+- eyes_closed: a posed photo where the main subject's eyes are shut by accident. \
+  Closed eyes while laughing, singing, praying or in an emotional moment are not a flaw.
+- cut_off: a main subject is cut awkwardly by the frame. People at the edges, \
+  background people and deliberate close crops are not a flaw.
+- blocked: something covers the main subject. A person's back is not a flaw when the \
+  moment is meaningful (a hug, walking on stage).
+- poor_exposure, awkward_moment, no_subject: only when obvious.
+Empty list if none.
+unsure: true when you cannot judge well (tiny faces, heavy motion, unclear moment). \
+Do not guess a flaw to fill the list.
+reason: one short line a photographer would agree with, about the photograph only, \
+never about anyone's appearance."""
 
 
 def shrink(image_bytes: bytes) -> bytes:
@@ -152,7 +171,9 @@ def clean_judgement(d: dict) -> dict:
         "scene": str(d.get("scene") or "")[:120],
         "keeper": keeper,
         "flaws": [f for f in (d.get("flaws") or []) if f in FLAWS],
+        "unsure": bool(d.get("unsure")),
         "reason": str(d.get("reason") or "")[:200],
+        "model": str(d.get("model") or MODEL)[:60],
     }
 
 

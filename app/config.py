@@ -64,7 +64,7 @@ INDEX_WORKERS = int(os.environ.get("INDEX_WORKERS", "4"))
 CLUSTER_THRESHOLD = float(os.environ.get("CLUSTER_THRESHOLD", "0.46"))
 COPY_WORKERS = int(os.environ.get("COPY_WORKERS", "4"))
 # Parallel Gemini calls while scanning. They wait on the network, not the CPU.
-GEMINI_WORKERS = int(os.environ.get("GEMINI_WORKERS", "12"))
+GEMINI_WORKERS = int(os.environ.get("GEMINI_WORKERS", "24"))
 
 def _ensure_dir(path: str, var: str) -> None:
     try:

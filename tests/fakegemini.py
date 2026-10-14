@@ -38,13 +38,14 @@ def judge(jpeg: bytes) -> dict:
         flaws.append("blurry")
     if light < 45 or light > 225:
         flaws.append("poor_exposure")
-    keeper = 8 - 3 * len(flaws)
+    keeper = 8 - 5 * len(flaws)
     return {
         "description": "People at an event, the nearest wearing %s." % colour,
         "people": ["adult in a %s top" % colour],
         "scene": "event photo",
         "keeper": max(1, keeper),
         "flaws": flaws,
+        "unsure": False,
         "reason": "Sharp and well exposed" if not flaws else "Soft focus or poor light",
     }
 
