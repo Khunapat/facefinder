@@ -10,40 +10,55 @@
 <link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Roboto:wght@500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ---------------------------------------------------------------------------
-   FaceFinder's own playful pink system: pale pink page, large rounded white
-   panels, one strong pink accent, pill buttons, and the camera mascot in a
-   different pose for each step. Mitr for headings, Noto Sans Thai for text
-   (both cover Thai and Latin).
+   FaceFinder's own pink system. One white workspace (the "shell") on a pale
+   pink page: the header, album selector and tabs sit in it as one bar, and
+   every tab's content starts at the same place below it. Strong pink only for
+   primary actions and the active tab. Mitr for headings, Noto Sans Thai for
+   text and controls (both cover Thai and Latin).
 --------------------------------------------------------------------------- */
 :root{
-  --page:#fdf0f5; --panel:#ffffff; --ink:#1f2540; --muted:#5b6178; --muted-soft:#5b6178;
+  --page:#fdf0f5; --panel:#ffffff; --ink:#1f2540; --muted:#5b6178;
   --accent:#d6336c; --accent-active:#b9255a; --accent-soft:#f6dbe6; --tint:#f3bcd0;
-  --line:#ececf2; --line-strong:#dcdde6; --error:#b42318; --error-bg:#fff4f2;
-  --tile-1:#fde3ec; --tile-2:#e7ecff; --tile-3:#fff1d6; --tile-4:#e2f5ec;
-  --shadow:0 10px 30px rgba(31,37,64,.06); --shadow-lift:0 12px 36px rgba(31,37,64,.14);
-  --r-panel:32px; --r-tile:24px; --r-sm:14px; --r-full:9999px;
-  --head:'Mitr','Noto Sans Thai',system-ui,sans-serif;
+  --line:#efe6ec; --line-strong:#d9dbe4; --field:#c9ccd8; --error:#b42318; --error-bg:#fff4f2;
+  --warn:#b45309; --photo-bg:#f4eef1;
+  --shadow:0 1px 2px rgba(31,37,64,.04),0 10px 32px rgba(31,37,64,.06);
+  --shadow-lift:0 12px 36px rgba(31,37,64,.16);
+  --r-shell:24px; --r-card:16px; --r-ctl:12px; --r-tile:12px; --r-full:9999px;
+  --pad:32px; --head:'Mitr','Noto Sans Thai',system-ui,sans-serif;
   --body:'Noto Sans Thai','Segoe UI',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
 body{margin:0;background:var(--page);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
 h1,h2,h3,p{margin:0}
-h1,h2,h3{font-family:var(--head);font-weight:600;color:var(--accent);line-height:1.2}
+h1,h2,h3{font-family:var(--head);font-weight:600;color:var(--ink);line-height:1.2}
 a{color:var(--ink)} a:hover{color:#000}
 button,input,select{font-family:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--ink);outline-offset:2px}
-
-/* ------------------------------------------------------------------- nav */
-.nav{display:flex;align-items:center;gap:16px;padding:20px 40px}
-.brand{display:flex;align-items:center;gap:12px;padding:0;border:0;background:transparent;color:var(--accent);
-       font-family:var(--head);font-size:24px;font-weight:600;text-decoration:none}
-.brand .logo{width:44px;height:44px;border-radius:var(--r-full);background:var(--panel);display:grid;place-items:center;
-       box-shadow:0 6px 18px rgba(31,37,64,.08)}
+.hint{font-size:15px;color:var(--muted)}
 .grow{flex:1}
-.email{font-size:14px;color:var(--muted)}
+.mascot{display:block;object-fit:contain}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+
+/* ------------------------------------------------------------- buttons */
+.btn{height:48px;padding:0 24px;border:1.5px solid transparent;border-radius:var(--r-ctl);background:var(--accent);color:#fff;
+     font-size:16px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--accent-active)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{height:40px;padding:0 16px;font-size:14px;border-radius:10px}
+.btn.ghost{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
+.btn.ghost:hover{background:var(--page);border-color:var(--field)}
+.btn.soft{background:var(--accent-soft);color:var(--accent-active)}
+.btn.soft:hover{background:var(--tint);color:var(--ink)}
+.linkbtn{border:0;background:transparent;padding:8px 0;min-height:44px;color:var(--ink);text-decoration:underline;font-size:14px;font-weight:500}
+.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:10px;border:0;background:transparent;color:var(--muted);
+     display:grid;place-items:center;padding:0}
+.iconbtn:hover{background:var(--page);color:var(--ink)}
+/* one clear action: once there is something to export, the run button steps back */
+body.can-export .mode .main .btn:not(.ghost):not(.soft){background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
+body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--page)}
 
 /* the official "Sign in with Google" button (Google's branding guidelines) */
 .gsi{height:44px;padding:0 16px 0 12px;border:1px solid #747775;border-radius:var(--r-full);background:#fff;color:#1f1f1f;
@@ -53,302 +68,323 @@ button{cursor:pointer}
 .gsi svg{width:20px;height:20px;flex:0 0 20px}
 .gsi.lg{height:52px;font-size:16px;padding:0 22px 0 16px}
 
-/* ------------------------------------------------------------- buttons */
-.btn{height:52px;padding:0 28px;border:0;border-radius:var(--r-full);background:var(--accent);color:#fff;
-     font-size:16px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-.btn:hover{background:var(--accent-active)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn.sm{height:44px;padding:0 20px;font-size:14px}
-.btn.ghost{background:var(--panel);color:var(--ink);border:1.5px solid var(--ink)}
-.btn.ghost:hover{background:var(--page)}
-.btn.soft{background:var(--accent-soft);color:var(--accent-active)}
-.btn.soft:hover{background:var(--tint);color:var(--ink)}
-.linkbtn{border:0;background:transparent;padding:8px 0;color:var(--ink);text-decoration:underline;font-size:14px;font-weight:500}
-.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r-full);border:0;background:transparent;color:var(--muted);
-     display:grid;place-items:center}
-.iconbtn:hover{background:var(--page);color:var(--ink)}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-
-/* ---------------------------------------------------------------- page */
-main{max-width:1160px;margin:0 auto;padding:16px 24px 200px}
-.panel{background:var(--panel);border-radius:var(--r-panel);box-shadow:var(--shadow);padding:40px}
-.panel.center{max-width:640px;margin:32px auto 0;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
-.mascot{display:block;object-fit:contain}
-.mirror{transform:scaleX(-1)}
-.hint{font-size:15px;color:var(--muted)}
-
-/* hero */
-.hero{display:flex;flex-wrap:wrap;gap:32px;align-items:center;margin-top:24px}
-.hero .copy{flex:999 1 480px;min-width:0}
-.hero h1{font-size:52px;line-height:1.15;text-wrap:balance}
-.hero p{margin-top:16px;max-width:560px;font-size:18px;font-weight:500}
-.hero .art{flex:1 1 260px;max-width:320px;margin:0 auto}
-.hero .art img{width:100%;aspect-ratio:1}
-.pill{display:flex;align-items:center;height:72px;margin-top:32px;max-width:640px;padding:0 10px 0 28px;
-      background:var(--panel);border-radius:var(--r-full);box-shadow:0 10px 30px rgba(31,37,64,.08)}
-.pill .seg{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-.pill label{font-size:12px;font-weight:700;color:var(--muted)}
-.pill input{border:0;outline:0;padding:0;width:100%;background:transparent;font-size:15px;color:var(--ink)}
-.pill input::placeholder{color:var(--muted-soft)}
-
-/* progress */
-.bar{width:100%;height:10px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
-.bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:var(--r-full);transition:width .4s ease}
-
-/* album chip + tabs */
-.chip{padding:12px 22px;background:var(--panel);border-radius:var(--r-full);box-shadow:0 6px 18px rgba(31,37,64,.06);
-      font-size:15px;margin-top:24px}
-.work[data-locked="1"]{display:none}
-.tabs{display:flex;gap:4px;padding:6px;margin:24px auto 0;width:fit-content;max-width:100%;overflow-x:auto;
-      background:var(--panel);border-radius:var(--r-full);box-shadow:0 6px 18px rgba(31,37,64,.06)}
-.tabs button{border:0;background:transparent;color:var(--muted);font-size:15px;font-weight:600;padding:10px 20px;
-      border-radius:var(--r-full);white-space:nowrap;display:flex;align-items:center;gap:6px}
-.tabs button:hover{color:var(--ink)}
-.tabs button[aria-selected="true"]{background:var(--accent);color:#fff}
-
-
-/* inputs */
-.field{width:100%;height:48px;padding:0 18px;border:1.5px solid var(--line-strong);border-radius:var(--r-full);
+/* ---------------------------------------------------------------- inputs */
+.field{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--field);border-radius:var(--r-ctl);
        background:var(--panel);color:var(--ink);font-size:16px}
+.field::placeholder{color:#7a7f93}
 .field:focus{outline:0;border-color:var(--ink)}
-select.field{width:auto;font-size:14px;padding:0 16px;cursor:pointer}
+.field:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+select.field{width:auto;font-size:14px;height:40px;padding:0 12px;border-radius:10px;cursor:pointer}
+.flabel{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--ink)}
+.flabel .field{flex:none}
 .check{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
 .check input{width:20px;height:20px;accent-color:var(--accent)}
 
-/* named people */
-.person{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:12px 16px;border:1px solid var(--line);
-        border-radius:20px}
-.person.drag{background:var(--page)}
-.shots{display:flex;gap:8px;flex:0 0 auto}
-.shots img,.addshot{width:64px;height:64px;border-radius:20px}
-.shots img{object-fit:cover;display:block}
-.addshot{border:1.5px dashed var(--tint);background:var(--page);color:var(--accent-active);display:flex;flex-direction:column;
-         align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600}
+/* ---------------------------------------------------- the app shell */
+.shell{max-width:1240px;margin:20px auto 0;background:var(--panel);border:1px solid #f3e4eb;
+       border-radius:var(--r-shell);box-shadow:var(--shadow);min-height:calc(100vh - 20px)}
+.apphead{display:grid;grid-template-columns:auto minmax(0,auto) auto minmax(0,1fr) auto;grid-template-areas:"brand album tabs . side";
+         align-items:center;column-gap:20px;min-height:76px;padding:0 var(--pad);border-bottom:1px solid var(--line);
+         position:relative;z-index:40}
+.brand{grid-area:brand;display:flex;align-items:center;gap:10px;color:var(--accent);font-family:var(--head);
+       font-size:22px;font-weight:600;text-decoration:none;white-space:nowrap}
+.brand:hover{color:var(--accent-active)}
+.brand .logo{width:40px;height:40px;border-radius:var(--r-full);background:var(--page);display:grid;place-items:center}
+.albumsel{grid-area:album;position:relative;min-width:0;padding-left:20px;border-left:1px solid var(--line)}
+.albumbtn{display:flex;align-items:center;gap:8px;min-height:44px;max-width:min(320px,100%);padding:0 10px;border:1px solid transparent;
+          border-radius:10px;background:transparent;color:var(--ink);font-size:15px}
+.albumbtn:hover,.albumbtn[aria-expanded="true"]{background:var(--page);border-color:var(--line)}
+.aname{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acount{color:var(--muted);font-size:13px;white-space:nowrap}
+.caret{flex:0 0 auto;color:var(--muted)}
+.tabs{grid-area:tabs;display:flex;align-self:stretch;gap:4px;min-width:0;padding-left:20px;border-left:1px solid var(--line)}
+.tabs button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:15px;font-weight:600;
+      padding:3px 12px 0;min-height:44px;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.headside{grid-area:side;display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.helpbtn{display:flex;align-items:center;gap:6px;height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;
+         color:var(--ink);font-size:14px;font-weight:600}
+.helpbtn:hover{background:var(--page)}
+.helpbtn .q{width:26px;height:26px;border-radius:var(--r-full);border:1.5px solid var(--line-strong);display:grid;place-items:center;font-size:13px}
+.headmascot{width:44px;height:44px}
+.acctbtn{display:flex;align-items:center;gap:6px;height:44px;padding:0 6px 0 4px;border:0;border-radius:var(--r-full);background:transparent}
+.acctbtn:hover,.acctbtn[aria-expanded="true"]{background:var(--page)}
+.acctbtn .initial{width:34px;height:34px;border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent-active);
+         display:grid;place-items:center;font-weight:700;font-size:15px}
+.dropwrap{position:relative}
+.menu{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(340px,calc(100vw - 32px));background:var(--panel);
+      border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-lift);padding:6px;z-index:60}
+.menu.right{left:auto;right:0}
+.menu .info{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.menu .info b{display:block;color:var(--ink);font-size:15px}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;
+      background:transparent;color:var(--ink);font-size:15px;text-align:left}
+.menu button:hover{background:var(--page)}
+.menu .sub{font-size:13px;color:var(--muted);font-weight:400}
+.menu button.two{flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding:6px 12px}
+
+main{padding:28px var(--pad) 140px}
+
+/* ---------------------------------------------------- start screen */
+.hero{display:flex;flex-wrap:wrap;gap:32px;align-items:center;padding:24px 0 8px}
+.hero .copy{flex:999 1 480px;min-width:0}
+.hero h1{font-size:46px;line-height:1.15;text-wrap:balance}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p{margin-top:14px;max-width:560px;font-size:18px;color:var(--muted)}
+.hero .art{flex:1 1 220px;max-width:280px;margin:0 auto}
+.hero .art img{width:100%;aspect-ratio:1}
+.openbox{margin-top:28px;max-width:620px}
+.openbox .row{flex-wrap:nowrap;margin-top:6px}
+.openbox .field{flex:1;min-width:0}
+
+/* ---------------------------------------------- one frame for every tab */
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 20px;min-height:72px;margin-bottom:20px}
+.mtitle{min-width:0}
+.mtitle h2{font-size:30px}
+.mtitle .sub{margin-top:4px;font-size:15px;color:var(--muted)}
+.mtools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:4px}
+.mode .main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.how{display:none}
+.work[data-locked="1"]{display:none}              /* its text is shown by the Help button */
+
+/* ---------------------------------------------------- messages */
+.msg{font-size:15px;line-height:1.45;border-radius:12px;padding:12px 16px}
+.msg.err{background:var(--error-bg);color:var(--error)}
+.msg.ok{background:var(--page);color:var(--ink)}
+.msg.info{background:#f6f6f9;color:var(--muted)}
+
+/* ---------------------------------------------------- find people */
+.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.person{position:relative;display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line-strong);border-radius:var(--r-card)}
+.person.drag{background:var(--page);border-color:var(--accent)}
+.phead{display:flex;align-items:center;justify-content:space-between;margin:-8px -8px -6px 0;font-size:14px}
+.dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:180px;
+          border:2px dashed var(--tint);border-radius:var(--r-ctl);background:#fff8fb;color:var(--accent-active);padding:16px}
+.dropzone:hover{border-color:var(--accent);background:var(--page)}
+.dropzone .plus{width:52px;height:52px;border-radius:var(--r-full);background:var(--accent-soft);display:grid;place-items:center}
+.dropzone b{font-size:17px}
+.dropzone span{font-size:13px;color:var(--muted)}
+.shots{display:flex;gap:10px;flex-wrap:wrap}
+.shot{position:relative;margin:0;width:96px;height:96px}
+.shot img{width:100%;height:100%;object-fit:cover;border-radius:var(--r-ctl);display:block}
+.shot .rm{position:absolute;top:-8px;right:-8px;width:32px;height:32px;border-radius:var(--r-full);border:2px solid #fff;
+          background:var(--ink);color:#fff;display:grid;place-items:center;padding:0}
+.shot .rm svg{width:14px;height:14px}
+.addshot{width:96px;height:96px;border:2px dashed var(--tint);border-radius:var(--r-ctl);background:#fff8fb;color:var(--accent-active);
+         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600}
 .addshot:hover{border-color:var(--accent)}
-.person .field{flex:1;min-width:160px}
+.peopleact{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .slider-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
 .slider-head b{color:var(--ink);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
 input[type=range]{width:100%;accent-color:var(--accent)}
 
-/* result card for one person / group */
-.card{background:var(--panel);border-radius:var(--r-panel);box-shadow:var(--shadow);padding:28px 32px;margin-top:20px}
-.card h2{font-size:26px}
-.rhead{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.avatar{width:56px;height:56px;flex:0 0 56px;border-radius:var(--r-full);object-fit:cover;background:var(--tile-1)}
-.rname{font-family:var(--head);font-size:24px;font-weight:600;color:var(--accent);line-height:1.2;overflow-wrap:anywhere}
+/* ---------------------------------------------------- result cards */
+.card{background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r-card);padding:20px 24px;margin-top:16px}
+.card h2{font-size:22px}
+.rhead{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.avatar{width:48px;height:48px;flex:0 0 48px;border-radius:var(--r-full);object-fit:cover;background:var(--photo-bg)}
+.rname{font-family:var(--head);font-size:22px;font-weight:600;color:var(--ink);line-height:1.2;overflow-wrap:anywhere}
 .rcount{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* photo grid */
-.grid{display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(4,minmax(0,1fr))}
-.tile{position:relative;cursor:pointer;min-width:0}
-.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:#f4eef1}
+/* ---------------------------------------------------- photo grid */
+.grid{display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fill,minmax(176px,1fr))}
+.tile{position:relative;min-width:0;border-radius:var(--r-tile)}
+.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
 .tile img{width:100%;height:100%;object-fit:contain;display:block}
-.tile:not(.sel) img{opacity:1}
 .tile.sel .ph{box-shadow:inset 0 0 0 3px var(--accent)}
-.tick{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:var(--r-full);display:grid;place-items:center;
-      padding:0;background:rgba(31,37,64,.35);color:transparent;border:2px solid rgba(255,255,255,.9)}
-.sel > .ph > .tick,.tick[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
-.tag{position:absolute;top:12px;left:12px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:600;
-     border-radius:var(--r-full);padding:3px 10px}
+.tile.viewing .ph{outline:3px solid var(--ink);outline-offset:3px}
+.photo-open{width:100%;height:100%;border:0;padding:0;background:transparent;display:block;cursor:zoom-in}
+.tick{position:absolute;top:6px;right:6px;width:44px;height:44px;border-radius:var(--r-full);display:grid;place-items:center;
+      padding:0;background:transparent;border:0;color:transparent}
+.tick::before{content:"";position:absolute;inset:7px;border-radius:var(--r-full);background:rgba(31,37,64,.35);border:2px solid rgba(255,255,255,.95)}
+.tick svg{position:relative}
+.sel > .ph > .tick,.tick[aria-pressed="true"]{color:#fff}
+.sel > .ph > .tick::before,.tick[aria-pressed="true"]::before{background:var(--accent);border-color:var(--accent)}
+.tag{position:absolute;top:10px;left:10px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:600;
+     border-radius:var(--r-full);padding:3px 10px;pointer-events:none}
 .tag.best{background:var(--accent);color:#fff}
 .tile .meta{display:flex;gap:4px;margin-top:8px;font-size:14px}
 .tile .meta .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-.tile .meta .sc{color:var(--muted);font-variant-numeric:tabular-nums}
-.tile .why{font-size:13px;color:var(--muted);line-height:1.4;margin-top:2px;
-     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile .why{display:flex;gap:6px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4;margin-top:2px}
+.tile .why.flag::before{content:"";flex:0 0 8px;height:8px;margin-top:5px;border-radius:var(--r-full);background:#f0a04b}
+.tile .why span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
-/* everyone in the album */
-.faces{display:grid;gap:20px 16px;grid-template-columns:repeat(4,minmax(0,1fr))}
+/* ---------------------------------------------------- everyone */
+.faces{display:grid;gap:20px 16px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 .fcard{display:flex;flex-direction:column;gap:8px;min-width:0}
 .fwrap{position:relative}
-.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:var(--r-tile);overflow:hidden;background:var(--tile-1)}
-.fcard:nth-child(4n+2) .fpic{background:var(--tile-2)} .fcard:nth-child(4n+3) .fpic{background:var(--tile-3)}
-.fcard:nth-child(4n) .fpic{background:var(--tile-4)}
+.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
 .fpic img{width:100%;height:100%;object-fit:cover;display:block}
-.fname{width:100%;height:44px;padding:0 16px;border:1.5px solid var(--line-strong);border-radius:var(--r-full);
+.fname{width:100%;height:44px;padding:0 12px;border:1.5px solid var(--field);border-radius:10px;
        font-size:15px;font-weight:600;color:var(--ink);background:var(--panel)}
 .fname:focus{outline:0;border-color:var(--ink)}
-.fmeta{padding-left:4px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fname:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.fmeta{padding-left:2px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* sort by description */
-.grow-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:10px 12px;border:1px solid var(--line);border-radius:20px}
+/* ---------------------------------------------------- sort */
+.grow-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;border:1px solid var(--line-strong);border-radius:var(--r-card)}
 .grow-row .gname{flex:1 1 160px;min-width:0}
 .grow-row .gdesc{flex:3 1 280px;min-width:0}
-.stat{display:flex;flex-wrap:wrap;gap:10px}
-.stat span{padding:8px 16px;border-radius:var(--r-full);background:var(--page);font-size:14px;font-weight:600}
+.whyline{font-size:14px;color:var(--muted)}
 
-/* messages */
-.msg{font-size:15px;line-height:1.45;border-radius:20px;padding:12px 18px}
-.msg.err{background:var(--error-bg);color:var(--error)}
-.msg.ok{background:var(--page);color:var(--ink)}
-.msg.info{background:var(--page);color:var(--muted)}
+/* ---------------------------------------------------- cull */
+.piles{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:4px;overflow-x:auto}
+.piles button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:15px;font-weight:600;
+     padding:0 14px;min-height:46px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.piles button:hover{color:var(--ink)}
+.piles button[aria-pressed="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.piles .n{font-size:13px;font-variant-numeric:tabular-nums;background:#f3f3f7;color:var(--ink);border-radius:var(--r-full);padding:1px 9px}
+.piles button[aria-pressed="true"] .n{background:var(--accent-soft);color:var(--accent-active)}
+.cullwrap{display:block}
+.cullwrap.has-side{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+.sidepreview{position:sticky;top:16px;margin-top:16px;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel)}
 
-/* one person's photos */
-dialog{border:0;padding:0;border-radius:var(--r-panel);background:var(--panel);color:var(--ink);
+/* ---------------------------------------------------- dialogs */
+dialog{border:0;padding:0;border-radius:20px;background:var(--panel);color:var(--ink);
        width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 20px 60px rgba(31,37,64,.25)}
 dialog[open]{display:flex;flex-direction:column}
 dialog::backdrop{background:rgba(31,37,64,.5)}
-.dhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:20px 28px;border-bottom:1px solid var(--line)}
+.dhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px 16px 24px;border-bottom:1px solid var(--line)}
+.dhead h2{font-size:22px;flex:1;min-width:0}
 .dhead .field{flex:1;min-width:160px}
-.dbody{padding:0 28px 28px;overflow:auto}
+.dbody{padding:0 24px 24px;overflow:auto}
+.dfoot{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding:16px 24px;border-top:1px solid var(--line)}
+dialog.narrow{width:min(520px,calc(100vw - 32px))}
 
-/* done */
-.donelist{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:8px;padding:0;list-style:none}
-.donelist a{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:var(--r-full);background:var(--page);
-       font-size:15px;font-weight:600;text-decoration:none}
-
-/* floating action bar */
-.actionbar{position:fixed;left:0;right:0;bottom:0;padding:0 24px 20px;z-index:30;pointer-events:none}
-.actionbar .inner{pointer-events:auto;max-width:1112px;margin:0 auto;display:flex;gap:12px;flex-wrap:wrap;align-items:center;
-       padding:12px 12px 12px 24px;background:var(--panel);border-radius:28px;box-shadow:var(--shadow-lift)}
-.actionbar .count{font-size:14px;color:var(--muted);white-space:nowrap}
-.actionbar .count b{color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums}
-.xprog{width:100%;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px;padding-right:12px}
-
-
-/* one frame for every mode: a header row of the same height on every tab
-   (heading, one short line, "How it works", small mascot), then the controls */
-html{scrollbar-gutter:stable}
-.mode{display:flex;flex-direction:column;gap:20px;margin-top:20px;padding:28px 32px}
-.mhead{display:flex;align-items:center;gap:16px;min-height:64px;position:relative}
-.mtitle{flex:1;min-width:0}
-.mtitle h2{font-size:28px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mtitle .hint{margin-top:2px}
-.mhead .mascot{width:56px;height:56px;flex:0 0 56px}
-.flabel .field{flex:none}
-.mode .main{display:flex;flex-direction:column;gap:12px;min-width:0}
-.how{font-size:14px;color:var(--muted);flex:0 0 auto}
-.how summary{cursor:pointer;font-weight:600;color:var(--ink);padding:10px 4px;list-style:none;
-     text-decoration:underline;text-underline-offset:3px}
-.how summary::-webkit-details-marker{display:none}
-/* opens over the page as a small card, so nothing below it moves */
-.how p{position:absolute;right:0;top:100%;z-index:20;width:min(420px,100%);margin-top:4px;padding:16px 20px;
-     background:var(--panel);border:1px solid var(--line-strong);border-radius:20px;box-shadow:var(--shadow-lift);
-     line-height:1.5;color:var(--ink)}
-.flabel{display:flex;flex-direction:column;gap:4px;font-size:13px;font-weight:600;color:var(--muted)}
-.actionbar .flabel{flex:1;min-width:180px}
-.actionbar .flabel input{height:40px;border:0;outline:0;padding:0;background:transparent;color:var(--ink);font-size:15px;font-weight:400}
-
-/* scanning: the mascot looks over a stack of photos while the steps tick off */
-.scanart{position:relative;width:240px;height:190px}
-.scanart .mascot{position:absolute;left:30px;top:4px;animation:bob 2.4s ease-in-out infinite}
-.scanart .stack i{position:absolute;right:0;bottom:6px;width:70px;height:54px;border-radius:10px;
-      background:var(--tile-2);border:3px solid #fff;box-shadow:0 4px 10px rgba(31,37,64,.12)}
-.scanart .stack i:nth-child(1){transform:rotate(-8deg);background:var(--tile-3)}
-.scanart .stack i:nth-child(2){transform:rotate(5deg) translate(-6px,-8px);background:var(--tile-4)}
-.scanart .stack i:nth-child(3){transform:translate(-14px,-18px);background:var(--tile-1)}
-.scanart .beam{position:absolute;right:-4px;bottom:0;width:86px;height:4px;border-radius:4px;
-      background:var(--accent);opacity:.55;animation:beam 1.8s ease-in-out infinite}
-@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes beam{0%,100%{transform:translateY(-70px)}50%{transform:translateY(0)}}
-@media (prefers-reduced-motion:reduce){.scanart .mascot,.scanart .beam{animation:none}}
-#scanCard.halted .scanart .mascot{animation:none} #scanCard.halted .beam,#scanCard.halted .scanhint{display:none}
-.scancount{font-size:17px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
-.bar.busy > i{width:35%!important;animation:slide 1.4s ease-in-out infinite}
-@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
-.steps{list-style:none;padding:0;margin:4px 0 0;display:flex;flex-wrap:wrap;justify-content:center;gap:6px 8px;font-size:14px}
-.steps li{padding:6px 14px;border-radius:var(--r-full);background:var(--page);color:var(--muted)}
-.steps li.now{background:var(--accent-soft);color:var(--accent-active);font-weight:600}
-.steps li.done{color:var(--ink)}
-.steps li.done::before{content:"✓ ";color:var(--accent)}
-.whyline{font-size:14px;color:var(--muted);margin-top:8px}
-
-@media (max-width:1000px){
-  .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .faces{grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-@media (max-width:744px){
-  .nav{padding:16px}
-  #gsiNav{display:none}          /* the start screen has the big button */
-  .email{display:none}
-  main{padding:8px 16px 280px}
-  .panel,.card{padding:24px 20px;border-radius:24px}
-  .hero h1{font-size:36px}
-  .hero .art{max-width:200px}
-  .pill{height:auto;flex-wrap:wrap;gap:10px;padding:14px 14px 14px 22px;border-radius:28px}
-  .pill .seg{flex:1 1 100%}
-  .pill .btn{width:100%}
-  .tabs{width:100%;display:grid;grid-template-columns:1fr 1fr;border-radius:24px}
-  .tabs button{justify-content:center}
-  .grid,.faces{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .actionbar{padding:0 12px 12px}
-  .actionbar .flabel{flex:1 1 100%}
-  .actionbar .btn{flex:1}
-}
-@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
-
-/* Review patch: compact hierarchy, keyboard visibility, and reduced motion. */
-.field:focus-visible,.fname:focus-visible,.pill input:focus-visible,
-.actionbar .flabel input:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
-.field,.fname{border-color:#85899b}
-.hint a,.linkbtn{min-height:44px}
-.tabs button[aria-selected="false"]:hover{color:var(--ink)}
-.tick{width:44px;height:44px}
-.actionbar{padding-bottom:max(12px,env(safe-area-inset-bottom))}
-html{scroll-padding-bottom:220px}
-@media(max-width:744px){
- .nav{padding:12px 16px}.brand{font-size:22px}
- .chip{margin-top:12px;padding:10px 14px;border-radius:16px}
- .tabs{margin-top:12px;padding:4px}.tabs button{padding:10px 8px;font-size:14px}
- .mode{margin-top:12px;gap:16px}.panel.mode{padding:20px}
- .mtitle h2{font-size:24px;white-space:normal}
- .mhead{flex-wrap:wrap;gap:4px 12px;min-height:0}
- .mhead .mascot{display:none}
- .mtitle{flex-basis:100%}
- .mode .main .row > .check{flex:1 1 100%;flex-wrap:wrap}
- .mode .main .row > .check select.field{width:100%}
- .mode .main .row > .btn:not(.sm){flex:1 1 100%}
- #go{width:100%;order:-1}#addPerson{background:transparent;border:0}
- .dhead{padding:16px;gap:8px}.dbody{padding:0 16px 16px}
- .dhead .btn{padding:0 12px}.actionbar .btn{min-width:0;padding:0 20px}
-}
-@media(prefers-reduced-motion:reduce){
- *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-}
-
-
-.photo-open{width:100%;height:100%;border:0;padding:0;background:transparent;display:block;cursor:zoom-in}
-.tile .tag{pointer-events:none}
-
-/* photo preview */
+/* photo preview: a dialog, or a panel beside the grid on wide screens */
 dialog.preview{width:min(1100px,calc(100vw - 32px))}
-.preview .dhead{flex-wrap:nowrap;padding:12px 16px 12px 28px}
-.preview h2{flex:1;min-width:0;font-size:20px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.preview .rcount{white-space:nowrap}
-.preview .iconbtn:disabled{opacity:.3;cursor:default}
-.preview .dbody{padding:16px 28px 24px}
-.full-photo{width:100%;height:min(66vh,720px);object-fit:contain;background:#f4eef1;border-radius:16px;display:block}
-.pfoot{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:16px}
-.why-full{flex:1;min-width:200px;font-size:15px;color:var(--muted)} .why-full b{color:var(--ink)}
-.seg2{display:flex;gap:8px}
-.seg2 .btn{background:var(--panel);color:var(--ink);border:1.5px solid var(--line-strong)}
+.pv .dhead{flex-wrap:nowrap;padding:10px 10px 10px 20px}
+.pv h2{flex:1;min-width:0;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv .rcount{white-space:nowrap}
+.pv .iconbtn:disabled{opacity:.3;cursor:default}
+.pv .dbody{padding:16px 20px 20px}
+.full-photo{width:100%;height:min(66vh,720px);object-fit:contain;background:var(--photo-bg);border-radius:12px;display:block}
+.sidepreview .full-photo{height:max(240px,calc(100vh - 470px))}   /* fixed, so stepping through photos never jumps */
+.pfoot{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.why-full{font-size:15px;color:var(--muted)} .why-full b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg2 .btn{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
 .seg2 .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .seg2 #previewOut[aria-pressed="true"]{background:var(--ink);border-color:var(--ink)}
-@media (max-width:744px){   /* on a phone the photo takes its own height, no tall letterbox */
-  .rhead{gap:8px}.rhead .btn.sm{padding:0 14px}   /* All / None stay on the title's line */
-  .full-photo{height:auto;max-height:62vh;min-height:200px}
-  .preview .dhead{padding:8px 8px 8px 20px}.preview .dbody{padding:12px 16px 16px}
+dialog.preview .pfoot{flex-direction:row-reverse;align-items:center;flex-wrap:wrap}
+dialog.preview .why-full{flex:1;min-width:220px}
+dialog.preview .seg2{min-width:260px}
+
+/* export */
+.xlist{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.xlist li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#f8f8fb;font-size:15px}
+.xlist li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.xlist li em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.safe{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
+
+/* ---------------------------------------------------- done */
+dialog.done{padding:28px 24px 24px;align-items:center;gap:14px;text-align:center}
+dialog.done h2{font-size:26px}
+.donelist{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:8px 0 0;padding:0;list-style:none}
+.donelist a{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;background:var(--page);
+       font-size:15px;font-weight:600;text-decoration:none}
+
+/* ---------------------------------------------------- selection bar */
+.actionbar{position:fixed;left:0;right:0;bottom:16px;padding:0 16px;z-index:30;pointer-events:none}
+.actionbar .inner{pointer-events:auto;max-width:1176px;margin:0 auto;min-height:68px;display:flex;gap:12px;align-items:center;
+       padding:10px 10px 10px 20px;background:var(--panel);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-lift)}
+.actionbar .count{flex:1;min-width:0;font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actionbar .count b{color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums}
+.thumbs{display:flex;flex:0 0 auto}
+.thumbs img{width:36px;height:36px;border-radius:8px;object-fit:cover;border:2px solid #fff;background:var(--photo-bg)}
+.thumbs img + img{margin-left:-14px}
+.xprog{flex:1;min-width:0;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+/* ---------------------------------------------------- progress */
+.bar{width:100%;height:8px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
+.bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:var(--r-full);transition:width .4s ease}
+.bar.busy > i{width:35%!important;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
+
+/* processing: the mascot looks over a stack of photos beside the real count */
+.scan{max-width:520px;margin:24px auto 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.scan h2{font-size:28px}
+.scanart{position:relative;width:200px;height:150px}
+.scanart .mascot{position:absolute;left:24px;top:2px;width:140px;height:140px;animation:bob 2.4s ease-in-out infinite}
+.scanart .stack i{position:absolute;right:0;bottom:6px;width:60px;height:46px;border-radius:9px;
+      background:#e7ecff;border:3px solid #fff;box-shadow:0 4px 10px rgba(31,37,64,.12)}
+.scanart .stack i:nth-child(1){transform:rotate(-8deg);background:#fff1d6}
+.scanart .stack i:nth-child(2){transform:rotate(5deg) translate(-6px,-8px);background:#e2f5ec}
+.scanart .stack i:nth-child(3){transform:translate(-12px,-16px);background:#fde3ec}
+.scanart .beam{position:absolute;right:-4px;bottom:0;width:74px;height:4px;border-radius:4px;
+      background:var(--accent);opacity:.55;animation:beam 1.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes beam{0%,100%{transform:translateY(-60px)}50%{transform:translateY(0)}}
+.scancount{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.scanact{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:pre-line}
+#scanCard.halted .scanart .mascot{animation:none} #scanCard.halted .beam,#scanCard.halted .scanhint{display:none}
+
+/* ---------------------------------------------------- medium screens */
+@media (max-width:1099px){
+  :root{--pad:28px}
+  .shell{margin:16px 16px 0}
+  .apphead{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"brand album side" "tabs tabs tabs";min-height:0}
+  .apphead > .brand,.apphead > .albumsel,.apphead > .headside{min-height:72px}
+  .albumsel{display:flex;align-items:center}
+  .tabs{margin:0 calc(-1 * var(--pad));padding:0 calc(var(--pad) - 12px);border-left:0;border-top:1px solid var(--line);min-height:52px}
+  .cullwrap.has-side{display:block}
+  .headmascot{display:none}
 }
-
-/* cull: one pile at a time */
-.piles{display:flex;gap:4px;padding:4px;background:var(--page);border-radius:var(--r-full);width:fit-content;max-width:100%}
-.piles button{border:0;background:transparent;color:var(--muted);font-size:15px;font-weight:600;padding:8px 18px;
-     border-radius:var(--r-full);white-space:nowrap;min-height:40px}
-.piles button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:0 2px 8px rgba(31,37,64,.1)}
-.piles button b{font-variant-numeric:tabular-nums;margin-left:4px;color:var(--accent-active)}
-
-/* one clear action: once there is something to export, the run button steps back */
-body.can-export .mode .main .btn:not(.ghost):not(.soft){background:var(--panel);color:var(--ink);border:1.5px solid var(--ink)}
-body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--page)}
-
+@media (max-width:900px){ .helpbtn .label{display:none} }
+/* ---------------------------------------------------- phones */
+@media (max-width:640px){
+  :root{--pad:16px}
+  body{background:var(--panel)}
+  .shell{margin:0;border-radius:0;border:0;min-height:100vh}
+  .apphead{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand side" "album album" "tabs tabs"}
+  .apphead > .brand,.apphead > .headside{min-height:64px}
+  .apphead > .albumsel{min-height:0}
+  .albumsel{padding:0 0 10px;border-left:0}
+  .albumbtn{width:100%;max-width:none;border-color:var(--line-strong);height:44px}
+  .albumbtn .aname{flex:0 1 auto}.albumbtn .caret{margin-left:auto}
+  .albumsel .menu{left:0;right:0;max-width:none}
+  .tabs{overflow-x:auto;scrollbar-width:none;padding:0 4px;gap:0}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{padding:3px 10px 0;font-size:14px;flex:1 0 auto}
+  .helpbtn .label{display:none}
+  .gsi{height:40px;font-size:13px;padding:0 12px 0 10px}
+  main{padding:20px var(--pad) 120px}
+  .hero{padding-top:8px}.hero h1{font-size:32px}.hero p{font-size:16px}
+  .hero .art{display:none}
+  .openbox .row{flex-wrap:wrap}.openbox .btn{width:100%}
+  .mhead{min-height:0;flex-wrap:wrap;margin-bottom:16px}
+  .mtitle{flex:1 1 100%}
+  .mtitle h2{font-size:26px}
+  .mtools{padding-top:0}
+  .roster{grid-template-columns:1fr}
+  .peopleact{flex-direction:column;align-items:stretch}
+  .peopleact .btn{width:100%}
+  .mode .main > .row > .btn:not(.sm){flex:1 1 100%}
+  .card{padding:16px;border-radius:14px}
+  .rhead{gap:8px}.rhead .btn.sm{padding:0 12px}
+  .grid,.faces{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+  dialog.narrow{height:auto;max-height:100dvh;border-radius:20px 20px 0 0;margin:auto 0 0}
+  .dhead{padding:10px 8px 10px 16px}.dbody{padding:0 16px 16px}.dfoot{padding:12px 16px}
+  .full-photo{height:auto;max-height:58vh;min-height:200px}
+  dialog.preview .pfoot{flex-direction:column;align-items:stretch}
+  .actionbar{bottom:8px;padding:0 8px}
+  .actionbar .inner{min-height:64px;padding:8px 8px 8px 14px}
+  .thumbs{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <body>
 
-<nav class="nav">
+<div class="shell">
+<header class="apphead">
   <a class="brand" href="/" aria-label="FaceFinder, back to the start">
     <span class="logo">
-      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"/>
         <path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
         <circle cx="8" cy="9.2" r="1" fill="currentColor"/>
@@ -358,11 +394,46 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
     </span>
     FaceFinder
   </a>
-  <div class="grow"></div>
-  <span class="email" id="who"></span>
-  <a class="gsi" id="gsiNav" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
-  <button class="btn ghost sm" id="auth" hidden>Sign out</button>
-</nav>
+
+  <!-- the open album: name, count, and what can be done with it -->
+  <div class="albumsel" id="albumSel" hidden>
+    <div class="dropwrap" style="min-width:0;width:100%">
+      <button class="albumbtn" id="albumBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="albumMenu">
+        <span class="aname" id="albumName"></span><span class="acount" id="albumCount"></span>
+        <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="menu" id="albumMenu" hidden>
+        <div class="info"><b id="menuAlbumName"></b><span id="menuAlbumCount"></span></div>
+        <div id="menuRetry"></div>
+        <button type="button" id="menuOther">Open another album</button>
+        <button type="button" id="menuRescan" class="two">Rescan album <span class="sub">Starts again from the first photo</span></button>
+      </div>
+    </div>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="What to do with the album" id="tabs" hidden>
+    <button role="tab" id="tabPeople" aria-selected="true">Find people</button>
+    <button role="tab" id="tabEveryone" aria-selected="false">Everyone</button>
+    <button role="tab" id="tabSort" aria-selected="false" data-ai>Sort</button>
+    <button role="tab" id="tabCull" aria-selected="false" data-ai>Cull photos</button>
+  </nav>
+
+  <div class="headside">
+    <button class="helpbtn" id="helpBtn" type="button"><span class="q" aria-hidden="true">?</span><span class="label">Help</span></button>
+    <img class="headmascot" src="/static/img/cam-search.png" alt="" width="44" height="44">
+    <a class="gsi" id="gsiNav" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
+    <div class="dropwrap" id="acct" hidden>
+      <button class="acctbtn" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctMenu" aria-label="Account">
+        <span class="initial" id="acctInitial">?</span>
+        <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="menu right" id="acctMenu" hidden>
+        <div class="info">Signed in as<b id="who"></b></div>
+        <button type="button" id="auth">Sign out</button>
+      </div>
+    </div>
+  </div>
+</header>
 
 <main>
   <div id="setupWarn"></div>
@@ -370,42 +441,37 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
   <!-- 1. start -->
   <section class="hero" id="hero">
     <div class="copy">
-      <h1>Find your photos. Choose your moments.</h1>
+      <h1>Find your photos. <em>Choose your moments.</em></h1>
       <p>Find people, review the best moments, and save your selections to Drive.</p>
-      <div id="signinBox" hidden style="margin-top:32px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+      <div id="signinBox" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
         <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
         <span class="hint" style="font-size:14px">FaceFinder reads the shared album with your Google account
           and puts the folders in your own Drive. It never deletes or moves anything.</span>
       </div>
-      <div class="pill" id="albumPill">
-        <div class="seg">
-          <label for="album">Shared album</label>
-          <input type="text" id="album" placeholder="Paste the Google Drive folder link">
+      <div class="openbox" id="albumPill">
+        <label class="flabel" for="album">Shared album link</label>
+        <div class="row">
+          <input class="field" type="text" id="album" placeholder="Paste the Google Drive folder link">
+          <button class="btn" id="openAlbum">Open album</button>
         </div>
-        <button class="btn" id="openAlbum">Open album</button>
       </div>
-      <div id="albumMsg" style="margin-top:12px;max-width:640px"></div>
+      <div id="albumMsg" style="margin-top:12px;max-width:620px"></div>
     </div>
     <div class="art"><img class="mascot" src="/static/img/cam-wave.png" alt="FaceFinder's camera mascot waving hello"></div>
   </section>
 
-  <!-- 2. scanning -->
-  <section class="panel center" id="scanCard" hidden>
+  <!-- 2. processing -->
+  <section class="scan" id="scanCard" hidden>
     <div class="scanart" aria-hidden="true">
       <div class="stack"><i></i><i></i><i></i></div>
-      <img class="mascot" src="/static/img/cam-search.png" alt="" width="180" height="180">
+      <img class="mascot" src="/static/img/cam-search.png" alt="" width="140" height="140">
       <div class="beam"></div>
     </div>
-    <h2 id="scanTitle" style="font-size:30px">Opening the album…</h2>
+    <h2 id="scanTitle">Preparing your album</h2>
     <div id="pstat" class="scancount" role="status" aria-live="polite" aria-atomic="true">Starting…</div>
-    <div class="bar" id="pbarBox" role="progressbar" aria-label="Current scan stage" aria-valuemin="0" aria-valuemax="100"><i id="pbar"></i></div>
-    <ol class="steps" id="steps">
-      <li data-step="read">Reading photos</li>
-      <li data-step="faces">Finding faces</li>
-      <li data-step="gemini" data-ai>Gemini checking</li>
-      <li data-step="ready">Ready</li>
-    </ol>
-    <div class="hint scanhint" style="font-size:14px">Keep this page open. Photos already scanned are kept if it stops.</div>
+    <div class="bar" id="pbarBox" role="progressbar" aria-label="Photos checked" aria-valuemin="0" aria-valuemax="100"><i id="pbar"></i></div>
+    <div class="scanact" id="pact"></div>
+    <div class="hint scanhint" style="font-size:14px">Keep this page open. Photos already checked are kept if it stops.</div>
     <div class="row" style="justify-content:center">
       <button class="btn" id="resumeScan" hidden>Resume scan</button>
       <button class="btn ghost sm" id="stopScan">Stop scan</button>
@@ -413,36 +479,25 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
     </div>
   </section>
 
-  <div class="chip" id="albumInfo" hidden></div>
-  <section class="panel center" id="doneCard" hidden></section>
 
   <div class="work" id="work" data-locked="1">
-    <div class="tabs" role="tablist" aria-label="What to do with the album">
-      <button role="tab" id="tabPeople" aria-selected="true">Find people</button>
-      <button role="tab" id="tabEveryone" aria-selected="false">Everyone</button>
-      <button role="tab" id="tabSort" aria-selected="false" data-ai>Sort by description</button>
-      <button role="tab" id="tabCull" aria-selected="false" data-ai>Cull photos</button>
-    </div>
-
-    <!-- Every mode has the same frame: one header row (heading, one short line,
-         "How it works", small mascot) at the same height, then the controls,
-         then the photos. -->
+    <!-- Every tab has the same frame: heading + optional tools, one short line,
+         then the work. The heading's top edge and left edge never move. -->
 
     <!-- mode: find people -->
     <div id="modePeople">
-      <section class="panel mode">
+      <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Find your photos</h2><p class="hint">Add a clear photo of each person.</p></div>
+          <div class="mtitle"><h2>Find your photos</h2><p class="sub">Add a clear photo of each person.</p></div>
           <details class="how"><summary>How it works</summary>
             <p>The face model turns each face into numbers and finds every photo with the same
                face, including group photos. Two or three angles of a person find more.</p></details>
-          <img class="mascot" src="/static/img/cam-stand.png" alt="" width="56" height="56">
         </div>
         <div class="main">
-          <div id="roster" style="display:flex;flex-direction:column;gap:12px"></div>
-          <div class="row">
-            <button class="btn ghost sm" id="addPerson">Add someone</button>
+          <div id="roster" class="roster"></div>
+          <div class="peopleact">
             <button class="btn" id="go">Find photos</button>
+            <button class="btn ghost" id="addPerson">+ Add someone</button>
           </div>
           <div id="searchMsg"></div>
           <div id="strict" hidden>
@@ -457,25 +512,25 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
 
     <!-- mode: everyone -->
     <div id="modeEveryone" hidden>
-      <section class="panel mode">
+      <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Who gets a folder?</h2><p class="hint">Tick a face and type a name.</p></div>
-          <details class="how"><summary>How it works</summary>
-            <p>Every face in the album is grouped into people. Tap a face to check their photos
-               and pick their best shots. Same person twice? Give both cards the same name and
-               they share a folder.</p></details>
-          <img class="mascot" src="/static/img/cam-point.png" alt="" width="56" height="56">
-        </div>
-        <div class="main">
-          <div class="row">
+          <div class="mtitle"><h2>Choose people</h2><p class="sub">Select people and name their folders.</p></div>
+          <div class="mtools">
             <label class="check">Grouping
               <select class="field" id="grouping">
-                <option value="loose">Looser — fewer, bigger groups</option>
+                <option value="loose">Looser</option>
                 <option value="balanced" selected>Balanced</option>
-                <option value="strict">Stricter — fewer uncertain matches</option>
+                <option value="strict">Stricter</option>
               </select>
             </label>
           </div>
+          <details class="how"><summary>How it works</summary>
+            <p>Every face in the album is grouped into people. Tap a face to check their photos
+               and pick their best shots. Same person twice? Give both cards the same name and
+               they share a folder. "Looser" makes fewer, bigger groups; "Stricter" makes fewer
+               uncertain matches.</p></details>
+        </div>
+        <div class="main">
           <div id="everyMsg"></div>
           <div class="faces" id="faces"></div>
           <div><button class="linkbtn" id="toggleSingles" hidden></button></div>
@@ -485,20 +540,20 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
 
     <!-- mode: sort by description (Gemini) -->
     <div id="modeSort" hidden>
-      <section class="panel mode">
+      <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Sort by description</h2><p class="hint">Describe each folder, in Thai or English.</p></div>
+          <div class="mtitle"><h2>Sort by description</h2><p class="sub">Describe a folder in Thai or English.</p></div>
           <details class="how"><summary>How it works</summary>
-            <p>Sorting uses saved descriptions, which may miss small details.
-               Photos can match several folders. Uncertain results appear in "Check these".</p></details>
-          <img class="mascot" src="/static/img/cam-search.png" alt="" width="56" height="56">
+            <p>Gemini wrote a short description of every photo during the scan. Sorting matches your
+               folder descriptions against those, so it may miss small details. A photo can go in
+               several folders. Uncertain ones appear in "Check these".</p></details>
         </div>
         <div class="main">
           <div id="groupRows" style="display:flex;flex-direction:column;gap:10px"></div>
           <div class="row">
-            <button class="btn soft sm" id="suggest">Suggest folders</button>
-            <button class="btn ghost sm" id="addGroup">Add a folder</button>
             <button class="btn" id="runSort">Sort the photos</button>
+            <button class="btn ghost sm" id="addGroup">+ Add a folder</button>
+            <button class="btn soft sm" id="suggest">Suggest folders</button>
           </div>
           <div class="bar" id="sbarBox" hidden><i id="sbar"></i></div>
           <div id="sortMsg"></div>
@@ -509,43 +564,44 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
 
     <!-- mode: cull (Gemini) -->
     <div id="modeCull" hidden>
-      <section class="panel mode">
+      <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Choose the keepers</h2><p class="hint">Review the suggestions. Originals stay untouched.</p></div>
+          <div class="mtitle"><h2>Choose the keepers</h2><p class="sub">Review suggestions. Originals stay untouched.</p></div>
+          <div class="mtools">
+            <label class="check">How strict
+              <select class="field" id="strictness">
+                <option value="gentle">Gentle</option>
+                <option value="normal" selected>Normal</option>
+                <option value="strict">Strict</option>
+              </select>
+            </label>
+          </div>
           <details class="how"><summary>How it works</summary>
             <p>Gemini checked every photo for blur, closed eyes, people cut off by the frame and
                bad light. Photos it could not check or was unsure about go to Review, never to
                Rejected. A near-identical copy is rejected only when a clearly better copy is kept.
-               Ticked photos are copied into a new "Keep" folder; the album is not touched.</p></details>
-          <img class="mascot" src="/static/img/cam-photo.png" alt="" width="56" height="56">
+               Ticked photos are copied into a new "Keep" folder; the album is not touched.
+               "Gentle" only drops clear mistakes; "Strict" keeps only the strongest frames.</p></details>
         </div>
         <div class="main">
-          <div class="row">
-            <label class="check">How strict
-              <select class="field" id="strictness">
-                <option value="gentle">Gentle — only drop clear mistakes</option>
-                <option value="normal" selected>Normal</option>
-                <option value="strict">Strict — only the strongest frames</option>
-              </select>
-            </label>
-            <button class="btn" id="runCull">Suggest keepers</button>
-          </div>
+          <div class="row"><button class="btn" id="runCull">Suggest keepers</button></div>
           <div id="cullMsg"></div>
-          <label class="check" id="alsoRejectedBox" hidden>
-            <input type="checkbox" id="alsoRejected"> Also copy the rejected photos into a "Rejected" folder
-          </label>
         </div>
       </section>
-      <div id="cullResults"></div>
+      <div class="cullwrap" id="cullWrap">
+        <div id="cullResults"></div>
+        <aside class="sidepreview pv" id="cullSide" hidden aria-label="Photo preview"></aside>
+      </div>
     </div>
   </div>
 </main>
+</div>
 
 <dialog id="dlg" aria-label="Photos of one person">
   <div class="dhead">
     <img class="avatar" id="dlgFace" alt="">
-    <label class="flabel" style="flex:1;min-width:160px">Person's name
-      <input type="text" class="field" id="dlgName" placeholder="Their folder name" maxlength="100"></label>
+    <label class="flabel" style="flex:1;min-width:160px">Folder name
+      <input type="text" class="field" id="dlgName" placeholder="Their name" maxlength="100"></label>
     <span class="rcount" id="dlgCount"></span>
     <button class="btn soft sm" id="dlgBest" data-ai>Best 10</button>
     <button class="btn ghost sm" id="dlgAll">All</button>
@@ -556,13 +612,41 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
   <div class="dbody"><div id="dlgMsg" style="margin-top:16px"></div><div class="grid" id="dlgGrid"></div></div>
 </dialog>
 
+<dialog id="xdlg" class="narrow" aria-labelledby="xdlgTitle">
+  <div class="dhead"><h2 id="xdlgTitle">Export to Drive</h2>
+    <button type="button" class="iconbtn" id="xClose" aria-label="Close"></button></div>
+  <div class="dbody">
+    <ul class="xlist" id="xlist"></ul>
+    <label class="flabel" style="margin-top:18px"><span>Destination folder <span style="font-weight:400;color:var(--muted)">(optional)</span></span>
+      <input class="field" type="text" id="dest" placeholder="A Drive folder link, or a name for a new folder"></label>
+    <p class="hint" style="font-size:13px;margin-top:6px" id="destHint"></p>
+    <label class="check" id="alsoRejectedBox" hidden style="margin-top:14px">
+      <input type="checkbox" id="alsoRejected"> Also copy the unticked photos into a "Rejected" folder
+    </label>
+    <p class="safe" style="margin-top:14px">✓ Originals stay untouched. FaceFinder only copies.</p>
+  </div>
+  <div class="dfoot">
+    <button type="button" class="btn ghost" id="xCancel">Cancel</button>
+    <button type="button" class="btn" id="xGo">Export</button>
+  </div>
+</dialog>
+
+<dialog id="doneCard" class="narrow done" aria-label="Export finished"></dialog>
+
+<dialog id="helpDlg" class="narrow" aria-labelledby="helpTitle">
+  <div class="dhead"><h2 id="helpTitle">How it works</h2>
+    <button type="button" class="iconbtn" id="helpClose" aria-label="Close"></button></div>
+  <div class="dbody" style="display:flex;gap:16px;align-items:flex-start;padding-top:18px">
+    <img src="/static/img/cam-point.png" alt="" width="72" height="72" style="flex:0 0 72px">
+    <p id="helpText" style="font-size:15px"></p>
+  </div>
+</dialog>
+
 <div class="actionbar" id="actionbar" hidden>
   <div class="inner">
-    <div class="xprog" id="xprog" hidden><div class="bar"><i id="xbar"></i></div><span id="xtext"></span></div>
-    <label class="flabel dest">Destination folder
-      <input type="text" id="dest"
-             placeholder="A Drive folder link, or a name for a new folder (optional)"></label>
+    <div class="thumbs" id="xthumbs" aria-hidden="true"></div>
     <span class="count" id="summary"></span>
+    <div class="xprog" id="xprog" hidden><span id="xtext"></span><div class="bar"><i id="xbar"></i></div></div>
     <button class="btn" id="export" disabled>Export to Drive</button>
   </div>
 </div>
@@ -603,6 +687,58 @@ const postJSON = (url, data) => api(url, {
 const plural = (n, one, many) => `${n.toLocaleString("en")} ${n === 1 ? one : many}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// The tabs and their content only exist for an album that is ready.
+function lockWork(locked){
+  $("#work").dataset.locked = locked ? "1" : "0";
+  $("#tabs").hidden = locked;
+  if(locked) closeSide();
+}
+// The album in the header: name, count and its menu.
+function showAlbum(name, count){
+  const on = name != null;
+  $("#albumSel").hidden = !on;
+  if(!on) return;
+  $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
+  $("#albumBtn").title = name;
+  $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
+  $("#menuRescan").hidden = !state.ready;
+}
+// Small drop-down menus: one open at a time, Escape or a click outside closes.
+function closeMenus(){
+  for(const [btn, menu] of [["#albumBtn","#albumMenu"],["#acctBtn","#acctMenu"]]){
+    $(menu).hidden = true; $(btn).setAttribute("aria-expanded", "false");
+  }
+}
+for(const [btn, menu] of [["#albumBtn","#albumMenu"],["#acctBtn","#acctMenu"]]){
+  $(btn).onclick = e => {
+    e.stopPropagation();
+    const open = $(menu).hidden; closeMenus();
+    if(open){ $(menu).hidden = false; $(btn).setAttribute("aria-expanded", "true"); $(menu).querySelector("button:not([hidden])")?.focus(); }
+  };
+}
+document.addEventListener("click", e => { if(!e.target.closest(".menu")) closeMenus(); });
+document.addEventListener("keydown", e => {
+  if(e.key !== "Escape") return;
+  const open = ["#albumMenu","#acctMenu"].find(m => !$(m).hidden);
+  if(open){ closeMenus(); $(open === "#albumMenu" ? "#albumBtn" : "#acctBtn").focus(); }
+});
+$("#menuOther").onclick = () => { closeMenus(); goHome(); };
+$("#menuRescan").onclick = async () => {
+  closeMenus();
+  if(!confirm("Rescan the whole album from the first photo? This takes a while and clears the current results."))return;
+  try{ await startIndex(true); }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
+};
+// Help: the "How it works" of the tab in view.
+$("#helpBtn").onclick = () => {
+  const panel = state.ready ? $("#mode" + state.mode[0].toUpperCase() + state.mode.slice(1)) : null;
+  const how = panel?.querySelector(".how p");
+  $("#helpTitle").textContent = how ? "How " + panel.querySelector("h2").textContent.toLowerCase() + " works" : "How FaceFinder works";
+  $("#helpText").textContent = how ? how.textContent.replace(/\s+/g, " ").trim()
+    : "Paste the link of a shared Google Drive album. FaceFinder finds every face and Gemini checks every photo once. Then you can find people, choose people to get folders, sort by a description, or cull the weak shots. Everything you pick is copied into folders in your own Drive; the album itself is never changed.";
+  $("#helpDlg").showModal();
+};
+$("#helpClose").innerHTML = CLOSE; $("#helpClose").onclick = () => $("#helpDlg").close();
+
 /* A "group" is a set of photos that becomes one folder, however it was found:
    kind "search"  -> all = every match down to 0.20, filtered live by the slider
    kind "cluster" -> all = the photos grouped under one face
@@ -619,9 +755,11 @@ async function refreshMe(){
   state.gemini = !!me.gemini;
   if(!me.configured)
     msg($("#setupWarn"), "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
-  $("#who").textContent = me.user?.emailAddress || "";
+  const email = me.user?.emailAddress || "";
+  $("#who").textContent = email;
+  $("#acctInitial").textContent = (me.user?.displayName || email || "?").trim()[0].toUpperCase();
   $("#gsiNav").hidden = me.signed_in;
-  $("#auth").hidden = !me.signed_in;
+  $("#acct").hidden = !me.signed_in;
   $("#signinBox").hidden = me.signed_in;
   $("#albumPill").hidden = !me.signed_in;
   state.thr = Number(me.default_threshold) || 0.38;
@@ -652,8 +790,9 @@ $("#openAlbum").onclick = async () => {
       $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode('people');
     }
     state.folderId = a.folder_id; state.albumName = a.name;
+    showAlbum(a.name, "Opening…");
     state.results = []; state.crowd = null; state.sorted = []; state.culled = null; state.ready = false;
-    renderResults(); renderCrowd(); renderSorted(); renderCull(); $("#doneCard").hidden = true;
+    renderResults(); renderCrowd(); renderSorted(); renderCull(); $("#doneCard").close();
     msg($("#albumMsg"), "");
     if(a.status.status !== "ready") await startIndex(false);
     pollStatus();
@@ -666,7 +805,7 @@ async function startIndex(rebuild){
   state.results=[];state.crowd=null;state.sorted=[];state.culled=null;state.open=null;
   $('#dlg').close();$('#strict').hidden=true;$('#alsoRejected').checked=false;
   renderResults();renderCrowd();renderSorted();renderCull();
-  state.ready = false; $("#work").dataset.locked = "1"; updateBar();
+  state.ready = false; lockWork(true); updateBar();
   state.stopping = false; scanButtons('running');
   await postJSON("/api/index", {folder_id:state.folderId, rebuild});
   pollStatus();
@@ -674,7 +813,7 @@ async function startIndex(rebuild){
 function pollStatus(){
   clearTimeout(state.poll);
   const epoch=state.pollEpoch=(state.pollEpoch||0)+1,folder=state.folderId;
-  $('#hero').hidden=true;$('#scanCard').hidden=false;$('#albumInfo').hidden=true;
+  $('#hero').hidden=true;$('#scanCard').hidden=false;
   const alive=()=>epoch===state.pollEpoch && folder===state.folderId;
   let failures=0;
   const tick=async()=>{
@@ -683,18 +822,20 @@ function pollStatus(){
       const s=await api(`/api/album/${encodeURIComponent(folder)}/status`);
       if(!alive())return;failures=0;
       const total=Math.max(0,Number(s.total)||0),done=Math.max(0,Number(s.done)||0),judged=Math.max(0,Number(s.judged)||0);
-      const stage=s.status==='ready'?'ready':done<total?'faces':s.gemini&&judged<done?'gemini':'read';
-      const order=['read','faces','gemini','ready'];
-      document.querySelectorAll('#steps li').forEach(li=>{const i=order.indexOf(li.dataset.step),at=order.indexOf(stage);li.className=i<at?'done':i===at?'now':'';});
-      const box=$('#pbarBox');box.classList.toggle('busy',!total && s.status!=='error');
-      // This is labelled current-stage progress. Face and Gemini work may overlap.
-      const numerator=stage==='gemini'?judged:done;
-      const pct=total?Math.min(100,Math.round(100*numerator/total)):0;
+      const faces=Number(s.faces)||0, n=x=>x.toLocaleString('en');
+      // Faces and the Gemini check run side by side: a photo is "checked"
+      // once both are done with it, so the bar never runs ahead of the work.
+      const checked=s.gemini?Math.min(done,judged):done;
+      const box=$('#pbarBox');box.classList.toggle('busy',!total && s.status!=='error' && s.status!=='stopped');
+      const pct=total?Math.min(100,Math.round(100*checked/total)):0;
       $('#pbar').style.width=pct+'%';
       if(total)box.setAttribute('aria-valuenow',pct);else box.removeAttribute('aria-valuenow');
-      box.setAttribute('aria-label',stage==='gemini'?'Photo analysis progress':'Face scan progress');
-      $('#scanTitle').textContent=stage==='gemini'?'Checking photo quality…':stage==='faces'?'Finding faces…':'Opening album…';
-      $('#pstat').textContent=total?`${numerator} of ${total} photos · ${Number(s.faces)||0} faces found`:'Reading the photo list…';
+      $('#scanTitle').textContent='Preparing your album';
+      $('#pstat').textContent=total?`${n(checked)} of ${n(total)} photos checked`:'Reading the photo list…';
+      $('#pact').textContent=!total?'':s.gemini
+        ?`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found\nGemini quality check: ${n(judged)} of ${n(total)}`
+        :`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found`;
+      showAlbum(state.albumName||s.name, total?`${n(total)} photos`:'Opening…');
       scanButtons(s.status==='error'||s.status==='stopped'?'stopped':'running');
       if(s.status==='error'){
         box.classList.remove('busy');$('#scanTitle').textContent='Scan interrupted';
@@ -703,27 +844,18 @@ function pollStatus(){
       }
       if(s.status==='stopped'){
         box.classList.remove('busy');$('#scanTitle').textContent='Scan stopped';
-        $('#pstat').textContent=`${done} of ${total} photos scanned. They are kept.`;
+        $('#pstat').textContent=`${n(checked)} of ${n(total)} photos checked. They are kept.`;
         $('#resumeScan').textContent='Resume scan';return;
       }
       if(s.status==='ready'){
-        state.ready=true;$('#work').dataset.locked='0';$('#scanCard').hidden=true;
-        const info=$('#albumInfo');info.hidden=false;
-        info.innerHTML=`<b>${esc(state.albumName||s.name)}</b> · ${done} photos
-          <button class="linkbtn" id="rebuild">Rescan</button>
-          <button class="linkbtn" id="otherAlbum2">Open another album</button>`;
-        $('#rebuild').onclick=async()=>{
-          if(!confirm('Scan the whole album again from the start? The current results are cleared.'))return;
-          try{await startIndex(true);}catch(e){msg(info,esc(e.message),'err');}};
-        $('#otherAlbum2').onclick=goHome;
-        if(done<total){
-          const again=document.createElement('button');again.className='linkbtn';again.textContent=`Retry ${total-done} unread`;
-          again.onclick=async()=>{try{await startIndex(false);}catch(e){msg(info,esc(e.message),'err');}};info.append(' ',again);
-        }
-        if(s.gemini&&judged<done){
-          const retry=document.createElement('button');retry.className='linkbtn';retry.textContent=`Retry ${done-judged} unchecked`;
-          retry.onclick=async()=>{try{await startIndex(false);}catch(e){msg(info,esc(e.message),'err');}};info.append(retry);
-        }
+        state.ready=true;lockWork(false);$('#scanCard').hidden=true;
+        showAlbum(state.albumName||s.name,`${n(done)} photos`);
+        // anything left over can be retried from the album menu
+        const retry=$('#menuRetry');retry.replaceChildren();
+        const add=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
+          b.onclick=async()=>{closeMenus();try{await fn();}catch(e){msg($('#albumMsg'),esc(e.message),'err');}};retry.append(b);};
+        if(done<total)add(`Retry ${n(total-done)} photos that could not be read`,()=>startIndex(false));
+        if(s.gemini&&judged<done)add(`Check ${n(done-judged)} photos Gemini missed`,()=>startIndex(false));
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
       }
     }catch(e){
@@ -759,8 +891,8 @@ $('#otherAlbum').onclick=()=>goHome();
 // running carries on in the background; reopening its album shows it.
 function goHome(){
   clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
-  state.ready=false;$('#work').dataset.locked='1';
-  $('#scanCard').hidden=true;$('#albumInfo').hidden=true;$('#doneCard').hidden=true;
+  state.ready=false;lockWork(true);
+  $('#scanCard').hidden=true;$('#doneCard').close();showAlbum(null);
   $('#hero').hidden=false;updateBar();
   const input=$('#album');input.value='';input.focus();
   window.scrollTo({top:0});
@@ -769,6 +901,7 @@ function goHome(){
 // ---- mode switch ----
 const MODES = {people:"#tabPeople", everyone:"#tabEveryone", sort:"#tabSort", cull:"#tabCull"};
 function setMode(mode){
+  if(mode !== "cull") closeSide();
   state.mode = mode;
   for(const [m, tab] of Object.entries(MODES)){
     $(tab).setAttribute("aria-selected", m === mode);
@@ -797,7 +930,7 @@ function fillGrid(el, g, onChange){
       ${best ? '<span class="tag best">Suggested</span>' : isSure(g,m) ? '' : '<span class="tag">Check match</span>'}
       <button type="button" class="tick" aria-label="Include ${esc(m.name)}" aria-pressed="${selected()}">${CHECK}</button>
     </div><div class="meta"><span class="nm">${esc(m.name)}</span></div>
-    ${why ? `<div class="why">${esc(why)}</div>` : ''}`;
+    ${why ? `<div class="why${g.flagged ? ' flag' : ''}"><span>${esc(why)}</span></div>` : ''}`;
     d.querySelector('.photo-open').dataset.fileId=m.file_id;
     d.querySelector('.photo-open').onclick = () => previewPhoto(m, g, onChange);
     const tick = d.querySelector('.tick');
@@ -818,58 +951,91 @@ function fillGrid(el, g, onChange){
 }
 
 // Tap a photo: see the whole frame, why it is here, and include or exclude it.
-// The arrows (and the arrow keys) step through the same set without closing.
+// The arrows (and the arrow keys) step through the same set. In Cull on a wide
+// screen it opens beside the grid; everywhere else it is a dialog.
+function syncTile(id, on){
+  document.querySelectorAll('.photo-open').forEach(b=>{
+    if(b.dataset.fileId!==id)return;
+    const t=b.closest('.tile');t.classList.toggle('sel',on);t.querySelector('.tick')?.setAttribute('aria-pressed',on);
+  });
+}
+function markViewing(id){
+  state.viewingId=id;
+  document.querySelectorAll('.tile.viewing').forEach(t=>t.classList.remove('viewing'));
+  if(id)document.querySelectorAll('#cullResults .photo-open').forEach(b=>{if(b.dataset.fileId===id)b.closest('.tile').classList.add('viewing');});
+}
+function closeSide(){
+  const side=$('#cullSide');if(!side||side.hidden)return;
+  side.hidden=true;side.replaceChildren();$('#cullWrap').classList.remove('has-side');markViewing(null);
+}
 function previewPhoto(m,g,onChange){
+  const beside=state.mode==='cull'&&!$('#dlg').open&&matchMedia('(min-width:1100px)').matches;
   let dialog=$('#photoPreview');
   if(!dialog){
-    dialog=document.createElement('dialog');dialog.id='photoPreview';dialog.className='preview';
+    dialog=document.createElement('dialog');dialog.id='photoPreview';dialog.className='preview pv';
     dialog.setAttribute('aria-labelledby','previewTitle');document.body.append(dialog);
   }
+  const host=beside?$('#cullSide'):dialog;
+  (beside?dialog:$('#cullSide')).replaceChildren();          // one preview at a time, one set of ids
   const opener=document.activeElement, grid=opener?.closest('.grid');
   const list=visible(g);
   let at=Math.max(0,list.findIndex(x=>x.file_id===m.file_id));
-  dialog.innerHTML=`<div class="dhead">
+  host.innerHTML=`<div class="dhead">
       <h2 id="previewTitle"></h2><span class="rcount" id="previewPos"></span>
       <button type="button" class="iconbtn" id="previewPrev" aria-label="Previous photo">${ARROW_L}</button>
       <button type="button" class="iconbtn" id="previewNext" aria-label="Next photo">${ARROW_R}</button>
       <button type="button" class="iconbtn" id="previewClose" aria-label="Close">${CLOSE}</button></div>
     <div class="dbody"><img class="full-photo" id="previewImg" alt="">
-      <div class="pfoot"><p class="why-full" id="previewWhy"></p>
+      <div class="pfoot">
         <div class="seg2" role="group" aria-label="In the export?">
-          <button type="button" class="btn sm" id="previewIn">${CHECK} Include</button>
-          <button type="button" class="btn sm" id="previewOut">${CLOSE} Exclude</button></div></div></div>`;
+          <button type="button" class="btn sm" id="previewIn">${CHECK} Keep</button>
+          <button type="button" class="btn sm" id="previewOut">${CLOSE} Exclude</button></div>
+        <p class="why-full" id="previewWhy"></p></div></div>`;
+  const q=sel=>host.querySelector(sel);
   const show=()=>{
     const x=list[at];
-    $('#previewTitle').textContent=x.name;
-    $('#previewPos').textContent=`${at+1} of ${list.length.toLocaleString('en')}`;
-    const img=$('#previewImg');img.alt=x.name;img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
+    q('#previewTitle').textContent=x.name;
+    q('#previewPos').textContent=`${at+1} of ${list.length.toLocaleString('en')}`;
+    const img=q('#previewImg');img.alt=x.name;img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
     const why=x.long||x.why||g.best?.get(x.file_id)||'';
-    $('#previewWhy').innerHTML=why?`<b>Why:</b> ${esc(why)}`:'';
+    q('#previewWhy').innerHTML=why?`<b>${g.flagged?'Why this was flagged':'Why'}</b>${esc(why)}`:'';
     const on=!g.removed.has(x.file_id);
-    $('#previewIn').setAttribute('aria-pressed',on);$('#previewOut').setAttribute('aria-pressed',!on);
-    $('#previewIn').disabled=$('#previewOut').disabled=!!g._busy;
-    $('#previewPrev').disabled=at===0;$('#previewNext').disabled=at===list.length-1;
+    q('#previewIn').setAttribute('aria-pressed',on);q('#previewOut').setAttribute('aria-pressed',!on);
+    q('#previewIn').disabled=q('#previewOut').disabled=!!g._busy;
+    q('#previewPrev').disabled=at===0;q('#previewNext').disabled=at===list.length-1;
+    if(beside)markViewing(x.file_id);
   };
-  const set=on=>{if(g._busy)return;const id=list[at].file_id;on?g.removed.delete(id):g.removed.add(id);show();onChange();};
+  const set=on=>{if(g._busy)return;const id=list[at].file_id;on?g.removed.delete(id):g.removed.add(id);syncTile(id,on);show();onChange();};
   const step=d=>{const n=at+d;if(n>=0&&n<list.length){at=n;show();}};
-  $('#previewIn').onclick=()=>set(true);$('#previewOut').onclick=()=>set(false);
-  $('#previewPrev').onclick=()=>step(-1);$('#previewNext').onclick=()=>step(1);
-  $('#previewClose').onclick=()=>dialog.close();
-  dialog.onkeydown=e=>{
+  q('#previewIn').onclick=()=>set(true);q('#previewOut').onclick=()=>set(false);
+  q('#previewPrev').onclick=()=>step(-1);q('#previewNext').onclick=()=>step(1);
+  host.onkeydown=e=>{
     if(e.target.matches('input,select,textarea'))return;
     if(e.key==='ArrowLeft'){e.preventDefault();step(-1);}
     else if(e.key==='ArrowRight'){e.preventDefault();step(1);}
+    else if(e.key==='Escape'&&beside){e.preventDefault();q('#previewClose').click();}
   };
-  dialog.onclose=()=>{
-    // Repaint the grid underneath so its ticks match what was chosen here.
-    if(state.open===g && $('#dlg').open) fillGrid($('#dlgGrid'),g,onChange);
-    else if(state.mode==='people')renderResults();else if(state.mode==='sort')renderSorted();else if(state.mode==='cull')renderCull();
+  const refocus=()=>{
     const id=list[at].file_id;
     const scope=state.open===g && $('#dlg').open ? $('#dlg') : grid?.isConnected ? grid : document;
     const target=[...scope.querySelectorAll('.photo-open')].find(b=>b.dataset.fileId===id);
     if(target)target.focus();else if(opener?.isConnected)opener.focus();
   };
-  show();dialog.showModal();$('#previewClose').focus();
+  if(beside){
+    q('#previewClose').onclick=()=>{closeSide();refocus();};
+    host.hidden=false;$('#cullWrap').classList.add('has-side');show();q('#previewClose').focus({preventScroll:true});
+    const r=host.getBoundingClientRect(), barTop=$('#actionbar').hidden?innerHeight:$('#actionbar .inner').getBoundingClientRect().top;
+    if(r.bottom>barTop-12)window.scrollBy({top:Math.min(r.top-16,r.bottom-barTop+12),behavior:'instant'});
+    return;
+  }
+  q('#previewClose').onclick=()=>dialog.close();
+  dialog.onclose=()=>{
+    // Repaint the grid underneath so its ticks match what was chosen here.
+    if(state.open===g && $('#dlg').open) fillGrid($('#dlgGrid'),g,onChange);
+    else if(state.mode==='people')renderResults();else if(state.mode==='sort')renderSorted();else if(state.mode==='cull')renderCull();
+    refocus();
+  };
+  show();dialog.showModal();q('#previewClose').focus();
 }
 
 function choose(g, which){
@@ -952,37 +1118,45 @@ function addShots(p, list){
   renderRoster();
 }
 function renderRoster(){
-  const box = $("#roster"); box.innerHTML = "";
-  for(const p of state.roster){
-    const row = document.createElement("div");
-    row.className = "person";
-    row.innerHTML =
-      `<div class="shots">
-         ${p.urls.map(u => `<img src="${u}" alt="">`).join("")}
-         ${p.files.length < 3 ? `<button class="addshot" type="button"
-             aria-label="Add a photo of this person">${PLUS}<span>${p.files.length ? "Another" : "Photo"}</span></button>` : ""}
-       </div>
-       <label class="flabel" style="flex:1;min-width:160px">Person's name
-         <input class="field" type="text" maxlength="100" value="${esc(p.name)}"
-                placeholder="Their folder name"></label>
-       ${state.roster.length > 1 ? `<button class="iconbtn" type="button"
-              aria-label="Remove this person">${CLOSE}</button>` : ""}
+  const box = $("#roster"); box.replaceChildren();
+  state.roster.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "person";
+    const label = state.roster.length > 1 ? `Person ${i + 1}: ` : "";
+    card.innerHTML =
+      `${state.roster.length > 1 ? `<div class="phead"><b>Person ${i + 1}</b>
+         <button class="iconbtn rmperson" type="button" aria-label="Remove ${esc(nameOf(p))}">${CLOSE}</button></div>` : ""}
+       ${p.files.length ? `<div class="shots">
+         ${p.urls.map((u, k) => `<figure class="shot"><img src="${u}" alt="Reference photo ${k + 1}">
+            <button class="rm" type="button" data-k="${k}" aria-label="Remove reference photo ${k + 1}">${CLOSE}</button></figure>`).join("")}
+         ${p.files.length < 3 ? `<button class="addshot" type="button" aria-label="${label}add another photo">${PLUS}<span>Add</span></button>` : ""}
+       </div>`
+       : `<button class="dropzone" type="button" aria-label="${label}add a photo of this person">
+            <span class="plus">${PLUS}</span><b>Add photo</b><span>A clear photo of their face. Up to 3 angles.</span></button>`}
+       <label class="flabel">Folder name
+         <input class="field" type="text" maxlength="100" value="${esc(p.name)}" placeholder="e.g. Mint"></label>
        <input type="file" accept="image/*" multiple hidden>`;
-    const file = row.querySelector("input[type=file]");
-    row.querySelector(".addshot")?.addEventListener("click", () => file.click());
+    const file = card.querySelector("input[type=file]");
+    card.querySelector(".addshot, .dropzone")?.addEventListener("click", () => file.click());
     file.onchange = e => addShots(p, e.target.files);
-    row.querySelector(".field").oninput = e => { p.name = e.target.value; relabel(); };
-    row.querySelector(".iconbtn")?.addEventListener("click", () => {
+    card.querySelectorAll(".shot .rm").forEach(b => b.onclick = () => {
+      const k = +b.dataset.k;
+      URL.revokeObjectURL(p.urls[k]); p.urls.splice(k, 1); p.files.splice(k, 1);
+      renderRoster();
+      $("#roster").children[i]?.querySelector(".rm, .addshot, .dropzone")?.focus();
+    });
+    card.querySelector(".field").oninput = e => { p.name = e.target.value; relabel(); };
+    card.querySelector(".rmperson")?.addEventListener("click", () => {
       p.urls.forEach(u=>URL.revokeObjectURL(u));
       state.roster = state.roster.filter(x => x !== p);
       state.results = state.results.filter(g => g.person !== p);
       renderRoster(); renderResults();
     });
-    row.ondragover = e => { e.preventDefault(); row.classList.add("drag"); };
-    row.ondragleave = () => row.classList.remove("drag");
-    row.ondrop = e => { e.preventDefault(); addShots(p, e.dataTransfer.files); };
-    box.appendChild(row);
-  }
+    card.ondragover = e => { e.preventDefault(); card.classList.add("drag"); };
+    card.ondragleave = () => card.classList.remove("drag");
+    card.ondrop = e => { e.preventDefault(); addShots(p, e.dataTransfer.files); };
+    box.appendChild(card);
+  });
 }
 $("#addPerson").onclick = addPerson;
 
@@ -1014,7 +1188,7 @@ $("#go").onclick = async () => {
   }
   const found = state.results.reduce((n, g) => n + visible(g).length, 0);
   msg($("#searchMsg"),
-    `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then create the folders.`, "ok");
+    `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then export to Drive.`, "ok");
   $("#strict").hidden = false;
   $("#go").disabled = false;
 };
@@ -1224,7 +1398,7 @@ function renderSorted(){
 
 // ---- mode: cull ----
 $("#runCull").onclick = async () => {
-  $("#runCull").disabled = true;
+  $("#runCull").disabled = true; closeSide();
   msg($("#cullMsg"), "Culling…");
   try{
     const r = await postJSON("/api/cull", {folder_id:state.folderId, strictness:$("#strictness").value});
@@ -1241,8 +1415,8 @@ $("#runCull").onclick = async () => {
                                                  why:short(x, pile), long:x.reason}));
     state.culled = {
       keep:{kind:"set", name:"Keep", all:rows(r.keep, "keep"), removed:new Set(), limit:24},
-      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(), limit:24},
-      reject:{kind:"set", name:"Rejected", all:rows(r.reject, "reject"), removed:new Set(r.reject.map(x => x.file_id)), limit:48},
+      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(), limit:24, flagged:true},
+      reject:{kind:"set", name:"Rejected", all:rows(r.reject, "reject"), removed:new Set(r.reject.map(x => x.file_id)), limit:48, flagged:true},
     };
     const counts = {};
     for(const x of r.reject){ const k = short(x, "reject").split(" · ")[0]; counts[k] = (counts[k] || 0) + 1; }
@@ -1261,7 +1435,6 @@ $("#runCull").onclick = async () => {
   }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
   $("#runCull").disabled = false;
 };
-$("#alsoRejected").onchange = updateBar;
 function renderCull(){
   const box = $("#cullResults"); box.innerHTML = "";
   if(!state.culled){ updateBar(); return; }
@@ -1275,16 +1448,16 @@ function renderCull(){
   for(const [k, label] of Object.entries(piles)){
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", state.cullPile === k);
-    b.innerHTML = `${label}<b>${state.culled[k].all.length.toLocaleString("en")}</b>`;
-    b.onclick = () => { state.cullPile = k; renderCull(); };
+    b.innerHTML = `${label}<span class="n">${state.culled[k].all.length.toLocaleString("en")}</span>`;
+    b.onclick = () => { state.cullPile = k; closeSide(); renderCull(); };
     bar.append(b);
   }
-  const wrap = document.createElement("div"); wrap.style.marginTop = "20px"; wrap.append(bar);
-  box.append(wrap);
+  box.append(bar);
   const g = state.culled[state.cullPile];
   if(g.all.length) box.appendChild(groupCard(g, {title:piles[state.cullPile], note:notes[state.cullPile]}));
   else { const p = document.createElement("p"); p.className = "msg info"; p.style.marginTop = "16px";
          p.textContent = `Nothing in ${piles[state.cullPile]}.`; box.append(p); }
+  if(!$("#cullSide").hidden) markViewing(state.viewingId);
   updateBar();
 }
 
@@ -1309,28 +1482,50 @@ function exportGroups(){
     .filter(x => x.file_ids.length);
 }
 function updateBar(){
-  const active = {people:state.results.length > 0, everyone:!!state.crowd,
-                  sort:state.sorted.length > 0, cull:!!state.culled}[state.mode];
-  $("#actionbar").hidden = !(state.ready && active);
   const gs = exportGroups();
+  const ids = [...new Set(gs.flatMap(g => g.file_ids))];
   const folders = new Set(gs.map(g => g.name.toLowerCase())).size;
-  const photos = new Set(gs.flatMap(g => g.file_ids)).size;
-  $("#summary").innerHTML = gs.length
-    ? `<b>${folders}</b> ${folders === 1 ? "folder" : "folders"} · <b>${photos.toLocaleString("en")}</b> ${photos === 1 ? "photo" : "photos"}`
-    : (state.mode === "everyone" ? "Tick or name someone" : "No photos selected");
-  $("#export").disabled = !gs.length || state.exporting;
-  document.body.classList.toggle("can-export", !$("#actionbar").hidden && gs.length > 0);
+  $("#actionbar").hidden = !(state.ready && (ids.length || state.exporting));
+  if(!state.exporting){
+    $("#summary").innerHTML = `<b>${ids.length.toLocaleString("en")}</b> ${ids.length === 1 ? "photo" : "photos"} selected` +
+      (folders > 1 ? ` · ${folders} folders` : "");
+    $("#xthumbs").innerHTML = ids.slice(0, 3).map(id =>
+      `<img src="/api/thumb/${encodeURIComponent(id)}?s=200" alt="" loading="lazy">`).join("");
+  }
+  $("#export").disabled = !ids.length || state.exporting;
+  document.body.classList.toggle("can-export", !$("#actionbar").hidden && ids.length > 0);
 }
 
-$("#export").onclick = async () => {
+// Export to Drive: the bar's button opens a short dialog that says exactly what
+// will be copied where; the dialog's button starts the copy.
+$("#xClose").innerHTML = CLOSE;
+$("#xClose").onclick = $("#xCancel").onclick = () => $("#xdlg").close();
+$("#alsoRejected").onchange = () => { fillExport(); updateBar(); };
+function fillExport(){
+  const gs = exportGroups(), total = new Set(gs.flatMap(g => g.file_ids)).size;
+  $("#xlist").innerHTML = gs.map(g =>
+    `<li>${FOLDER}<span>${esc(g.name)}</span><em>${plural(g.file_ids.length, "photo", "photos")}</em></li>`).join("");
+  $("#destHint").textContent = `Leave it empty to make "FaceFinder - ${state.albumName || "album"}" in My Drive.`;
+  $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled &&
+    (state.culled.reject.all.length || state.culled.review.all.length));
+  $("#xGo").textContent = `Export ${plural(total, "photo", "photos")}`;
+  $("#xGo").disabled = !total;
+}
+$("#export").onclick = () => {
+  if(!exportGroups().length) return;
+  fillExport(); $("#xdlg").showModal(); $("#dest").focus();
+};
+$("#xGo").onclick = async () => {
   const groups = exportGroups();
   if(!groups.length) return;
+  $("#xdlg").close();
   const v = $("#dest").value.trim();
   const body = {folder_id:state.folderId, groups};
   if(v.includes("drive.google.com") || /^[A-Za-z0-9_-]{25,}$/.test(v)) body.dest_link = v;
   else if(v) body.dest_name = v;
 
   state.exporting = true; updateBar();
+  $("#summary").hidden = true; $("#xthumbs").hidden = true;
   $("#xprog").hidden = false; $("#xbar").style.width = "0%";
   $("#xtext").textContent = "Starting…";
   let job;
@@ -1339,26 +1534,27 @@ $("#export").onclick = async () => {
     while(true){
       job = await api("/api/export/" + job_id);
       $("#xbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
-      $("#xtext").textContent = `Filling the folders — ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}`;
+      $("#xtext").textContent = `Copying ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}…`;
       if(job.status !== "running") break;
       await sleep(1200);
     }
   }catch(e){ job = {status:"error", message:e.message}; }
-  state.exporting = false; $("#xprog").hidden = true; updateBar();
+  state.exporting = false; $("#xprog").hidden = true; $("#summary").hidden = false; $("#xthumbs").hidden = false;
+  updateBar();
   showDone(job);
 };
 
 function showDone(job){
   const card = $("#doneCard");
   if(job.status === "error"){
-    card.innerHTML = `<img class="mascot" src="/static/img/cam-sad.png" alt="The mascot looking sorry" width="180" height="180">
-      <h2 style="font-size:30px">Export interrupted</h2>
+    card.innerHTML = `<img class="mascot" src="/static/img/cam-sad.png" alt="The mascot looking sorry" width="140" height="140">
+      <h2>Export interrupted</h2>
       <div class="msg err">${esc(job.message || "Some copies may already exist. Retry the same export to check for missing copies.")}</div>`;
   } else {
     const made = job.people.filter(p => p.url);
     card.innerHTML =
-      `<img class="mascot" src="/static/img/cam-celebrate.png" alt="The mascot celebrating" width="220" height="220">
-       <h2 style="font-size:34px">${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
+      `<img class="mascot" src="/static/img/cam-celebrate.png" alt="The mascot celebrating" width="160" height="160">
+       <h2>${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
        <p class="hint">Inside <a href="${esc(job.root_url)}" target="_blank" rel="noopener"><b>${esc(job.root_name)}</b></a> in your Drive.
          ${job.skipped ? `${plural(job.skipped, "photo was", "photos were")} already there and left alone.` : ""}</p>
        ${job.note ? `<div class="msg info">${esc(job.note)}</div>` : ""}
@@ -1367,8 +1563,9 @@ function showDone(job){
        <ul class="donelist">${made.map(p =>
          `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${FOLDER}${esc(p.name)} · ${(p.copied + p.skipped).toLocaleString("en")}</a></li>`).join("")}</ul>`;
   }
-  card.hidden = false;
-  card.scrollIntoView({behavior:"smooth", block:"center"});
+  card.insertAdjacentHTML("beforeend", '<button type="button" class="btn" id="doneOk" style="margin-top:6px">Done</button>');
+  $("#doneOk").onclick = () => card.close();
+  card.showModal(); $("#doneOk").focus();
 }
 
 
@@ -1405,13 +1602,13 @@ function lockDuring(handler){
   return async function(event){
     if(state.uiBusy)return;
     state.uiBusy=true;
-    const controls=[...document.querySelectorAll('main button, main input, main select, .tabs button, #dest, #export')];
+    const controls=[...document.querySelectorAll('main button, main input, main select, .tabs button, #albumBtn, #dest, #export')];
     const previous=controls.map(el=>[el,el.disabled]);controls.forEach(el=>el.disabled=true);
     try{return await handler.call(this,event);}
     finally{previous.forEach(([el,value])=>{if(el.isConnected)el.disabled=value;});state.uiBusy=false;updateBar();}
   };
 }
-for(const id of ['openAlbum','go','suggest','runSort','runCull','export']){
+for(const id of ['openAlbum','go','suggest','runSort','runCull','xGo']){
   const button=$('#'+id);button.onclick=lockDuring(button.onclick);
 }
 $('#grouping').onchange=lockDuring(async()=>{if(state.ready)await loadCrowd();});
