@@ -193,10 +193,12 @@ async def open_album(request: Request):
     }
 
 
-def _index_worker(folder_id: str, creds_data: dict):
+def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
     """Walk the album once: cache an embedding for every face found, a burst
     fingerprint for every photo and, when Gemini is on, its judgement of the
-    photo. Photos scanned before Gemini was switched on get judged too."""
+    photo. Photos scanned before Gemini was switched on get judged too.
+    Setting `stop` ends it early; what is already scanned is kept, and opening
+    the album again carries on from there."""
     gem = None
     try:
         creds = gd.creds_from_session(creds_data)
@@ -219,6 +221,8 @@ def _index_worker(folder_id: str, creds_data: dict):
             gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
 
         def judge(file_id, data):
+            if stop.is_set():
+                return
             try:
                 store.save_ai(folder_id, file_id, gemini.judge(gemini.shrink(data)))
             except Exception:
@@ -232,6 +236,8 @@ def _index_worker(folder_id: str, creds_data: dict):
         failed = []
 
         def one(meta):
+            if stop.is_set():
+                return
             try:
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta)
                 found, size = faces.analyze(data)
@@ -247,6 +253,8 @@ def _index_worker(folder_id: str, creds_data: dict):
                 gem.submit(judge, meta["id"], data)
 
         def rejudge(meta):
+            if stop.is_set():
+                return
             try:
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
             except Exception:
@@ -260,9 +268,14 @@ def _index_worker(folder_id: str, creds_data: dict):
                 missing = {m["id"] for m in store.unjudged(folder_id)} - fresh
                 list(pool.map(rejudge, [f for f in files if f["id"] in missing]))
         if gem:
-            gem.shutdown(wait=True)
+            gem.shutdown(wait=True, cancel_futures=stop.is_set())
 
         row = store.album(folder_id)
+        if stop.is_set():
+            store.set_album(folder_id, status="stopped", message=(
+                "Stopped after %d of %d photos. They are kept; open the album again to carry on."
+                % (row["done"], row["total"])))
+            return
         msg = "%d faces across %d photos" % (row["faces"], row["done"])
         if failed:
             msg += "; %d could not be read (scan again to retry)" % len(failed)
@@ -301,14 +314,30 @@ async def start_index(request: Request):
         # Say so before the thread starts, so a status poll right after this
         # never sees the previous scan's "ready".
         store.set_album(folder_id, status="pending")
+        stop = threading.Event()
         t = threading.Thread(
             target=_index_worker,
-            args=(folder_id, request.session["creds"]),
+            args=(folder_id, request.session["creds"], stop),
             daemon=True,
         )
+        t.stop = stop
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
+
+
+@app.post("/api/index/stop")
+def stop_index(request: Request, body: dict = Body(...)):
+    """Stop a scan (the wrong album was pasted, or it can wait). Photos in
+    flight finish; nothing already scanned is thrown away."""
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    with _jobs_lock:
+        t = _jobs.get(folder_id)
+        if t is None:
+            return {"stopping": False}
+        t.stop.set()
+    return {"stopping": True}
 
 
 @app.get("/api/album/{folder_id}/status")

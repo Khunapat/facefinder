@@ -196,6 +196,29 @@ def main_test():
     st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
     check("scanning again picks it up", st["done"] == st["total"] == 7, st)
 
+    print("Stop and resume")
+    import time as _time
+
+    def slow(creds, svc, meta, size=None):
+        _time.sleep(0.4)
+        return real_fetch(creds, svc, meta, size)
+    main.gd.fetch_image_bytes = slow
+    try:
+        c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        _time.sleep(0.6)
+        r = c.post("/api/index/stop", json={"folder_id": fid}).json()
+        check("a running scan can be stopped", r.get("stopping") is True, r)
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] != "indexing" and s["status"] != "pending")
+    finally:
+        main.gd.fetch_image_bytes = real_fetch
+    check("it ends as stopped, keeping what it scanned", st["status"] == "stopped" and st["done"] < st["total"], st)
+    check("stopping when nothing runs is harmless",
+          c.post("/api/index/stop", json={"folder_id": fid}).json().get("stopping") is False)
+    check("another session cannot stop a scan", other.post("/api/index/stop", json={"folder_id": fid}).status_code == 403)
+    c.post("/api/index", json={"folder_id": fid})
+    st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    check("resuming finishes the album", st["status"] == "ready" and st["done"] == st["total"] == 7, st)
+
     print()
     print("%d of %d checks passed" % (sum(checks), len(checks)))
     return all(checks)

@@ -242,6 +242,7 @@ html{scrollbar-gutter:stable}
 @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes beam{0%,100%{transform:translateY(-70px)}50%{transform:translateY(0)}}
 @media (prefers-reduced-motion:reduce){.scanart .mascot,.scanart .beam{animation:none}}
+#scanCard.halted .scanart .mascot{animation:none} #scanCard.halted .beam,#scanCard.halted .scanhint{display:none}
 .scancount{font-size:17px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .bar.busy > i{width:35%!important;animation:slide 1.4s ease-in-out infinite}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
@@ -404,7 +405,12 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
       <li data-step="gemini" data-ai>Gemini checking</li>
       <li data-step="ready">Ready</li>
     </ol>
-    <div class="hint" style="font-size:14px">Keep this page open. Photos already scanned are kept if it stops.</div>
+    <div class="hint scanhint" style="font-size:14px">Keep this page open. Photos already scanned are kept if it stops.</div>
+    <div class="row" style="justify-content:center">
+      <button class="btn" id="resumeScan" hidden>Resume scan</button>
+      <button class="btn ghost sm" id="stopScan">Stop scan</button>
+      <button class="btn ghost sm" id="otherAlbum" hidden>Open another album</button>
+    </div>
   </section>
 
   <div class="chip" id="albumInfo" hidden></div>
@@ -661,6 +667,7 @@ async function startIndex(rebuild){
   $('#dlg').close();$('#strict').hidden=true;$('#alsoRejected').checked=false;
   renderResults();renderCrowd();renderSorted();renderCull();
   state.ready = false; $("#work").dataset.locked = "1"; updateBar();
+  state.stopping = false; scanButtons('running');
   await postJSON("/api/index", {folder_id:state.folderId, rebuild});
   pollStatus();
 }
@@ -688,18 +695,27 @@ function pollStatus(){
       box.setAttribute('aria-label',stage==='gemini'?'Photo analysis progress':'Face scan progress');
       $('#scanTitle').textContent=stage==='gemini'?'Checking photo quality…':stage==='faces'?'Finding faces…':'Opening album…';
       $('#pstat').textContent=total?`${numerator} of ${total} photos · ${Number(s.faces)||0} faces found`:'Reading the photo list…';
+      scanButtons(s.status==='error'||s.status==='stopped'?'stopped':'running');
       if(s.status==='error'){
         box.classList.remove('busy');$('#scanTitle').textContent='Scan interrupted';
         $('#pstat').textContent=s.message||'Some photos could not be checked.';
-        addScanRetry();return;
+        $('#resumeScan').textContent='Retry scan';return;
+      }
+      if(s.status==='stopped'){
+        box.classList.remove('busy');$('#scanTitle').textContent='Scan stopped';
+        $('#pstat').textContent=`${done} of ${total} photos scanned. They are kept.`;
+        $('#resumeScan').textContent='Resume scan';return;
       }
       if(s.status==='ready'){
         state.ready=true;$('#work').dataset.locked='0';$('#scanCard').hidden=true;
-        $('#scanRetry')?.remove();
         const info=$('#albumInfo');info.hidden=false;
         info.innerHTML=`<b>${esc(state.albumName||s.name)}</b> · ${done} photos
-          <button class="linkbtn" id="rebuild">Rescan</button>`;
-        $('#rebuild').onclick=async()=>{try{await startIndex(true);}catch(e){msg(info,esc(e.message),'err');}};
+          <button class="linkbtn" id="rebuild">Rescan</button>
+          <button class="linkbtn" id="otherAlbum2">Open another album</button>`;
+        $('#rebuild').onclick=async()=>{
+          if(!confirm('Scan the whole album again from the start? The current results are cleared.'))return;
+          try{await startIndex(true);}catch(e){msg(info,esc(e.message),'err');}};
+        $('#otherAlbum2').onclick=goHome;
         if(done<total){
           const again=document.createElement('button');again.className='linkbtn';again.textContent=`Retry ${total-done} unread`;
           again.onclick=async()=>{try{await startIndex(false);}catch(e){msg(info,esc(e.message),'err');}};info.append(' ',again);
@@ -713,17 +729,41 @@ function pollStatus(){
     }catch(e){
       if(!alive())return;failures++;
       $('#pstat').textContent='Connection interrupted. Retrying…';
-      if(failures>=3){$('#pstat').textContent='Cannot reconnect. Try again when your connection is back.';addScanRetry();return;}
+      if(failures>=3){$('#pstat').textContent='Cannot reconnect. Try again when your connection is back.';
+        scanButtons('stopped');$('#resumeScan').textContent='Retry';return;}
     }
     if(alive())state.poll=setTimeout(tick,Math.min(10000,1500*Math.max(1,failures)));
   };
   tick();
 }
-function addScanRetry(){
-  if($('#scanRetry'))return;
-  const button=document.createElement('button');button.id='scanRetry';button.className='btn';button.textContent='Retry scan';
-  button.onclick=async()=>{button.disabled=true;try{await startIndex(false);button.remove();}catch(e){$('#pstat').textContent=e.message;button.disabled=false;}};
-  $('#scanCard').append(button);
+// While scanning: Stop. Once stopped (or failed): carry on, or open another album.
+function scanButtons(mode){
+  const running=mode==='running';
+  $('#stopScan').hidden=!running;$('#resumeScan').hidden=running;$('#otherAlbum').hidden=running;
+  $('#scanCard').classList.toggle('halted',!running);
+  if(running&&!state.stopping){$('#stopScan').disabled=false;$('#stopScan').textContent='Stop scan';}
+  if(!running)state.stopping=false;
+}
+$('#stopScan').onclick=async()=>{
+  state.stopping=true;$('#stopScan').disabled=true;$('#stopScan').textContent='Stopping…';
+  try{await postJSON('/api/index/stop',{folder_id:state.folderId});}
+  catch(e){state.stopping=false;$('#stopScan').disabled=false;$('#stopScan').textContent='Stop scan';$('#pstat').textContent=e.message;}
+};
+$('#resumeScan').onclick=async()=>{
+  const b=$('#resumeScan');b.disabled=true;
+  try{await startIndex(false);}catch(e){$('#pstat').textContent=e.message;}
+  b.disabled=false;
+};
+$('#otherAlbum').onclick=()=>goHome();
+// Back to the start screen to paste another link. A scan that is still
+// running carries on in the background; reopening its album shows it.
+function goHome(){
+  clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
+  state.ready=false;$('#work').dataset.locked='1';
+  $('#scanCard').hidden=true;$('#albumInfo').hidden=true;$('#doneCard').hidden=true;
+  $('#hero').hidden=false;updateBar();
+  const input=$('#album');input.value='';input.focus();
+  window.scrollTo({top:0});
 }
 
 // ---- mode switch ----
