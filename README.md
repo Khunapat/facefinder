@@ -290,21 +290,10 @@ second, for every person who searches that album.
 
 ## Visual design
 
-The front end follows a design system adapted from the community-written
-`DESIGN.md` for Airbnb in <https://github.com/VoltAgent/awesome-design-md>
-(`design-md/airbnb/DESIGN.md`, kept in `design-refs/` for reference).
-
-What was taken: the 4px spacing scale, the radius scale (4/8/14/20/32/full),
-the single-shadow elevation model, 48px buttons at 8px radius, 56px inputs,
-the pill search surface with a circular accent orb, and the "open hero, dense
-photo grid below" whitespace rhythm.
-
-What was changed: Airbnb Cereal is proprietary, so the stack falls back to
-Nunito Sans; no Airbnb name, logo or wording appears anywhere.
-
-**Before you publish this, change the accent.** `--accent: #ff385c` in
-`app/static/index.html` is Airbnb's brand colour. Those files are community
-analyses of public websites, not official design systems, and the brands do not
-endorse them — they are meant as a direction to start from, not a skin to copy.
-Editing that one token, plus `--accent-active` and `--accent-disabled`, restyles
-the entire app.
+FaceFinder's own pink system, made for this project: a pale pink page, one
+white workspace with the header, album menu and tabs in a single bar, navy
+headings in Mitr, text in Noto Sans Thai (both cover Thai and Latin), and one
+strong pink (`--accent: #d6336c`) kept for primary actions and the active tab.
+The camera mascot (`app/static/img/cam-*.png`, drawn for FaceFinder) appears on
+the start, processing and done screens. All colours are tokens at the top of
+`app/static/index.html`.

@@ -70,7 +70,6 @@ scripts/run-codespace.sh   starts the app inside a GitHub Codespace
 tools/diagnose.py     scan diagnosis helper
 tests/                see section 9
 design-canvas/        design work, see section 8
-design-refs/          third-party design specs used as reference, see 7.6
 Dockerfile            multi-stage, python:3.11-slim, bakes the face model in
 ```
 
@@ -244,10 +243,8 @@ text. The deck must use their template and be exported to PDF under 5 MB.
 
 ### 7.6 Before the repository goes public
 
-- `design-refs/` holds community-written design specs for Airbnb, Pinterest and
-  Claude. The old page's `--accent: #ff385c` is Airbnb's colour. Both go away
-  with the new design; remove `design-refs/` and the README's "Visual design"
-  section when it lands.
+- Done: `design-refs/` and the old Airbnb-based "Visual design" README section were
+  removed once our own pink design landed (they remain in git history).
 - `tests/img/` holds photos of public figures taken from another open-source
   project. Replace them with photos we may publish, and update the three tests'
   expected names and counts.
