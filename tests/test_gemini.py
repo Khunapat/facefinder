@@ -171,6 +171,18 @@ def main_test():
           all(sorted(g["file_ids"]) == tree.get("%s/%s" % (exp["root_name"], g["name"])) for g in groups),
           (groups, tree))
 
+    print("Recent albums")
+    rec = c.get("/api/albums/recent").json()["albums"]
+    mine = next((a for a in rec if a["folder_id"] == fid), None)
+    check("an opened album is on the account's recent list", mine is not None, rec)
+    check("it carries its name, status and a few photos to show",
+          mine and mine["name"] and mine["status"] == "ready" and 1 <= len(mine["covers"]) <= 3, mine)
+    c.post("/api/albums/forget", json={"folder_id": fid})
+    check("an album can be taken off the list", all(a["folder_id"] != fid for a in c.get("/api/albums/recent").json()["albums"]))
+    c.post("/api/album", json={"folder": fakedrive.ALBUM_URL})
+    check("opening it again puts it back", any(a["folder_id"] == fid for a in c.get("/api/albums/recent").json()["albums"]))
+    check("signed out, there is no list", TestClient(main.app).get("/api/albums/recent").status_code == 401)
+
     print("Access and retries")
     r = c.post("/api/export", json={"folder_id": fid, "groups": [{"name": "x", "file_ids": ["not-in-album"]}]})
     check("export refuses photos from outside the album", r.status_code == 400, r.status_code)
@@ -195,6 +207,7 @@ def main_test():
     c.post("/api/index", json={"folder_id": fid})
     st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
     check("scanning again picks it up", st["done"] == st["total"] == 7, st)
+    check("a rescan keeps the album's name", bool(st.get("name")), st)
 
     print("Stop and resume")
     import time as _time

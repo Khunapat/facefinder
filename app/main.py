@@ -1,4 +1,5 @@
 """FaceFinder - sort a shared Drive album into one folder per person."""
+import hashlib
 import os
 import secrets
 import threading
@@ -162,10 +163,47 @@ def me(request: Request):
         "default_threshold": config.DEFAULT_THRESHOLD,
         "drive_access": config.DRIVE_ACCESS,
         "gemini": gemini.enabled(),
+        "sample_album": config.SAMPLE_ALBUM or None,
     }
 
 
 # -------------------------------------------------------------- album -----
+def _user_key(request: Request):
+    """Recent albums are kept per Google account, under a hash of its email,
+    so they survive signing out and in again."""
+    email = (request.session.get("user") or {}).get("emailAddress")
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32] if email else None
+
+
+@app.get("/api/albums/recent")
+def recent_albums(request: Request):
+    """The albums this account opened before, newest first, with a few photos
+    each. Opening one still goes through /api/album and its Drive check."""
+    _creds(request)
+    user = _user_key(request)
+    out = []
+    for folder_id, opened_at in (store.recent_albums(user, 6) if user else []):
+        row = store.album(folder_id)
+        if row is None:
+            continue
+        row = dict(row)
+        out.append({
+            "folder_id": folder_id, "name": row.get("name") or "Album", "status": row.get("status"),
+            "total": row.get("total") or 0, "done": row.get("done") or 0, "opened_at": opened_at,
+            "covers": store.cover_ids(folder_id, 3) if row.get("done") else [],
+        })
+    return {"albums": out}
+
+
+@app.post("/api/albums/forget")
+def forget_album(request: Request, body: dict = Body(...)):
+    """Take an album off this account's recent list. The scan is kept."""
+    _creds(request)
+    user, folder_id = _user_key(request), body.get("folder_id")
+    if user and isinstance(folder_id, str):
+        store.forget_album(user, folder_id)
+    return {"ok": True}
+
 @app.post("/api/album")
 async def open_album(request: Request):
     body = await request.json()
@@ -182,8 +220,17 @@ async def open_album(request: Request):
         ) from e
     if meta["mimeType"] != gd.FOLDER_MIME:
         raise HTTPException(400, "That link points at a file, not a folder")
-    if store.album(folder_id) is None:
+    row = store.album(folder_id)
+    if row is None:
         store.set_album(folder_id, name=meta["name"], status="pending")
+    elif row["name"] != meta["name"]:          # renamed in Drive, or lost by an old rescan
+        store.set_album(folder_id, name=meta["name"])
+    user = _user_key(request)
+    if user:
+        try:
+            store.remember_album(user, folder_id)
+        except Exception:
+            pass                # the list of recent albums is a convenience
     opened = [a for a in request.session.get("albums", []) if a != folder_id]
     request.session["albums"] = (opened + [folder_id])[-20:]
     return {
@@ -303,7 +350,10 @@ async def start_index(request: Request):
         if folder_id in _jobs:
             return {"started": False, "reason": "already running"}
         if body.get("rebuild"):
+            old = store.album(folder_id)
             store.clear_album(folder_id)
+            if old is not None:
+                store.set_album(folder_id, name=old["name"], status="pending")
             _mat_cache.pop(folder_id, None)
             for key in list(_people_cache):
                 if key[0] == folder_id:

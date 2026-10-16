@@ -6,6 +6,7 @@ STORE=firestore (see config.py); the functions match store.py one for one.
 
 Layout:
   albums/{folder_id}                     name, status, total, done, faces, message
+  users/{user}/recent/{folder_id}        opened_at (user is a hash of the email)
   albums/{folder_id}/photos/{file_id}    name, w, h, dhash, judged, ai,
                                          faces: [{det_score, bbox, embedding}]
 
@@ -23,7 +24,7 @@ from . import config
 __all__ = [
     "album", "set_album", "bump_progress", "indexed_file_ids", "save_photo",
     "load_matrix", "save_ai", "photos", "unjudged", "judged_count",
-    "clear_album", "face_box",
+    "clear_album", "face_box", "remember_album", "recent_albums", "forget_album", "cover_ids",
 ]
 
 _lock = threading.Lock()
@@ -176,3 +177,27 @@ def face_box(folder_id: str, file_id: str, face_idx: int):
     if not 0 <= face_idx < len(faces):
         return None
     return list(faces[face_idx].get("bbox") or []), ((d["w"], d["h"]) if d.get("w") else None)
+
+
+def _recent(user: str):
+    return db().collection("users").document(user).collection("recent")
+
+
+def remember_album(user: str, folder_id: str):
+    _recent(user).document(folder_id).set({"opened_at": time.time()})
+
+
+def recent_albums(user: str, limit: int = 6) -> list:
+    from google.cloud import firestore
+
+    q = _recent(user).order_by("opened_at", direction=firestore.Query.DESCENDING).limit(limit)
+    return [(s.id, s.to_dict().get("opened_at")) for s in q.stream()]
+
+
+def forget_album(user: str, folder_id: str):
+    _recent(user).document(folder_id).delete()
+
+
+def cover_ids(folder_id: str, n: int = 3) -> list:
+    """A few photos to show for an album: n reads, never the whole album."""
+    return [s.id for s in _photos(folder_id).select([]).limit(n).stream()]

@@ -138,6 +138,28 @@ main{padding:28px var(--pad) 140px}
 .openbox .row{flex-wrap:nowrap;margin-top:6px}
 .openbox .field{flex:1;min-width:0}
 
+/* recent albums */
+.recent{margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}
+.recent h2{font-size:20px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px}
+.rcard{position:relative;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel);overflow:hidden}
+.rcard:hover{border-color:var(--field);box-shadow:var(--shadow)}
+.ropen{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;color:var(--ink)}
+.rmosaic{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px;height:140px;background:var(--photo-bg)}
+.rmosaic img{width:100%;height:100%;object-fit:cover;display:block;min-height:0}
+.rmosaic img:first-child{grid-row:1 / 3}
+.rmosaic.one img{grid-column:1 / 3}
+.rmosaic.empty{display:grid;place-items:center;grid-template-columns:1fr;grid-template-rows:1fr}
+.rmosaic.empty img{width:96px;height:96px;object-fit:contain;grid-row:auto}
+.rinfo{display:flex;flex-direction:column;gap:2px;padding:12px 14px 14px;min-width:0}
+.rinfo b{font-size:15px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.rinfo span{font-size:13px;color:var(--muted)}
+.rinfo .st{font-weight:600;color:var(--ink)} .rinfo .st.warn{color:var(--warn)}
+.rforget{position:absolute;top:6px;right:6px;width:36px;height:36px;flex-basis:36px;background:rgba(255,255,255,.92);color:var(--ink)}
+.rforget:hover{background:#fff}
+.rcard.sample{border-style:dashed;border-color:var(--tint)}
+.rcard.sample .rmosaic{background:#fff8fb}
+
 /* ---------------------------------------------- one frame for every tab */
 .mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 20px;min-height:72px;margin-bottom:20px}
 .mtitle{min-width:0}
@@ -358,6 +380,9 @@ dialog.done h2{font-size:26px}
   .mtitle h2{font-size:26px}
   .mtools{padding-top:0}
   .roster{grid-template-columns:1fr}
+  .rgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .rmosaic{height:104px}
+  .recent{margin-top:24px;padding-top:20px}
   .peopleact{flex-direction:column;align-items:stretch}
   .peopleact .btn{width:100%}
   .mode .main > .row > .btn:not(.sm){flex:1 1 100%}
@@ -439,7 +464,8 @@ dialog.done h2{font-size:26px}
   <div id="setupWarn"></div>
 
   <!-- 1. start -->
-  <section class="hero" id="hero">
+  <div id="hero">
+  <section class="hero">
     <div class="copy">
       <h1>Find your photos. <em>Choose your moments.</em></h1>
       <p>Find people, review the best moments, and save your selections to Drive.</p>
@@ -459,6 +485,12 @@ dialog.done h2{font-size:26px}
     </div>
     <div class="art"><img class="mascot" src="/static/img/cam-wave.png" alt="FaceFinder's camera mascot waving hello"></div>
   </section>
+  <!-- albums this account opened before, and the sample album if there is one -->
+  <section class="recent" id="recentBox" hidden aria-labelledby="recentTitle">
+    <h2 id="recentTitle">Pick up where you left off</h2>
+    <div class="rgrid" id="recentGrid"></div>
+  </section>
+  </div>
 
   <!-- 2. processing -->
   <section class="scan" id="scanCard" hidden>
@@ -728,6 +760,51 @@ $("#menuRescan").onclick = async () => {
   if(!confirm("Rescan the whole album from the first photo? This takes a while and clears the current results."))return;
   try{ await startIndex(true); }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
 };
+// The start screen remembers this account's albums (kept on the server, so
+// they survive signing out) and offers the sample album when there is one.
+const ago = ts => {
+  const m = Math.max(0, (Date.now() / 1000 - ts) / 60);
+  return m < 2 ? "just now" : m < 60 ? `${Math.round(m)} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago`
+       : m < 2880 ? "yesterday" : `${Math.round(m / 1440)} days ago`;
+};
+function albumState(a){
+  const n = x => (x || 0).toLocaleString("en");
+  if(a.status === "ready") return [`${n(a.done)} photos · Ready`, ""];
+  if(a.status === "stopped") return [`Stopped at ${n(a.done)} of ${n(a.total)}`, "warn"];
+  if(a.status === "error") return ["Scan interrupted", "warn"];
+  return [a.total ? `Scanning · ${n(a.done)} of ${n(a.total)}` : "Not scanned yet", ""];
+}
+async function loadRecent(){
+  if(!state.signedIn) { $("#recentBox").hidden = true; return; }
+  let albums = [];
+  try { albums = (await api("/api/albums/recent")).albums; } catch(e){}
+  const grid = $("#recentGrid"); grid.replaceChildren();
+  const card = (html, open, cls = "") => {
+    const c = document.createElement("div"); c.className = "rcard " + cls; c.innerHTML = html;
+    c.querySelector(".ropen").onclick = () => { $("#album").value = open; $("#openAlbum").click(); };
+    grid.append(c); return c;
+  };
+  for(const a of albums){
+    const [st, warn] = albumState(a);
+    const pics = a.covers.map(id => `<img src="/api/thumb/${encodeURIComponent(id)}?s=300" alt="" loading="lazy">`).join("");
+    const c = card(`<button class="ropen" type="button" aria-label="Open ${esc(a.name)}, ${esc(st)}">
+        <div class="rmosaic ${a.covers.length === 1 ? "one" : a.covers.length ? "" : "empty"}">${pics || '<img src="/static/img/cam-stand.png" alt="">'}</div>
+        <div class="rinfo"><b title="${esc(a.name)}">${esc(a.name)}</b><span class="st ${warn}">${esc(st)}</span>
+          <span>Opened ${ago(a.opened_at)}</span></div></button>
+      <button class="iconbtn rforget" type="button" aria-label="Remove ${esc(a.name)} from this list">${CLOSE}</button>`, a.folder_id);
+    c.querySelector(".rforget").onclick = async () => {
+      c.remove();
+      try { await postJSON("/api/albums/forget", {folder_id:a.folder_id}); } catch(e){}
+      if(!grid.children.length) $("#recentBox").hidden = true;
+    };
+  }
+  if(state.sampleAlbum)
+    card(`<button class="ropen" type="button"><div class="rmosaic empty"><img src="/static/img/cam-photo.png" alt=""></div>
+      <div class="rinfo"><b>Sample album</b><span>Try FaceFinder with example photos.</span></div></button>`, state.sampleAlbum, "sample");
+  $("#recentTitle").textContent = albums.length ? "Pick up where you left off" : "Try it first";
+  $("#recentBox").hidden = !grid.children.length;
+}
+
 // Help: the "How it works" of the tab in view.
 $("#helpBtn").onclick = () => {
   const panel = state.ready ? $("#mode" + state.mode[0].toUpperCase() + state.mode.slice(1)) : null;
@@ -762,6 +839,8 @@ async function refreshMe(){
   $("#acct").hidden = !me.signed_in;
   $("#signinBox").hidden = me.signed_in;
   $("#albumPill").hidden = !me.signed_in;
+  state.sampleAlbum = me.sample_album || null;
+  loadRecent();
   state.thr = Number(me.default_threshold) || 0.38;
   $("#th").value = state.thr; $("#thVal").textContent = state.thr.toFixed(2);
   document.querySelectorAll("[data-ai]").forEach(el => el.hidden = !state.gemini);
@@ -895,6 +974,7 @@ function goHome(){
   $('#scanCard').hidden=true;$('#doneCard').close();showAlbum(null);
   $('#hero').hidden=false;updateBar();
   const input=$('#album');input.value='';input.focus();
+  loadRecent();
   window.scrollTo({top:0});
 }
 

@@ -20,6 +20,9 @@ REDIRECT_URI = PUBLIC_BASE_URL + "/oauth2/callback"
 # edit. Both drive.readonly and drive are "restricted" scopes to Google, so this
 # does not change the verification tier, only what the consent screen says.
 DRIVE_ACCESS = os.environ.get("DRIVE_ACCESS", "limited").strip().lower()
+# Optional: a shared Drive folder anyone can open ("anyone with the link"),
+# offered on the start screen as a sample album. Only photos we may publish.
+SAMPLE_ALBUM = os.environ.get("SAMPLE_ALBUM", "").strip()
 if DRIVE_ACCESS == "full":
     SCOPES = ["https://www.googleapis.com/auth/drive"]
 else:

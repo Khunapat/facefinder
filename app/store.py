@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS faces (
     PRIMARY KEY (folder_id, file_id, face_idx)
 );
 CREATE INDEX IF NOT EXISTS faces_folder ON faces(folder_id);
+CREATE TABLE IF NOT EXISTS recent (          -- the albums each user opened
+    user        TEXT NOT NULL,               -- a hash of the account's email
+    folder_id   TEXT NOT NULL,
+    opened_at   REAL,
+    PRIMARY KEY (user, folder_id)
+);
 """
 
 
@@ -221,6 +227,35 @@ def face_box(folder_id: str, file_id: str, face_idx: int):
     if r is None:
         return None
     return json.loads(r["bbox"] or "[]"), ((r["w"], r["h"]) if r["w"] else None)
+
+
+def remember_album(user: str, folder_id: str):
+    c = conn()
+    c.execute("INSERT OR REPLACE INTO recent (user, folder_id, opened_at) VALUES (?, ?, ?)",
+              (user, folder_id, time.time()))
+    c.commit()
+
+
+def recent_albums(user: str, limit: int = 6) -> list:
+    rows = conn().execute(
+        "SELECT folder_id, opened_at FROM recent WHERE user=? ORDER BY opened_at DESC LIMIT ?",
+        (user, limit)).fetchall()
+    return [(r["folder_id"], r["opened_at"]) for r in rows]
+
+
+def forget_album(user: str, folder_id: str):
+    c = conn()
+    c.execute("DELETE FROM recent WHERE user=? AND folder_id=?", (user, folder_id))
+    c.commit()
+
+
+def cover_ids(folder_id: str, n: int = 3) -> list:
+    """A few photos to show for an album, ones with faces first."""
+    rows = conn().execute(
+        "SELECT p.file_id FROM photos p WHERE p.folder_id=? ORDER BY "
+        "EXISTS(SELECT 1 FROM faces f WHERE f.folder_id=p.folder_id AND f.file_id=p.file_id) DESC, p.name LIMIT ?",
+        (folder_id, n)).fetchall()
+    return [r["file_id"] for r in rows]
 
 
 # On Cloud Run the index lives in Firestore; every function above is replaced
