@@ -242,6 +242,44 @@ def main_test():
     st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
     check("resuming finishes the album", st["status"] == "ready" and st["done"] == st["total"] == 7, st)
 
+    print("Choose which photos to scan")
+    files = c.get("/api/album/%s/files" % fid).json()["files"]
+    check("the album's photos are listed with when they were taken",
+          len(files) == 7 and all(f["taken"] for f in files) and all(f["scanned"] for f in files), files[:2])
+    check("listed oldest first", [f["taken"] for f in files] == sorted(f["taken"] for f in files))
+    check("another session cannot list them", other.get("/api/album/%s/files" % fid).status_code == 403)
+    first3 = [f["id"] for f in files[:3]]
+    ready = lambda: wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error", "stopped"))
+    c.post("/api/index", json={"folder_id": fid, "rebuild": True, "file_ids": first3})
+    st = ready()
+    check("a scan of three chosen photos checks only those three", st["status"] == "ready" and st["total"] == st["done"] == 3, st)
+    check("cull works on just those", len(sum((c.post("/api/cull", json={"folder_id": fid}).json()[k] for k in ("keep", "review", "reject")), [])) == 3)
+    c.post("/api/index", json={"folder_id": fid})
+    st = ready()
+    check("scanning again without a choice keeps the same three", st["total"] == 3, st)
+    c.post("/api/index", json={"folder_id": fid, "file_ids": [files[5]["id"]]})
+    st = ready()
+    check("choosing one more adds it to the three", st["total"] == st["done"] == 4, st)
+    check("an empty choice is refused", c.post("/api/index", json={"folder_id": fid, "file_ids": []}).status_code == 400)
+
+    print("Stop and use what is done")
+    main.gd.fetch_image_bytes = slow
+    try:
+        c.post("/api/index", json={"folder_id": fid, "all": True, "rebuild": True})
+        _time.sleep(0.3)
+        c.post("/api/index/stop", json={"folder_id": fid})
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] not in ("indexing", "pending"))
+    finally:
+        main.gd.fetch_image_bytes = real_fetch
+    check("stopped part way through all seven", st["status"] == "stopped" and 4 <= st["done"] < st["total"] == 7, st)
+    r = c.post("/api/index/use", json={"folder_id": fid})
+    st = c.get("/api/album/%s/status" % fid).json()
+    check("the checked photos can be used as they are", r.status_code == 200 and st["status"] == "ready" and st["done"] < 7, st)
+    check("and worked on", c.post("/api/cull", json={"folder_id": fid}).status_code == 200)
+    c.post("/api/index", json={"folder_id": fid})
+    st = ready()
+    check("the rest can be scanned later", st["status"] == "ready" and st["done"] == st["total"] == 7, st)
+
     print()
     print("%d of %d checks passed" % (sum(checks), len(checks)))
     return all(checks)

@@ -138,6 +138,32 @@ main{padding:28px var(--pad) 140px}
 .openbox .row{flex-wrap:nowrap;margin-top:6px}
 .openbox .field{flex:1;min-width:0}
 
+/* choosing photos before a scan */
+.choose{max-width:960px}
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1.5px solid var(--line-strong);border-radius:var(--r-card);cursor:pointer}
+.opt:hover{border-color:var(--field)}
+.opt:has(input:checked){border-color:var(--accent);background:#fff8fb}
+.opt input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent);flex:0 0 20px}
+.opt span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.opt b{font-size:15px}.opt em{font-style:normal;font-size:13px;color:var(--muted)}
+.days{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.day{display:flex;flex-direction:column;align-items:flex-start;min-height:52px;padding:6px 14px;border:1.5px solid var(--line-strong);border-radius:10px;
+     background:var(--panel);color:var(--ink);font-size:14px;font-weight:600}
+.day span{font-size:12px;font-weight:400;color:var(--muted)}
+.day[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-active)}
+.pick{position:relative;border:0;padding:0;background:transparent;text-align:left;min-width:0}
+.pick .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
+.pick img{width:100%;height:100%;object-fit:cover;display:block}
+.pick[aria-pressed="true"] .ph{box-shadow:inset 0 0 0 3px var(--accent)}
+.pick .tick{pointer-events:none}
+.pick[aria-pressed="true"] .tick{color:#fff} .pick[aria-pressed="true"] .tick::before{background:var(--accent);border-color:var(--accent)}
+.pick:disabled{cursor:default}.pick:disabled .ph{opacity:.55}
+.pick .nm{display:block;margin-top:6px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.choosebar{position:sticky;bottom:16px;display:flex;align-items:center;gap:10px;margin-top:20px;padding:12px 12px 12px 18px;
+     background:var(--panel);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-lift);z-index:5}
+.choosebar .count{flex:1;min-width:0;font-size:15px;color:var(--muted)} .choosebar .count b{color:var(--ink)}
+
 /* recent albums */
 .recent{margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}
 .recent h2{font-size:20px}
@@ -388,6 +414,8 @@ dialog.done h2{font-size:26px}
   .mtitle h2{font-size:26px}
   .mtools{padding-top:0}
   .roster{grid-template-columns:1fr}
+  .opts{grid-template-columns:1fr}
+  .choosebar{bottom:8px;flex-wrap:wrap}.choosebar .count{flex:1 1 100%}.choosebar .btn{flex:1}
   .rgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   .rmosaic{height:104px}
   .recent{margin-top:24px;padding-top:20px}
@@ -438,6 +466,7 @@ dialog.done h2{font-size:26px}
       <div class="menu" id="albumMenu" hidden>
         <div class="info"><b id="menuAlbumName"></b><span id="menuAlbumCount"></span></div>
         <div id="menuRetry"></div>
+        <button type="button" id="menuMore" class="two">Choose more photos to check <span class="sub">Add photos from this album to the scan</span></button>
         <button type="button" id="menuOther">Open another album</button>
         <button type="button" id="menuRescan" class="two">Rescan album <span class="sub">Starts again from the first photo</span></button>
       </div>
@@ -513,12 +542,40 @@ dialog.done h2{font-size:26px}
     <div class="scanact" id="pact"></div>
     <div class="hint scanhint" style="font-size:14px">Keep this page open. Photos already checked are kept if it stops.</div>
     <div class="row" style="justify-content:center">
+      <button class="btn" id="usePartial" hidden>Use the checked photos</button>
       <button class="btn" id="resumeScan" hidden>Resume scan</button>
       <button class="btn ghost sm" id="stopScan">Stop scan</button>
       <button class="btn ghost sm" id="otherAlbum" hidden>Open another album</button>
     </div>
   </section>
 
+
+  <!-- 2a. before a scan: which photos to check -->
+  <section class="choose" id="chooseCard" hidden aria-labelledby="chooseTitle">
+    <div class="mhead">
+      <div class="mtitle"><h2 id="chooseTitle">Which photos should we check?</h2>
+        <p class="sub" id="chooseSub">Faces are found and Gemini checks each photo once. You can add more later.</p></div>
+    </div>
+    <div class="opts" role="radiogroup" aria-label="Photos to check">
+      <label class="opt"><input type="radio" name="scope" value="all" checked>
+        <span><b>All photos</b><em id="optAllN"></em></span></label>
+      <label class="opt"><input type="radio" name="scope" value="date">
+        <span><b>By the day they were taken</b><em id="optDateN">Pick one or more days</em></span></label>
+      <label class="opt"><input type="radio" name="scope" value="hand">
+        <span><b>Pick photos by hand</b><em id="optHandN">Tap the photos you want</em></span></label>
+    </div>
+    <div class="days" id="dayBox" hidden></div>
+    <div id="handBox" hidden>
+      <div class="row" style="margin-top:4px"><button class="btn ghost sm" id="pickAll">All</button>
+        <button class="btn ghost sm" id="pickNone">None</button></div>
+      <div class="grid" id="pickGrid"></div>
+    </div>
+    <div class="choosebar">
+      <span class="count" id="chooseSum"></span>
+      <button class="btn ghost" id="chooseCancel">Cancel</button>
+      <button class="btn" id="chooseGo">Start</button>
+    </div>
+  </section>
 
   <div class="work" id="work" data-locked="1">
     <!-- Every tab has the same frame: heading + optional tools, one short line,
@@ -741,7 +798,7 @@ function showAlbum(name, count){
   $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
   $("#albumBtn").title = name;
   $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
-  $("#menuRescan").hidden = !state.ready;
+  $("#menuRescan").hidden = !state.ready; $("#menuMore").hidden = !state.ready;
 }
 // Small drop-down menus: one open at a time, Escape or a click outside closes.
 function closeMenus(){
@@ -881,22 +938,114 @@ $("#openAlbum").onclick = async () => {
     state.results = []; state.crowd = null; state.sorted = []; state.culled = null; state.ready = false;
     renderResults(); renderCrowd(); renderSorted(); renderCull(); $("#doneCard").close();
     msg($("#albumMsg"), "");
-    if(a.status.status !== "ready") await startIndex(false);
-    pollStatus();
+    const st = a.status;
+    // Never scanned: ask which photos first. Otherwise show where it is
+    // (ready, still scanning, or stopped with its Use / Resume buttons).
+    if(st.status === "pending" && !st.done) await showChooser(false);
+    else pollStatus();
   }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
 };
 $("#album").addEventListener("keydown", e => { if(e.key === "Enter") $("#openAlbum").click(); });
 
-async function startIndex(rebuild){
+async function startIndex(rebuild, choice = {}){
   if(rebuild){try{sessionStorage.removeItem(NAMES_KEY());}catch(e){}}
   state.results=[];state.crowd=null;state.sorted=[];state.culled=null;state.open=null;
   $('#dlg').close();$('#strict').hidden=true;$('#alsoRejected').checked=false;
   renderResults();renderCrowd();renderSorted();renderCull();
   state.ready = false; lockWork(true); updateBar();
   state.stopping = false; scanButtons('running');
-  await postJSON("/api/index", {folder_id:state.folderId, rebuild});
+  $("#chooseCard").hidden = true;
+  await postJSON("/api/index", {folder_id:state.folderId, rebuild, ...choice});
   pollStatus();
 }
+
+// ---- before a scan: which photos to check ----
+// All of them, the days they were taken, or picked by hand. When adding to an
+// album, photos already checked are shown but cannot be picked again.
+const SECONDS_PER_PHOTO = () => state.gemini ? 2 : 0.6;   // measured on Cloud Run, 4 CPUs
+async function showChooser(adding){
+  const card = $("#chooseCard");
+  closeMenus(); clearTimeout(state.poll); state.pollEpoch = (state.pollEpoch || 0) + 1;
+  $("#hero").hidden = true; $("#scanCard").hidden = true; lockWork(true); updateBar();
+  card.hidden = false;
+  $("#chooseTitle").textContent = adding ? "Choose more photos to check" : "Which photos should we check?";
+  $("#chooseSum").textContent = "Reading the album…"; $("#chooseGo").disabled = true;
+  let files;
+  try { files = (await api(`/api/album/${encodeURIComponent(state.folderId)}/files`)).files; }
+  catch(e){ $("#chooseSum").textContent = e.message; return; }
+  const todo = files.filter(f => !f.scanned);
+  showAlbum(state.albumName, plural(files.length, "photo", "photos"));
+  state.choose = {adding, files, todo, days:new Set(), picked:new Set(todo.map(f => f.id)), page:60};
+  $("#optAllN").textContent = adding ? `The ${plural(todo.length, "photo", "photos")} not checked yet` : `${plural(files.length, "photo", "photos")}`;
+  // one chip per day, with its count
+  const byDay = new Map();
+  for(const f of todo){ const d = (f.taken || "").slice(0, 10) || "unknown"; byDay.set(d, (byDay.get(d) || 0) + 1); }
+  const box = $("#dayBox"); box.replaceChildren();
+  for(const [d, n] of byDay){
+    const b = document.createElement("button"); b.type = "button"; b.className = "day"; b.setAttribute("aria-pressed", "false");
+    const label = d === "unknown" ? "No date" : new Date(d + "T12:00:00").toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short", year:"numeric"});
+    b.innerHTML = `${esc(label)}<span>${plural(n, "photo", "photos")}</span>`;
+    b.onclick = () => { const on = !state.choose.days.has(d); on ? state.choose.days.add(d) : state.choose.days.delete(d);
+      b.setAttribute("aria-pressed", on); chooseSummary(); };
+    box.append(b);
+  }
+  $("#optDateN").textContent = byDay.size > 1 ? `${byDay.size} days in this album` : "All on one day";
+  card.querySelector('input[value="all"]').checked = true;
+  drawPicks(); chooseMode();
+  window.scrollTo({top:0});
+}
+function chosenIds(){
+  const c = state.choose, mode = $('#chooseCard input[name="scope"]:checked').value;
+  if(mode === "all") return null;
+  if(mode === "date") return c.todo.filter(f => c.days.has((f.taken || "").slice(0, 10) || "unknown")).map(f => f.id);
+  return c.todo.filter(f => c.picked.has(f.id)).map(f => f.id);
+}
+function chooseSummary(){
+  const ids = chosenIds(), n = ids ? ids.length : state.choose.todo.length;
+  const min = Math.max(1, Math.round(n * SECONDS_PER_PHOTO() / 60));
+  $("#chooseSum").innerHTML = n ? `<b>${plural(n, "photo", "photos")}</b> to check · about ${min} ${min === 1 ? "minute" : "minutes"}`
+                                : "No photos chosen yet";
+  $("#chooseGo").disabled = !n;
+  $("#chooseGo").textContent = n ? `Check ${plural(n, "photo", "photos")}` : "Start";
+  $("#optHandN").textContent = `${state.choose.picked.size.toLocaleString("en")} picked`;
+}
+function chooseMode(){
+  const mode = $('#chooseCard input[name="scope"]:checked').value;
+  $("#dayBox").hidden = mode !== "date"; $("#handBox").hidden = mode !== "hand";
+  chooseSummary();
+}
+document.querySelectorAll('#chooseCard input[name="scope"]').forEach(r => r.onchange = chooseMode);
+function drawPicks(){
+  const c = state.choose, grid = $("#pickGrid"); grid.replaceChildren();
+  for(const f of c.files.slice(0, c.page)){
+    const b = document.createElement("button"); b.type = "button"; b.className = "pick";
+    const on = f.scanned || c.picked.has(f.id);
+    b.setAttribute("aria-pressed", on); b.disabled = f.scanned;
+    b.setAttribute("aria-label", `${f.name}${f.scanned ? ", already checked" : ""}`);
+    b.innerHTML = `<div class="ph"><img loading="lazy" src="/api/thumb/${encodeURIComponent(f.id)}?s=200" alt="">
+      <span class="tick">${CHECK}</span></div><span class="nm">${f.scanned ? "Checked · " : ""}${esc(f.name)}</span>`;
+    b.onclick = () => { const now = !c.picked.has(f.id); now ? c.picked.add(f.id) : c.picked.delete(f.id);
+      b.setAttribute("aria-pressed", now); chooseSummary(); };
+    grid.append(b);
+  }
+  if(c.page < c.files.length){
+    const more = document.createElement("button"); more.className = "btn ghost sm"; more.style.gridColumn = "1 / -1";
+    more.textContent = `Show ${Math.min(60, c.files.length - c.page)} more`;
+    more.onclick = () => { c.page += 60; drawPicks(); };
+    grid.append(more);
+  }
+}
+$("#pickAll").onclick = () => { state.choose.picked = new Set(state.choose.todo.map(f => f.id)); drawPicks(); chooseSummary(); };
+$("#pickNone").onclick = () => { state.choose.picked = new Set(); drawPicks(); chooseSummary(); };
+$("#chooseCancel").onclick = () => {
+  $("#chooseCard").hidden = true;
+  if(state.choose?.adding) pollStatus(); else goHome();
+};
+$("#chooseGo").onclick = async () => {
+  const ids = chosenIds();
+  try { await startIndex(false, ids ? {file_ids:ids} : {all:true}); }
+  catch(e){ $("#chooseSum").textContent = e.message; }
+};
 function pollStatus(){
   clearTimeout(state.poll);
   const epoch=state.pollEpoch=(state.pollEpoch||0)+1,folder=state.folderId;
@@ -930,8 +1079,12 @@ function pollStatus(){
         $('#resumeScan').textContent='Retry scan';return;
       }
       if(s.status==='stopped'){
+        // Photos with faces found count; any Gemini has not checked yet go to
+        // Review in Cull, and are checked when the scan carries on.
+        $('#usePartial').hidden=!done;
+        $('#usePartial').textContent=`Use the ${n(done)} ${done===1?'photo':'photos'} scanned so far`;
         box.classList.remove('busy');$('#scanTitle').textContent='Scan stopped';
-        $('#pstat').textContent=`${n(checked)} of ${n(total)} photos checked. They are kept.`;
+        $('#pstat').textContent=`${n(done)} of ${n(total)} photos scanned. They are kept.`;
         $('#resumeScan').textContent='Resume scan';return;
       }
       if(s.status==='ready'){
@@ -941,7 +1094,7 @@ function pollStatus(){
         const retry=$('#menuRetry');retry.replaceChildren();
         const add=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
           b.onclick=async()=>{closeMenus();try{await fn();}catch(e){msg($('#albumMsg'),esc(e.message),'err');}};retry.append(b);};
-        if(done<total)add(`Retry ${n(total-done)} photos that could not be read`,()=>startIndex(false));
+        if(done<total)add(`Check the other ${n(total-done)} photos`,()=>startIndex(false));
         if(s.gemini&&judged<done)add(`Check ${n(done-judged)} photos Gemini missed`,()=>startIndex(false));
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
       }
@@ -959,6 +1112,8 @@ function pollStatus(){
 function scanButtons(mode){
   const running=mode==='running';
   $('#stopScan').hidden=!running;$('#resumeScan').hidden=running;$('#otherAlbum').hidden=running;
+  if(running)$('#usePartial').hidden=true;
+  $('#resumeScan').classList.toggle('ghost',!running);
   $('#scanCard').classList.toggle('halted',!running);
   if(running&&!state.stopping){$('#stopScan').disabled=false;$('#stopScan').textContent='Stop scan';}
   if(!running)state.stopping=false;
@@ -974,12 +1129,19 @@ $('#resumeScan').onclick=async()=>{
   b.disabled=false;
 };
 $('#otherAlbum').onclick=()=>goHome();
+$('#usePartial').onclick=async()=>{
+  const b=$('#usePartial');b.disabled=true;
+  try{await postJSON('/api/index/use',{folder_id:state.folderId});pollStatus();}
+  catch(e){$('#pstat').textContent=e.message;}
+  b.disabled=false;
+};
+$('#menuMore').onclick=()=>showChooser(true);
 // Back to the start screen to paste another link. A scan that is still
 // running carries on in the background; reopening its album shows it.
 function goHome(){
   clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
   state.ready=false;lockWork(true);
-  $('#scanCard').hidden=true;$('#doneCard').close();showAlbum(null);
+  $('#scanCard').hidden=true;$('#chooseCard').hidden=true;$('#doneCard').close();showAlbum(null);
   $('#hero').hidden=false;updateBar();
   const input=$('#album');input.value='';input.focus();
   loadRecent();
@@ -1730,7 +1892,7 @@ function lockDuring(handler){
     finally{previous.forEach(([el,value])=>{if(el.isConnected)el.disabled=value;});state.uiBusy=false;updateBar();}
   };
 }
-for(const id of ['openAlbum','go','suggest','runSort','runCull','xGo']){
+for(const id of ['openAlbum','go','suggest','runSort','runCull','xGo','chooseGo']){
   const button=$('#'+id);button.onclick=lockDuring(button.onclick);
 }
 $('#grouping').onchange=lockDuring(async()=>{if(state.ready)await loadCrowd();});

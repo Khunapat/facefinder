@@ -105,7 +105,7 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
         while True:
             resp = svc.files().list(
                 q=f"'{current}' in parents and trashed=false",
-                fields="nextPageToken, files(id,name,mimeType,size,thumbnailLink,imageMediaMetadata/width)",
+                fields="nextPageToken, files(id,name,mimeType,size,thumbnailLink,createdTime,imageMediaMetadata(width,time))",
                 pageSize=1000,
                 pageToken=page,
                 supportsAllDrives=True,
@@ -121,6 +121,16 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
             if not page:
                 break
     return out
+
+
+def taken_at(f: dict):
+    """When the photo was taken, as 'YYYY-MM-DDTHH:MM:SS': the camera's own time
+    when Drive has it (EXIF writes it '2026:06:12 14:03:22'), else the upload time."""
+    t = (f.get("imageMediaMetadata") or {}).get("time")
+    if t and len(t) >= 19 and t[4] == ":" and t[7] == ":":
+        return "%s-%s-%sT%s" % (t[0:4], t[5:7], t[8:10], t[11:19])
+    c = f.get("createdTime")
+    return c[:19] if c else None
 
 
 def fetch_image_bytes(creds: Credentials, svc, file_meta: dict, size: int = None) -> bytes:

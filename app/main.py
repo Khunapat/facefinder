@@ -1,5 +1,6 @@
 """FaceFinder - sort a shared Drive album into one folder per person."""
 import hashlib
+import json
 import os
 import secrets
 import threading
@@ -251,6 +252,9 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
         creds = gd.creds_from_session(creds_data)
         svc = gd.service(creds)
         files = gd.list_images(svc, folder_id)
+        scope = _scope(store.album(folder_id))
+        if scope is not None:           # only the photos the user chose
+            files = [f for f in files if f["id"] in scope]
         already = store.indexed_file_ids(folder_id)
         todo = [f for f in files if f["id"] not in already]
         store.set_album(
@@ -320,7 +324,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
         row = store.album(folder_id)
         if stop.is_set():
             store.set_album(folder_id, status="stopped", message=(
-                "Stopped after %d of %d photos. They are kept; open the album again to carry on."
+                "Stopped after %d of %d photos. Use them as they are, or carry on later."
                 % (row["done"], row["total"])))
             return
         msg = "%d faces across %d photos" % (row["faces"], row["done"])
@@ -349,8 +353,20 @@ async def start_index(request: Request):
     with _jobs_lock:
         if folder_id in _jobs:
             return {"started": False, "reason": "already running"}
+        old = store.album(folder_id)
+        # Which photos: the whole album, the ones picked now (added to what
+        # was picked or scanned before), or, by default, the same as last time.
+        scope = _scope(old)
+        if body.get("all"):
+            scope = None
+        elif isinstance(body.get("file_ids"), list):
+            picked = {f for f in body["file_ids"] if isinstance(f, str)}
+            if not picked:
+                raise HTTPException(400, "Choose at least one photo to scan")
+            # a rescan starts from nothing, so it keeps only what is picked now
+            kept = set() if body.get("rebuild") else store.indexed_file_ids(folder_id) | (scope or set())
+            scope = picked | kept
         if body.get("rebuild"):
-            old = store.album(folder_id)
             store.clear_album(folder_id)
             if old is not None:
                 store.set_album(folder_id, name=old["name"], status="pending")
@@ -363,7 +379,8 @@ async def start_index(request: Request):
                     _face_cache.pop(key, None)
         # Say so before the thread starts, so a status poll right after this
         # never sees the previous scan's "ready".
-        store.set_album(folder_id, status="pending")
+        store.set_album(folder_id, status="pending",
+                        scope=json.dumps(sorted(scope)) if scope is not None else None)
         stop = threading.Event()
         t = threading.Thread(
             target=_index_worker,
@@ -374,6 +391,43 @@ async def start_index(request: Request):
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
+
+
+def _scope(row):
+    """The set of photos chosen for this album's scan, or None for all of them."""
+    raw = (dict(row).get("scope") if row is not None else None)
+    return set(json.loads(raw)) if raw else None
+
+
+@app.get("/api/album/{folder_id}/files")
+def album_files(request: Request, folder_id: str):
+    """Every photo in the album with when it was taken, so the user can choose
+    which to scan: by date, by hand, or all of them."""
+    creds = _creds(request)
+    _need_album(request, folder_id)
+    files = gd.list_images(gd.service(creds), folder_id)
+    scanned = store.indexed_file_ids(folder_id)
+    out = [{"id": f["id"], "name": f.get("name"), "taken": gd.taken_at(f), "scanned": f["id"] in scanned}
+           for f in files]
+    out.sort(key=lambda f: (f["taken"] or "9999", f["name"] or ""))
+    return {"files": out}
+
+
+@app.post("/api/index/use")
+def use_partial(request: Request, body: dict = Body(...)):
+    """Work with the photos checked so far: a stopped scan becomes a ready
+    album of those photos. The rest can be scanned later from the album menu."""
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    with _jobs_lock:
+        if folder_id in _jobs:
+            raise HTTPException(409, "The scan is still stopping. Try again in a moment.")
+        row = store.album(folder_id)
+        if row is None or not row["done"]:
+            raise HTTPException(400, "No photos have been checked yet")
+        store.set_album(folder_id, status="ready", message="Using %d of %d photos; scan the rest any time."
+                        % (row["done"], row["total"]))
+    return {"ok": True}
 
 
 @app.post("/api/index/stop")
