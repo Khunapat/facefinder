@@ -57,6 +57,9 @@ MODEL_ROOT = os.environ.get("MODEL_ROOT", DATA_DIR)
 # 0.35-0.5 is "probably them". We default low and let the user tighten it.
 DEFAULT_THRESHOLD = float(os.environ.get("DEFAULT_THRESHOLD", "0.38"))
 DET_SIZE = int(os.environ.get("DET_SIZE", "640"))
+# Sizes the detector looks at each photo with, merged. The larger one finds the
+# small faces at the back of a group photo.
+DET_SIZES = [int(v) for v in os.environ.get("DET_SIZES", "%d,1280" % DET_SIZE).split(",") if v.strip()]
 MODEL_NAME = os.environ.get("MODEL_NAME", "buffalo_l")
 # Pixel width of the Drive thumbnail we run detection on. Bigger = better on
 # faces far from the camera, but slower.

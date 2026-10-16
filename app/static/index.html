@@ -116,13 +116,27 @@ select.field{width:auto;font-size:14px;height:40px;padding:0 12px;border-radius:
 .menu{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(340px,calc(100vw - 32px));background:var(--panel);
       border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-lift);padding:6px;z-index:60}
 .menu.right{left:auto;right:0}
-.menu .info{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px;font-size:14px;color:var(--muted);overflow-wrap:anywhere}
-.menu .info b{display:block;color:var(--ink);font-size:15px}
-.menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;
-      background:transparent;color:var(--ink);font-size:15px;text-align:left}
-.menu button:hover{background:var(--page)}
-.menu .sub{font-size:13px;color:var(--muted);font-weight:400}
-.menu button.two{flex-direction:column;align-items:flex-start;justify-content:center;gap:0;padding:6px 12px}
+/* menus: a header saying what this is, then actions with an icon and one line each */
+.menu.albummenu{min-width:320px}
+.mhd{display:flex;gap:12px;align-items:center;padding:8px 8px 10px;min-width:0}
+.mhd > div{min-width:0}
+.mhd b{display:block;font-size:15px;color:var(--ink);overflow-wrap:anywhere}
+.mhd span:not(.mic){display:block;font-size:13px;color:var(--muted)}
+.mic{width:40px;height:40px;flex:0 0 40px;border-radius:10px;background:var(--accent-soft);color:var(--accent-active);display:grid;place-items:center;font-weight:700}
+.mprog{height:6px;margin:0 8px 8px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
+.mprog i{display:block;height:100%;background:var(--accent);border-radius:var(--r-full)}
+.msep{height:1px;background:var(--line);margin:6px 2px}
+.menu .mi{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:6px 8px;border:0;border-radius:10px;
+     background:transparent;color:var(--ink);text-align:left;font-size:14px}
+.menu .mi:hover,.menu .mi:focus-visible{background:var(--page)}
+.mi .ico{width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:#f2f2f6;color:var(--ink);display:grid;place-items:center}
+.mi b{display:block;font-size:14px;font-weight:600}
+.mi small{display:block;font-size:12px;color:var(--muted);line-height:1.35}
+.mi.primary .ico{background:var(--accent);color:#fff}
+.mi.primary b{color:var(--accent-active)}
+.mi.danger .ico{background:var(--error-bg);color:var(--error)}
+.mi.danger b{color:var(--error)}
+
 
 main{padding:28px var(--pad) 140px}
 
@@ -463,12 +477,19 @@ dialog.done h2{font-size:26px}
         <span class="aname" id="albumName"></span><span class="acount" id="albumCount"></span>
         <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <div class="menu" id="albumMenu" hidden>
-        <div class="info"><b id="menuAlbumName"></b><span id="menuAlbumCount"></span></div>
+      <div class="menu albummenu" id="albumMenu" hidden>
+        <div class="mhd"><span class="mic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+          <div><b id="menuAlbumName"></b><span id="menuAlbumCount"></span></div></div>
+        <div class="mprog" id="menuProg" hidden><i></i></div>
         <div id="menuRetry"></div>
-        <button type="button" id="menuMore" class="two">Choose more photos to check <span class="sub">Add photos from this album to the scan</span></button>
-        <button type="button" id="menuOther">Open another album</button>
-        <button type="button" id="menuRescan" class="two">Rescan album <span class="sub">Starts again from the first photo</span></button>
+        <div class="msep"></div>
+        <button type="button" class="mi" id="menuMore"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          <span><b>Choose more photos</b><small>Pick by day or by hand</small></span></button>
+        <button type="button" class="mi" id="menuOther"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span>
+          <span><b>Open another album</b><small>This one stays saved on the start page</small></span></button>
+        <div class="msep" id="menuRescanSep"></div>
+        <button type="button" class="mi danger" id="menuRescan"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6L20 8.7M20 4v4.7h-4.7"/></svg></span>
+          <span><b>Rescan from the start</b><small>Clears this album's results</small></span></button>
       </div>
     </div>
   </div>
@@ -490,8 +511,10 @@ dialog.done h2{font-size:26px}
         <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="menu right" id="acctMenu" hidden>
-        <div class="info">Signed in as<b id="who"></b></div>
-        <button type="button" id="auth">Sign out</button>
+        <div class="mhd"><span class="mic initial2" id="acctInitial2"></span>
+          <div><span>Signed in as</span><b id="who"></b></div></div>
+        <div class="msep"></div>
+        <button type="button" class="mi" id="auth"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l4-4-4-4M14 12H4"/></svg></span><span><b>Sign out</b></span></button>
       </div>
     </div>
   </div>
@@ -755,6 +778,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g,
 const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
 const CLOSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const PLAY = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
 const ARROW_L = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const ARROW_R = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const FOLDER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
@@ -798,7 +822,8 @@ function showAlbum(name, count){
   $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
   $("#albumBtn").title = name;
   $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
-  $("#menuRescan").hidden = !state.ready; $("#menuMore").hidden = !state.ready;
+  $("#menuRescan").hidden = $("#menuRescanSep").hidden = !state.ready; $("#menuMore").hidden = !state.ready;
+  if(!state.ready){ $("#menuRetry").replaceChildren(); $("#menuProg").hidden = true; }
 }
 // Small drop-down menus: one open at a time, Escape or a click outside closes.
 function closeMenus(){
@@ -899,7 +924,7 @@ async function refreshMe(){
     msg($("#setupWarn"), "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
   const email = me.user?.emailAddress || "";
   $("#who").textContent = email;
-  $("#acctInitial").textContent = (me.user?.displayName || email || "?").trim()[0].toUpperCase();
+  $("#acctInitial").textContent = $("#acctInitial2").textContent = (me.user?.displayName || email || "?").trim()[0].toUpperCase();
   $("#gsiNav").hidden = me.signed_in;
   $("#acct").hidden = !me.signed_in;
   $("#signinBox").hidden = me.signed_in;
@@ -1092,10 +1117,15 @@ function pollStatus(){
         showAlbum(state.albumName||s.name,`${n(done)} photos`);
         // anything left over can be retried from the album menu
         const retry=$('#menuRetry');retry.replaceChildren();
-        const add=(label,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=label;
+        const add=(label,sub,fn)=>{const b=document.createElement('button');b.type='button';b.className='mi primary';
+          b.innerHTML=`<span class="ico">${PLAY}</span><span><b>${esc(label)}</b><small>${esc(sub)}</small></span>`;
           b.onclick=async()=>{closeMenus();try{await fn();}catch(e){msg($('#albumMsg'),esc(e.message),'err');}};retry.append(b);};
-        if(done<total)add(`Check the other ${n(total-done)} photos`,()=>startIndex(false));
-        if(s.gemini&&judged<done)add(`Check ${n(done-judged)} photos Gemini missed`,()=>startIndex(false));
+        const mins=k=>{const m=Math.max(1,Math.round(k*SECONDS_PER_PHOTO()/60));return `about ${m} ${m===1?'minute':'minutes'}`;};
+        // carrying on also adds Gemini's notes to photos still missing them
+        if(done<total)add(`Check the other ${plural(total-done,'photo','photos')}`,`Carries on where it stopped · ${mins(total-done)}`,()=>startIndex(false));
+        else if(s.gemini&&judged<done)add(`Add Gemini's notes to ${plural(done-judged,'photo','photos')}`,`Faces are done; this adds quality and descriptions`,()=>startIndex(false));
+        $('#menuAlbumCount').textContent=done<total?`${n(done)} of ${n(total)} photos checked`:`${n(done)} photos · all checked`;
+        $('#menuProg').hidden=done>=total;$('#menuProg i').style.width=(total?Math.round(100*done/total):0)+'%';
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
       }
     }catch(e){
