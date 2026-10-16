@@ -105,7 +105,7 @@ def cull(photos: list, strictness: str = "normal") -> dict:
             pile, row["reason"] = _alone(ai, strictness)
             if best is not None and i != best and pile != "reject":
                 b = photos[best]
-                row["similar_to"] = b["file_id"]
+                row["similar_to"], row["similar_name"] = b["file_id"], b.get("name")
                 same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
                 if same and best_pile == "keep" and ai["keeper"] <= b["ai"]["keeper"] - 2:
                     pile, row["reason"] = "reject", "A clearly better copy is kept (%s)" % b.get("name")
@@ -187,5 +187,6 @@ def best_shots(file_ids: list, ai: dict, faces: dict, n: int = 10, prints: dict 
         "file_id": c["f"],
         "score": round(c["score"], 2),
         "reason": (c["j"] or {}).get("reason") or "Quality reason unavailable; review this photo",
+        "description": (c["j"] or {}).get("description") or "",
         "checked": bool(c["j"]),
     } for c in picks]

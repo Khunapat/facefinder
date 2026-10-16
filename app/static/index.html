@@ -213,7 +213,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .grid{display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fill,minmax(176px,1fr))}
 .tile{position:relative;min-width:0;border-radius:var(--r-tile)}
 .tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
-.tile img{width:100%;height:100%;object-fit:contain;display:block}
+.tile img{width:100%;height:100%;object-fit:cover;object-position:center 30%;display:block}
 .tile.sel .ph{box-shadow:inset 0 0 0 3px var(--accent)}
 .tile.viewing .ph{outline:3px solid var(--ink);outline-offset:3px}
 .photo-open{width:100%;height:100%;border:0;padding:0;background:transparent;display:block;cursor:zoom-in}
@@ -260,7 +260,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .piles button[aria-pressed="true"] .n{background:var(--accent-soft);color:var(--accent-active)}
 .cullwrap{display:block}
 .cullwrap.has-side{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
-.sidepreview{position:sticky;top:16px;margin-top:16px;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel)}
+.sidepreview{position:sticky;top:16px;margin-top:16px;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel);
+  max-height:calc(100vh - 116px);overflow:auto}   /* clear of the bottom bar; its notes scroll inside */
 
 /* ---------------------------------------------------- dialogs */
 dialog{border:0;padding:0;border-radius:20px;background:var(--panel);color:var(--ink);
@@ -285,18 +286,25 @@ dialog.preview{width:min(1100px,calc(100vw - 32px))}
 .sidepreview .full-photo{height:max(240px,calc(100vh - 470px))}   /* fixed, so stepping through photos never jumps */
 .pfoot{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .why-full{font-size:15px;color:var(--muted)} .why-full b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.pnotes{display:flex;flex-direction:column;gap:12px;min-width:0}
+.seen{font-size:14px;color:var(--muted);padding-top:10px;border-top:1px solid var(--line)}
+.seen b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.seen .tagline{display:block;margin-top:4px;font-size:13px}
+.cmp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.cmp img{width:84px;height:63px;object-fit:cover;border-radius:8px;background:var(--photo-bg)}
 .seg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg2 .btn{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
 .seg2 .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .seg2 #previewOut[aria-pressed="true"]{background:var(--ink);border-color:var(--ink)}
 dialog.preview .pfoot{flex-direction:row-reverse;align-items:center;flex-wrap:wrap}
-dialog.preview .why-full{flex:1;min-width:220px}
+dialog.preview .pnotes{flex:1;min-width:220px}
 dialog.preview .seg2{min-width:260px}
 
 /* export */
 .xlist{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
 .xlist li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#f8f8fb;font-size:15px}
 .xlist li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.xlist li.note{background:transparent;padding:4px 2px;font-size:13px;color:var(--muted)}
 .xlist li em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .safe{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 
@@ -444,7 +452,7 @@ dialog.done h2{font-size:26px}
   </nav>
 
   <div class="headside">
-    <button class="helpbtn" id="helpBtn" type="button"><span class="q" aria-hidden="true">?</span><span class="label">Help</span></button>
+    <button class="helpbtn" id="helpBtn" type="button" aria-label="Help"><span class="q" aria-hidden="true">?</span><span class="label">Help</span></button>
     <img class="headmascot" src="/static/img/cam-search.png" alt="" width="44" height="44">
     <a class="gsi" id="gsiNav" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
     <div class="dropwrap" id="acct" hidden>
@@ -1044,6 +1052,24 @@ function markViewing(id){
   document.querySelectorAll('.tile.viewing').forEach(t=>t.classList.remove('viewing'));
   if(id)document.querySelectorAll('#cullResults .photo-open').forEach(b=>{if(b.dataset.fileId===id)b.closest('.tile').classList.add('viewing');});
 }
+// What Gemini saw in a photo, read from the scan's saved notes (no new call).
+const notes = new Map();
+async function showNotes(el, id){
+  el.hidden = true;
+  if(!state.gemini) return;
+  const key = state.folderId + "/" + id;
+  let n = notes.get(key);
+  if(!n){
+    try { n = await api(`/api/photo/${encodeURIComponent(state.folderId)}/${encodeURIComponent(id)}`); } catch(e){ return; }
+    notes.set(key, n);
+  }
+  if(!el.isConnected || !n.description) return;
+  const FL = {blurry:"blur", eyes_closed:"closed eyes", cut_off:"someone cut off", poor_exposure:"light",
+              blocked:"something in the way", awkward_moment:"awkward moment", no_subject:"no clear subject"};
+  el.innerHTML = `<b>What Gemini saw</b>${esc(n.description)}` +
+    (n.scene ? `<span class="tagline">${esc(n.scene)}${n.flaws?.length ? " · " + n.flaws.map(f => FL[f] || f).join(", ") : ""}</span>` : "");
+  el.hidden = false;
+}
 function closeSide(){
   const side=$('#cullSide');if(!side||side.hidden)return;
   side.hidden=true;side.replaceChildren();$('#cullWrap').classList.remove('has-side');markViewing(null);
@@ -1070,15 +1096,22 @@ function previewPhoto(m,g,onChange){
         <div class="seg2" role="group" aria-label="In the export?">
           <button type="button" class="btn sm" id="previewIn">${CHECK} Keep</button>
           <button type="button" class="btn sm" id="previewOut">${CLOSE} Exclude</button></div>
-        <p class="why-full" id="previewWhy"></p></div></div>`;
+        <div class="pnotes"><p class="why-full" id="previewWhy"></p>
+          <div class="cmp" id="previewCmp" hidden><img alt=""><span></span></div>
+          <p class="seen" id="previewSeen" hidden></p></div></div></div>`;
   const q=sel=>host.querySelector(sel);
   const show=()=>{
     const x=list[at];
     q('#previewTitle').textContent=x.name;
     q('#previewPos').textContent=`${at+1} of ${list.length.toLocaleString('en')}`;
     const img=q('#previewImg');img.alt=x.name;img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
-    const why=x.long||x.why||g.best?.get(x.file_id)||'';
-    q('#previewWhy').innerHTML=why?`<b>${g.flagged?'Why this was flagged':'Why'}</b>${esc(why)}`:'';
+    const picked=g.bestWhy?.get(x.file_id);
+    const why=x.long||x.why||picked||'';
+    q('#previewWhy').innerHTML=why?`<b>${g.flagged?'Why this was flagged':picked?'Why it was picked':'Why'}</b>${esc(why)}`:'';
+    const cmp=q('#previewCmp');cmp.hidden=!x.similar_to;
+    if(x.similar_to){cmp.querySelector('img').src=`/api/thumb/${encodeURIComponent(x.similar_to)}?s=300`;
+      cmp.querySelector('span').textContent=`The kept copy: ${x.similar_name||''}`;}
+    showNotes(q('#previewSeen'),x.file_id);
     const on=!g.removed.has(x.file_id);
     q('#previewIn').setAttribute('aria-pressed',on);q('#previewOut').setAttribute('aria-pressed',!on);
     q('#previewIn').disabled=q('#previewOut').disabled=!!g._busy;
@@ -1120,7 +1153,7 @@ function previewPhoto(m,g,onChange){
 
 function choose(g, which){
   if(g._busy) return;
-  g.best = null;
+  g.best = null; g.bestWhy = null;
   if(which === "all") g.removed.clear();
   else g.removed = new Set(visible(g)
     .filter(m => which === "none" || !isSure(g, m)).map(m => m.file_id));
@@ -1139,7 +1172,8 @@ async function pickBest(g, n, msgEl){
       msg(msgEl, "No photo here was checked and strong enough to suggest. Choose by hand.", "info");
       return;
     }
-    g.best = new Map(r.best.map(b => [b.file_id, b.reason]));
+    g.best = new Map(r.best.map(b => [b.file_id, b.description || b.reason]));
+    g.bestWhy = new Map(r.best.map(b => [b.file_id, b.reason]));
     g.removed = new Set(visible(g).map(m => m.file_id).filter(f => !g.best.has(f)));
     // the picks first, in Gemini's order
     const order = new Map(r.best.map((b, i) => [b.file_id, i]));
@@ -1485,17 +1519,22 @@ $("#runCull").onclick = async () => {
     const SHORT = {blurry:"Out of focus", eyes_closed:"Closed eyes", cut_off:"Cut off by the frame",
                    poor_exposure:"Too dark or bright", blocked:"Something in the way",
                    awkward_moment:"Awkward moment", no_subject:"No clear subject"};
+    const base = n => (n || "another photo").replace(/\.[a-z0-9]+$/i, "");
     const short = (x, pile) =>
-        x.similar_to ? (pile === "reject" ? "Copy of a better frame" : "Similar to another frame")
+        x.similar_to ? (pile === "reject" ? `Copy of ${base(x.similar_name)}` : `Looks like ${base(x.similar_name)}`)
       : x.reason === "Gemini could not check this photo" ? "Not checked by Gemini"
       : x.reason?.startsWith("Gemini was not sure") ? "Gemini was not sure"
       : x.flaws?.length ? x.flaws.map(f => SHORT[f] || f).join(" · ")
       : x.reason || (pile === "review" ? "Needs a look" : "Check the full photo");
     const rows = (list, pile) => list.map(x => ({file_id:x.file_id, name:x.name,
-                                                 why:short(x, pile), long:x.reason}));
+                                                 why:short(x, pile), long:x.reason,
+                                                 similar_to:x.similar_to, similar_name:x.similar_name}));
+    // Look-alikes of a photo that is kept start unticked: still in Review to
+    // check, but culling actually culls. Everything else in Review is ticked.
+    const lookalikes = r.review.filter(x => x.similar_to).map(x => x.file_id);
     state.culled = {
       keep:{kind:"set", name:"Keep", all:rows(r.keep, "keep"), removed:new Set(), limit:24},
-      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(), limit:24, flagged:true},
+      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(lookalikes), limit:24, flagged:true},
       reject:{kind:"set", name:"Rejected", all:rows(r.reject, "reject"), removed:new Set(r.reject.map(x => x.file_id)), limit:48, flagged:true},
     };
     const counts = {};
@@ -1520,7 +1559,7 @@ function renderCull(){
   if(!state.culled){ updateBar(); return; }
   const piles = {keep:"Keep", review:"Review", reject:"Rejected"};
   const notes = {
-    review:"Ticked photos go into Keep. Untick the ones you do not want.",
+    review:"Ticked photos go into Keep. Look-alikes of a kept photo start unticked: open one to compare, and tick it if the moment differs.",
     reject:"Each photo says why. Tick any you want to keep after all.",
     keep:""};
   const bar = document.createElement("div");
@@ -1588,6 +1627,9 @@ function fillExport(){
   $("#destHint").textContent = `Leave it empty to make "FaceFinder - ${state.albumName || "album"}" in My Drive.`;
   $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled &&
     (state.culled.reject.all.length || state.culled.review.all.length));
+  const copies = gs.reduce((n, g) => n + g.file_ids.length, 0);
+  $("#xlist").insertAdjacentHTML("beforeend", copies > total
+    ? `<li class="note">${plural(total, "photo", "photos")} in several folders: ${copies.toLocaleString("en")} copies in all.</li>` : "");
   $("#xGo").textContent = `Export ${plural(total, "photo", "photos")}`;
   $("#xGo").disabled = !total;
 }

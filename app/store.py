@@ -193,6 +193,14 @@ def photos(folder_id: str) -> list:
     ]
 
 
+def photo_ai(folder_id: str, file_id: str):
+    r = conn().execute("SELECT name, ai FROM photos WHERE folder_id=? AND file_id=?",
+                       (folder_id, file_id)).fetchone()
+    if r is None:
+        return None
+    return {"name": r["name"], "ai": json.loads(r["ai"]) if r["ai"] else None}
+
+
 def unjudged(folder_id: str) -> list:
     """Photos Gemini has not checked yet: [{id, name}], ready for list_images-style use."""
     rows = conn().execute(

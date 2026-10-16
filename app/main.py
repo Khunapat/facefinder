@@ -562,6 +562,17 @@ def _ready_photos(folder_id: str) -> list:
     return store.photos(folder_id)
 
 
+@app.get("/api/photo/{folder_id}/{file_id}")
+def photo_notes(request: Request, folder_id: str, file_id: str):
+    """What Gemini saw in one photo, for the preview: no new Gemini call, it
+    reads the note saved during the scan."""
+    _need_album(request, folder_id)
+    row = store.photo_ai(folder_id, file_id)
+    ai = (row or {}).get("ai") or {}
+    keep = ("description", "people", "scene", "keeper", "flaws", "unsure", "reason")
+    return {k: ai[k] for k in keep if k in ai}
+
+
 @app.post("/api/cull")
 def cull(request: Request, body: dict = Body(...)):
     """For the photographer: which frames to keep, which to drop, and why."""

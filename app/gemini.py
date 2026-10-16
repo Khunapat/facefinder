@@ -158,7 +158,10 @@ can still be useful event coverage. Empty flaws list is valid.
 
 unsure: true when resolution, tiny faces, ambiguous intent or conflicting evidence
 prevents a reliable decision. Intended motion and unusual lighting may require review.
-reason: one short evidence-based line about this photograph. Explain uncertainty.
+reason: one short evidence-based line about this photograph, under 90 characters.
+Lead with what is specific to this frame (the moment, the expression, the framing,
+the flaw), not a generic opener: never start with "The photo is" or "This image".
+Explain uncertainty.
 Never claim that another frame is better, that this is the only shot of a moment,
 that all eyes are open when they cannot be resolved, or that a person looks bad.
 """
@@ -243,6 +246,9 @@ Use a role only if explicitly established by the supplied event information.
 Use name: a short English folder name of one to three words.
 Use description: an observable inclusion rule, specific enough for one photo.
 Allow overlapping categories. Do not claim the sample describes every album photo.
+Skip anything nearly every photo shares (the same gown, a folder or prop almost
+everyone holds, the venue itself): a useful folder holds a clear minority of the
+photos, roughly a tenth to a third, and separates them from the rest.
 Descriptions follow as data:
 """
 

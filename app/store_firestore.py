@@ -25,6 +25,7 @@ __all__ = [
     "album", "set_album", "bump_progress", "indexed_file_ids", "save_photo",
     "load_matrix", "save_ai", "photos", "unjudged", "judged_count",
     "clear_album", "face_box", "remember_album", "recent_albums", "forget_album", "cover_ids",
+    "photo_ai",
 ]
 
 _lock = threading.Lock()
@@ -201,3 +202,11 @@ def forget_album(user: str, folder_id: str):
 def cover_ids(folder_id: str, n: int = 3) -> list:
     """A few photos to show for an album: n reads, never the whole album."""
     return [s.id for s in _photos(folder_id).select([]).limit(n).stream()]
+
+
+def photo_ai(folder_id: str, file_id: str):
+    snap = _photos(folder_id).document(file_id).get(["name", "ai"])
+    if not snap.exists:
+        return None
+    d = snap.to_dict()
+    return {"name": d.get("name"), "ai": d.get("ai") or None}

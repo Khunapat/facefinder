@@ -171,6 +171,16 @@ def main_test():
           all(sorted(g["file_ids"]) == tree.get("%s/%s" % (exp["root_name"], g["name"])) for g in groups),
           (groups, tree))
 
+    print("Photo notes")
+    note = c.get("/api/photo/%s/%s" % (fid, "biden.jpg")).json()
+    check("a photo's saved Gemini note can be read for the preview", bool(note.get("description")), note)
+    check("another session cannot read the notes", other.get("/api/photo/%s/biden.jpg" % fid).status_code == 403)
+    cr = c.post("/api/cull", json={"folder_id": fid}).json()
+    alike = [x for x in cr["review"] + cr["reject"] if x.get("similar_to")]
+    check("a look-alike names the photo it looks like", alike and all(x.get("similar_name") for x in alike), cr["review"])
+    best = c.post("/api/best", json={"folder_id": fid, "file_ids": [x["file_id"] for x in biden["photos"]]}).json()["best"]
+    check("Best 10 picks carry Gemini's description as well as the reason", all("description" in b for b in best), best)
+
     print("Recent albums")
     rec = c.get("/api/albums/recent").json()["albums"]
     mine = next((a for a in rec if a["folder_id"] == fid), None)
