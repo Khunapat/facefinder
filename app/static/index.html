@@ -334,6 +334,7 @@ dialog.preview{width:min(1100px,calc(100vw - 32px))}
 .pv .iconbtn:disabled{opacity:.3;cursor:default}
 .pv .dbody{padding:16px 20px 20px}
 .full-photo{width:100%;height:min(66vh,720px);object-fit:contain;background:var(--photo-bg);border-radius:12px;display:block}
+.full-photo.loading{opacity:.25}
 .sidepreview .full-photo{height:max(240px,calc(100vh - 470px))}   /* fixed, so stepping through photos never jumps */
 .pfoot{display:flex;flex-direction:column;gap:14px;margin-top:16px}
 .why-full{font-size:15px;color:var(--muted)} .why-full b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
@@ -341,7 +342,9 @@ dialog.preview{width:min(1100px,calc(100vw - 32px))}
 .seen{font-size:14px;color:var(--muted);padding-top:10px;border-top:1px solid var(--line)}
 .seen b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
 .seen .tagline{display:block;margin-top:4px;font-size:13px}
-.cmp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.cmp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);border:1px solid var(--line-strong);border-radius:10px;
+     background:var(--panel);padding:6px 10px 6px 6px;text-align:left;min-height:44px}
+.cmp:hover{border-color:var(--field);color:var(--ink)}
 .cmp img{width:84px;height:63px;object-fit:cover;border-radius:8px;background:var(--photo-bg)}
 .seg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg2 .btn{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
@@ -453,6 +456,8 @@ dialog.done h2{font-size:26px}
   dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
   dialog.narrow{height:auto;max-height:100dvh;border-radius:20px 20px 0 0;margin:auto 0 0}
   .dhead{padding:10px 8px 10px 16px}.dbody{padding:0 16px 16px}.dfoot{padding:12px 16px}
+  #dlg .dhead{padding-right:16px}#dlg .dhead #dlgFace{order:0}#dlg .dhead #dlgCount{order:1;flex:1}#dlg .dhead #dlgDone{order:2}
+  #dlg .dhead .flabel{order:3;flex:1 1 100%!important}#dlg .dhead .btn.ghost,#dlg .dhead #dlgBest{order:4;flex:1 0 auto}
   .full-photo{height:auto;max-height:58vh;min-height:200px}
   dialog.preview .pfoot{flex-direction:column;align-items:stretch}
   .actionbar{bottom:8px;padding:0 8px}
@@ -500,7 +505,7 @@ dialog.done h2{font-size:26px}
           <span><b>Open another album</b><small>This one stays saved on the start page</small></span></button>
         <div class="msep" id="menuRescanSep"></div>
         <button type="button" class="mi danger" id="menuRescan"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6L20 8.7M20 4v4.7h-4.7"/></svg></span>
-          <span><b>Rescan from the start</b><small>Clears this album's results</small></span></button>
+          <span><b>Rescan from the start</b><small>Checks the same photos again; clears their results</small></span></button>
       </div>
     </div>
   </div>
@@ -686,7 +691,7 @@ dialog.done h2{font-size:26px}
           <div class="row">
             <button class="btn" id="runSort">Sort the photos</button>
             <button class="btn ghost sm" id="addGroup">+ Add a folder</button>
-            <button class="btn soft sm" id="suggest">Suggest folders</button>
+            <button class="btn soft sm" id="suggest">Suggest folders with Gemini</button>
           </div>
           <div class="bar" id="sbarBox" hidden><i id="sbar"></i></div>
           <div id="sortMsg"></div>
@@ -717,7 +722,7 @@ dialog.done h2{font-size:26px}
                "Gentle" only drops clear mistakes; "Strict" keeps only the strongest frames.</p></details>
         </div>
         <div class="main">
-          <div class="row"><button class="btn" id="runCull">Suggest keepers</button></div>
+          <div class="row"><button class="btn" id="runCull">Suggest again</button></div>
           <div id="cullMsg"></div>
         </div>
       </section>
@@ -750,7 +755,7 @@ dialog.done h2{font-size:26px}
     <button type="button" class="iconbtn" id="xClose" aria-label="Close"></button></div>
   <div class="dbody">
     <ul class="xlist" id="xlist"></ul>
-    <label class="flabel" style="margin-top:18px"><span>Destination folder <span style="font-weight:400;color:var(--muted)">(optional)</span></span>
+    <label class="flabel" style="margin-top:18px"><span><span id="destLabel">Destination folder</span> <span style="font-weight:400;color:var(--muted)">(optional)</span></span>
       <input class="field" type="text" id="dest" placeholder="A Drive folder link, or a name for a new folder"></label>
     <p class="hint" style="font-size:13px;margin-top:6px" id="destHint"></p>
     <label class="check" id="alsoRejectedBox" hidden style="margin-top:14px">
@@ -820,6 +825,13 @@ const postJSON = (url, data) => api(url, {
   method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
 const plural = (n, one, many) => `${n.toLocaleString("en")} ${n === 1 ? one : many}`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// For progress checks: a dropped connection is retried a few times before it counts.
+async function retrying(fn, tries = 5){
+  for(let i = 1; ; i++){
+    try { return await fn(); }
+    catch(e){ if(i >= tries) throw new Error("Lost the connection. The work carries on; check your Drive in a minute."); await sleep(1500 * i); }
+  }
+}
 
 // The tabs and their content only exist for an album that is ready.
 function lockWork(locked){
@@ -835,7 +847,7 @@ function showAlbum(name, count){
   $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
   $("#albumBtn").title = name;
   $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
-  $("#menuRescan").hidden = $("#menuRescanSep").hidden = !state.ready; $("#menuMore").hidden = !state.ready;
+  $("#menuRescan").hidden = $("#menuRescanSep").hidden = !state.ready; if(!state.ready) $("#menuMore").hidden = true;
   if(!state.ready){ $("#menuRetry").replaceChildren(); $("#menuProg").hidden = true; }
 }
 // Small drop-down menus: one open at a time, Escape or a click outside closes.
@@ -853,6 +865,15 @@ for(const [btn, menu] of [["#albumBtn","#albumMenu"],["#acctBtn","#acctMenu"]]){
 }
 document.addEventListener("click", e => { if(!e.target.closest(".menu")) closeMenus(); });
 document.addEventListener("keydown", e => {
+  const inMenu = e.target.closest?.(".menu");
+  if(inMenu && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End")){
+    const items = [...inMenu.querySelectorAll("button")].filter(b => b.offsetParent && !b.disabled);
+    if(!items.length) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement), n = items.length;
+    const to = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n;
+    items[to].focus(); return;
+  }
   if(e.key !== "Escape") return;
   const open = ["#albumMenu","#acctMenu"].find(m => !$(m).hidden);
   if(open){ closeMenus(); $(open === "#albumMenu" ? "#albumBtn" : "#acctBtn").focus(); }
@@ -860,7 +881,8 @@ document.addEventListener("keydown", e => {
 $("#menuOther").onclick = () => { closeMenus(); goHome(); };
 $("#menuRescan").onclick = async () => {
   closeMenus();
-  if(!confirm("Rescan the whole album from the first photo? This takes a while and clears the current results."))return;
+  const k = (state.checkedCount || 0).toLocaleString("en");
+  if(!confirm(`Check these ${k} photos again from the start? This takes a while, clears their results and runs Gemini on them again.`))return;
   try{ await startIndex(true); }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
 };
 // The start screen remembers this account's albums (kept on the server, so
@@ -872,7 +894,8 @@ const ago = ts => {
 };
 function albumState(a){
   const n = x => (x || 0).toLocaleString("en");
-  if(a.status === "ready") return [`${n(a.done)} photos · Ready`, ""];
+  const whole = Math.max(a.album_total || 0, a.total || 0);
+  if(a.status === "ready") return [whole > a.done ? `Checked ${n(a.done)} of ${n(whole)} · Ready` : `${n(a.done)} photos · Ready`, ""];
   if(a.status === "stopped") return [`Stopped at ${n(a.done)} of ${n(a.total)}`, "warn"];
   if(a.status === "error") return ["Scan interrupted", "warn"];
   return [a.total ? `Scanning · ${n(a.done)} of ${n(a.total)}` : "Not scanned yet", ""];
@@ -943,6 +966,11 @@ async function refreshMe(){
   $("#signinBox").hidden = me.signed_in;
   $("#albumPill").hidden = !me.signed_in;
   state.sampleAlbum = me.sample_album || null;
+  state.limitedDrive = me.drive_access !== "full";
+  if(state.limitedDrive){
+    $("#destLabel").textContent = "Folder name in your Drive";
+    $("#dest").placeholder = "e.g. Graduation 2026";
+  }
   loadRecent();
   state.thr = Number(me.default_threshold) || 0.38;
   $("#th").value = state.thr; $("#thVal").textContent = state.thr.toFixed(2);
@@ -1015,7 +1043,7 @@ async function showChooser(adding){
   catch(e){ $("#chooseSum").textContent = e.message; return; }
   const todo = files.filter(f => !f.scanned);
   showAlbum(state.albumName, plural(files.length, "photo", "photos"));
-  state.choose = {adding, files, todo, days:new Set(), picked:new Set(todo.map(f => f.id)), page:60};
+  state.choose = {adding, files, todo, days:new Set(), picked:new Set(), page:60};
   $("#optAllN").textContent = adding ? `The ${plural(todo.length, "photo", "photos")} not checked yet` : `${plural(files.length, "photo", "photos")}`;
   // one chip per day, with its count
   const byDay = new Map();
@@ -1047,7 +1075,11 @@ function chooseSummary(){
                                 : "No photos chosen yet";
   $("#chooseGo").disabled = !n;
   $("#chooseGo").textContent = n ? `Check ${plural(n, "photo", "photos")}` : "Start";
-  $("#optHandN").textContent = `${state.choose.picked.size.toLocaleString("en")} picked`;
+  const k = state.choose.picked.size;
+  $("#optHandN").textContent = k ? `${k.toLocaleString("en")} picked` : "Tap the photos you want";
+  if(!state.choose.todo.length){
+    $("#chooseSum").textContent = "Every photo in this album is already checked."; $("#chooseGo").disabled = true; $("#chooseGo").textContent = "Start";
+  }
 }
 function chooseMode(){
   const mode = $('#chooseCard input[name="scope"]:checked').value;
@@ -1094,7 +1126,7 @@ $("#chooseGo").onclick = async () => {
 function pollStatus(){
   clearTimeout(state.poll);
   const epoch=state.pollEpoch=(state.pollEpoch||0)+1,folder=state.folderId;
-  $('#hero').hidden=true;$('#scanCard').hidden=false;
+  $('#hero').hidden=true;   // the scan card shows only if the album is not ready
   const alive=()=>epoch===state.pollEpoch && folder===state.folderId;
   let failures=0;
   const tick=async()=>{
@@ -1104,6 +1136,7 @@ function pollStatus(){
       if(!alive())return;failures=0;
       const total=Math.max(0,Number(s.total)||0),done=Math.max(0,Number(s.done)||0),judged=Math.max(0,Number(s.judged)||0);
       const faces=Number(s.faces)||0, n=x=>x.toLocaleString('en');
+      if(s.status!=='ready')$('#scanCard').hidden=false;
       // Faces and the Gemini check run side by side: a photo is "checked"
       // once both are done with it, so the bar never runs ahead of the work.
       const checked=s.gemini?Math.min(done,judged):done;
@@ -1141,11 +1174,17 @@ function pollStatus(){
           b.innerHTML=`<span class="ico">${PLAY}</span><span><b>${esc(label)}</b><small>${esc(sub)}</small></span>`;
           b.onclick=async()=>{closeMenus();try{await fn();}catch(e){msg($('#albumMsg'),esc(e.message),'err');}};retry.append(b);};
         const mins=k=>{const m=Math.max(1,Math.round(k*SECONDS_PER_PHOTO()/60));return `about ${m} ${m===1?'minute':'minutes'}`;};
+        // total: the photos chosen for the scan; whole: every photo in the album
+        const whole=Math.max(total,Number(s.album_total)||0);
         // carrying on also adds Gemini's notes to photos still missing them
-        if(done<total)add(`Check the other ${plural(total-done,'photo','photos')}`,`Carries on where it stopped · ${mins(total-done)}`,()=>startIndex(false));
+        if(done<total)add(`Check the other ${plural(total-done,'chosen photo','chosen photos')}`,`Carries on where it stopped · ${mins(total-done)}`,()=>startIndex(false));
+        else if(whole>total)add(`Check the rest of the album`,`${plural(whole-total,'more photo','more photos')} · ${mins(whole-total)}`,()=>startIndex(false,{all:true}));
         else if(s.gemini&&judged<done)add(`Add Gemini's notes to ${plural(done-judged,'photo','photos')}`,`Faces are done; this adds quality and descriptions`,()=>startIndex(false));
-        $('#menuAlbumCount').textContent=done<total?`${n(done)} of ${n(total)} photos checked`:`${n(done)} photos · all checked`;
-        $('#menuProg').hidden=done>=total;$('#menuProg i').style.width=(total?Math.round(100*done/total):0)+'%';
+        if(done<whole)$('#albumCount').textContent=`${n(done)} of ${n(whole)} photos`;
+        $('#menuAlbumCount').textContent=done<whole?`${n(done)} of ${n(whole)} photos checked`:`${n(done)} photos · all checked`;
+        $('#menuProg').hidden=done>=whole;$('#menuProg i').style.width=(whole?Math.round(100*done/whole):0)+'%';
+        $('#menuMore').hidden=done>=whole;
+        state.checkedCount=done;
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
       }
     }catch(e){
@@ -1190,6 +1229,8 @@ $('#menuMore').onclick=()=>showChooser(true);
 // running carries on in the background; reopening its album shows it.
 function goHome(){
   nav("home");
+  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg"]) document.querySelector(d)?.open && document.querySelector(d).close();
+  closeSide(); closeMenus();
   clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
   state.ready=false;lockWork(true);
   $('#scanCard').hidden=true;$('#chooseCard').hidden=true;$('#doneCard').close();showAlbum(null);
@@ -1225,7 +1266,10 @@ window.addEventListener("popstate", () => {
   popping = true;
   try{
     if(!h.a){ if($("#hero").hidden) goHome(); return; }
-    if(h.choose){ if(state.folderId === h.a && state.ready) showChooser(true); return; }
+    if(h.choose){
+      if(state.folderId === h.a && state.ready) showChooser(true);
+      else { $("#album").value = h.a; $("#openAlbum").click(); }   // a new album opens on its chooser
+      return; }
     if(!$("#chooseCard").hidden){ leaveChooser(); return; }
     if(state.folderId !== h.a || (!state.ready && $("#scanCard").hidden)){
       state.wantMode = MODES[h.t] ? h.t : null; $("#album").value = h.a; $("#openAlbum").click(); return; }
@@ -1245,6 +1289,7 @@ function setMode(mode){
     $("#mode" + m[0].toUpperCase() + m.slice(1)).hidden = m !== mode;
   }
   if(mode === "everyone" && state.ready && !state.crowd) loadCrowd();
+  if(mode === "cull" && state.ready && state.gemini && !state.culled && !state.uiBusy) $("#runCull").click();
   if(mode === "sort" && !state.sortDefs.length) addGroup();
   updateBar();
 }
@@ -1318,6 +1363,7 @@ async function showNotes(el, id){
     (n.scene ? `<span class="tagline">${esc(n.scene)}${n.flaws?.length ? " · " + n.flaws.map(f => FL[f] || f).join(", ") : ""}</span>` : "");
   el.hidden = false;
 }
+matchMedia("(max-width:1099px)").addEventListener("change", e => { if(e.matches) closeSide(); });
 function closeSide(){
   const side=$('#cullSide');if(!side||side.hidden)return;
   side.hidden=true;side.replaceChildren();$('#cullWrap').classList.remove('has-side');markViewing(null);
@@ -1345,20 +1391,27 @@ function previewPhoto(m,g,onChange){
           <button type="button" class="btn sm" id="previewIn">${CHECK} Keep</button>
           <button type="button" class="btn sm" id="previewOut">${CLOSE} Exclude</button></div>
         <div class="pnotes"><p class="why-full" id="previewWhy"></p>
-          <div class="cmp" id="previewCmp" hidden><img alt=""><span></span></div>
+          <button type="button" class="cmp" id="previewCmp" hidden><img alt=""><span></span></button>
           <p class="seen" id="previewSeen" hidden></p></div></div></div>`;
   const q=sel=>host.querySelector(sel);
   const show=()=>{
     const x=list[at];
     q('#previewTitle').textContent=x.name;
     q('#previewPos').textContent=`${at+1} of ${list.length.toLocaleString('en')}`;
-    const img=q('#previewImg');img.alt=x.name;img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
+    const img=q('#previewImg');img.alt=x.name;img.classList.add('loading');
+    img.onload=()=>img.classList.remove('loading');
+    img.onerror=()=>{img.classList.remove('loading');img.alt='This photo could not be loaded';};
+    img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
     const picked=g.bestWhy?.get(x.file_id);
     const why=x.long||x.why||picked||'';
     q('#previewWhy').innerHTML=why?`<b>${g.flagged?'Why this was flagged':picked?'Why it was picked':'Why'}</b>${esc(why)}`:'';
     const cmp=q('#previewCmp');cmp.hidden=!x.similar_to;
     if(x.similar_to){cmp.querySelector('img').src=`/api/thumb/${encodeURIComponent(x.similar_to)}?s=300`;
-      cmp.querySelector('span').textContent=`The kept copy: ${x.similar_name||''}`;}
+      cmp.querySelector('span').textContent=`Compare with ${x.similar_name||'the other photo'} · tap to switch`;
+      cmp.onclick=()=>{const other=`/api/thumb/${encodeURIComponent(x.similar_to)}?s=1200`, own=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
+        const showingOther=img.dataset.other==='1';img.classList.add('loading');img.src=showingOther?own:other;img.dataset.other=showingOther?'':'1';
+        q('#previewTitle').textContent=showingOther?x.name:`${x.similar_name} (to compare)`;};}
+    img.dataset.other='';
     showNotes(q('#previewSeen'),x.file_id);
     const on=!g.removed.has(x.file_id);
     q('#previewIn').setAttribute('aria-pressed',on);q('#previewOut').setAttribute('aria-pressed',!on);
@@ -1497,7 +1550,7 @@ function renderRoster(){
             <span class="plus">${PLUS}</span><b>Add photo</b><span>A clear photo of their face. Up to 3 angles.</span></button>`}
        <label class="flabel">Folder name
          <input class="field" type="text" maxlength="100" value="${esc(p.name)}" placeholder="e.g. Mint"></label>
-       <input type="file" accept="image/*" multiple hidden>`;
+       <input type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple hidden>`;
     const file = card.querySelector("input[type=file]");
     card.querySelector(".addshot, .dropzone")?.addEventListener("click", () => file.click());
     file.onchange = e => addShots(p, e.target.files);
@@ -1549,9 +1602,11 @@ $("#go").onclick = async () => {
     renderResults();
   }
   const found = state.results.reduce((n, g) => n + visible(g).length, 0);
-  msg($("#searchMsg"),
+  const worked = state.results.filter(g => !g.error).length;
+  if(!worked) msg($("#searchMsg"), "No search worked. See the message under each person.", "err");
+  else msg($("#searchMsg"),
     `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then export to Drive.`, "ok");
-  $("#strict").hidden = false;
+  $("#strict").hidden = !worked;
   $("#go").disabled = false;
 };
 
@@ -1635,10 +1690,11 @@ function renderCrowd(){
     tick.setAttribute('aria-label',`Create a folder for ${crowdName(g)}`);
     card.querySelector('.fname').setAttribute('aria-label',`Name for ${crowdName(g)}`);
     card.querySelector(".fpic").onclick = () => openPerson(g);
-    tick.onclick = () => setOn(!g.on);
+    tick.onclick = () => { g.autoOn = false; setOn(!g.on); };
     card.querySelector(".fname").oninput = e => {
       g.name = e.target.value;
-      setOn(g.on || g.name.trim() !== "");
+      if(g.name.trim() && !g.on){ g.autoOn = true; setOn(true); }
+      else if(!g.name.trim() && g.autoOn){ g.autoOn = false; setOn(false); }
     };
     box.appendChild(card);
   }
@@ -1658,12 +1714,16 @@ function openPerson(g){
   msg($("#dlgMsg"), "");
   const tally = () => $("#dlgCount").textContent =
     `${picked(g).length.toLocaleString("en")} of ${g.all.length.toLocaleString("en")} selected`;
-  const refill = () => { fillGrid($("#dlgGrid"), g, tally); tally(); };
-  $("#dlgAll").onclick  = () => { choose(g, "all");  refill(); };
+  // Picking photos here means this person gets a folder: no need to tick
+  // the card as well. "None" leaves it as it was.
+  const touched = () => { g.on = picked(g).length > 0 || g.on; tally(); };
+  const refill = () => { fillGrid($("#dlgGrid"), g, touched); tally(); };
+  $("#dlgAll").onclick  = () => { choose(g, "all");  g.on = true; refill(); };
   $("#dlgNone").onclick = () => { choose(g, "none"); refill(); };
-  $("#dlgSure").onclick = () => { choose(g, "sure"); refill(); };
+  $("#dlgSure").onclick = () => { choose(g, "sure"); g.on = true; refill(); };
   $("#dlgBest").onclick = async () => {
     await pickBest(g,10,$('#dlgMsg'));
+    if(g.best) g.on = true;
     if(state.open===g && $('#dlg').open)refill();
   };
   refill();
@@ -1671,7 +1731,9 @@ function openPerson(g){
 }
 $("#dlgName").oninput = e => {
   const g = state.open; if(!g) return;
-  g.name = e.target.value; g.on = g.on || g.name.trim() !== "";
+  g.name = e.target.value;
+  if(g.name.trim() && !g.on){ g.autoOn = true; g.on = true; }
+  else if(!g.name.trim() && g.autoOn && !g.best){ g.autoOn = false; g.on = false; }
 };
 $("#dlgDone").onclick = () => $("#dlg").close();
 $("#dlg").addEventListener("close", () => {
@@ -1726,7 +1788,9 @@ $("#suggest").onclick = async () => {
   msg($("#sortMsg"), "Gemini is reading the album…");
   try{
     const r = await postJSON("/api/groups/suggest", {folder_id:state.folderId});
-    state.sortDefs = state.sortDefs.filter(d => d.name.trim() || d.description.trim()).concat(r.groups);
+    const have = new Set(state.sortDefs.map(d => d.name.trim().toLowerCase()));
+    state.sortDefs = state.sortDefs.filter(d => d.name.trim() || d.description.trim())
+      .concat(r.groups.filter(g => !have.has(g.name.trim().toLowerCase())));
     renderGroupRows();
     msg($("#sortMsg"), r.groups.length
       ? `Gemini suggests ${plural(r.groups.length, "group", "groups")}. Rename, edit or remove any of them, then sort.`
@@ -1745,7 +1809,7 @@ $("#runSort").onclick = async () => {
     const {job_id} = await postJSON("/api/sort", {folder_id:state.folderId, groups});
     let job;
     while(true){
-      job = await api("/api/sort/" + job_id);
+      job = await retrying(() => api("/api/sort/" + job_id));
       $("#sbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
       msg($("#sortMsg"), `Sorting — ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}`);
       if(job.status !== "running") break;
@@ -1772,8 +1836,14 @@ $("#runSort").onclick = async () => {
 };
 function renderSorted(){
   const box = $("#sortResults"); box.innerHTML = "";
-  for(const g of state.sorted)
+  for(const g of state.sorted){
+    if(!g.all.length){
+      const c = document.createElement("section"); c.className = "card";
+      c.innerHTML = `<div class="rname">${esc(g.name)}</div><p class="hint" style="margin-top:6px">No photos matched this folder. Try describing it differently.</p>`;
+      box.append(c); continue;
+    }
     box.appendChild(groupCard(g, {title:g.name, note:g.note ? esc(g.note) : ""}));
+  }
   updateBar();
 }
 
@@ -1817,7 +1887,6 @@ $("#runCull").onclick = async () => {
     $("#recheck")?.addEventListener("click", () => startIndex(false));
     $("#alsoRejectedBox").hidden = !(r.reject.length || r.review.length);
     renderCull();
-    $("#cullResults").scrollIntoView({behavior:"smooth", block:"start"});
   }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
   $("#runCull").disabled = false;
 };
@@ -1835,7 +1904,12 @@ function renderCull(){
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("aria-pressed", state.cullPile === k);
     b.innerHTML = `${label}<span class="n">${state.culled[k].all.length.toLocaleString("en")}</span>`;
-    b.onclick = () => { state.cullPile = k; closeSide(); renderCull(); };
+    b.onclick = () => { state.cullPile = k; closeSide(); renderCull(); $(".piles button[aria-pressed='true']")?.focus(); };
+    b.onkeydown = e => {
+      const keys = Object.keys(piles), i = keys.indexOf(k);
+      const to = e.key === "ArrowRight" ? keys[(i + 1) % 3] : e.key === "ArrowLeft" ? keys[(i + 2) % 3] : null;
+      if(to){ e.preventDefault(); state.cullPile = to; closeSide(); renderCull(); $(".piles button[aria-pressed='true']")?.focus(); }
+    };
     bar.append(b);
   }
   box.append(bar);
@@ -1863,9 +1937,13 @@ function exportGroups(){
       groups.push({name:"Rejected", ids:reject.all.concat(review.all).filter(m =>
         (reject.removed.has(m.file_id) && reject.all.includes(m)) || (review.removed.has(m.file_id) && review.all.includes(m)))});
   } else groups = [];
-  return groups
-    .map(x => ({name:x.name, file_ids:x.ids.map(m => m.file_id)}))
-    .filter(x => x.file_ids.length);
+  const merged = new Map();     // same name, any case: one folder, each photo once
+  for(const x of groups){
+    const key = x.name.trim().toLowerCase();
+    if(!merged.has(key)) merged.set(key, {name:x.name.trim(), ids:new Set()});
+    x.ids.forEach(m => merged.get(key).ids.add(m.file_id));
+  }
+  return [...merged.values()].map(x => ({name:x.name, file_ids:[...x.ids]})).filter(x => x.file_ids.length);
 }
 function updateBar(){
   const gs = exportGroups();
@@ -1921,7 +1999,7 @@ $("#xGo").onclick = async () => {
   try{
     const {job_id} = await postJSON("/api/export", body);
     while(true){
-      job = await api("/api/export/" + job_id);
+      job = await retrying(() => api("/api/export/" + job_id));
       $("#xbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
       $("#xtext").textContent = `Copying ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}…`;
       if(job.status !== "running") break;
@@ -1991,7 +2069,8 @@ function lockDuring(handler){
   return async function(event){
     if(state.uiBusy)return;
     state.uiBusy=true;
-    const controls=[...document.querySelectorAll('main button, main input, main select, .tabs button, #albumBtn, #dest, #export')];
+    const controls=[...document.querySelectorAll('main button, main input, main select, .tabs button, #albumBtn, #dest, #export')]
+      .filter(el=>!el.closest('#chooseCard'));      // the chooser sets its own buttons as it fills
     const previous=controls.map(el=>[el,el.disabled]);controls.forEach(el=>el.disabled=true);
     try{return await handler.call(this,event);}
     finally{previous.forEach(([el,value])=>{if(el.isConnected)el.disabled=value;});state.uiBusy=false;updateBar();}
@@ -2001,6 +2080,7 @@ for(const id of ['openAlbum','go','suggest','runSort','runCull','xGo','chooseGo'
   const button=$('#'+id);button.onclick=lockDuring(button.onclick);
 }
 $('#grouping').onchange=lockDuring(async()=>{if(state.ready)await loadCrowd();});
+$('#strictness').onchange=()=>{if(state.ready&&state.culled)$('#runCull').click();};
 window.addEventListener('beforeunload',e=>{if(state.exporting||state.uiBusy){e.preventDefault();e.returnValue='';}});
 
 setMode(state.mode);

@@ -59,7 +59,7 @@ def album(folder_id: str):
         return None
     d = snap.to_dict()
     out = {"folder_id": folder_id, "name": None, "status": "pending", "total": 0,
-           "done": 0, "faces": 0, "message": None, "updated_at": None, "scope": None}
+           "done": 0, "faces": 0, "message": None, "updated_at": None, "scope": None, "album_total": None}
     out.update(d)
     return out
 

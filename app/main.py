@@ -37,6 +37,7 @@ _exports = {}       # job_id -> progress dict, read by the page while it runs
 _mat_cache = {}     # folder_id -> (stamp, matrix, meta)
 _people_cache = {}  # (folder_id, faces, threshold) -> grouped people
 _face_cache = {}    # (folder_id, file_id, face_idx) -> small JPEG, memory only
+_thumb_meta = {}    # (access token, file_id) -> (time, Drive metadata), ten minutes
 _sorts = {}         # job_id -> sort-by-description progress and result
 
 
@@ -191,6 +192,7 @@ def recent_albums(request: Request):
         out.append({
             "folder_id": folder_id, "name": row.get("name") or "Album", "status": row.get("status"),
             "total": row.get("total") or 0, "done": row.get("done") or 0, "opened_at": opened_at,
+            "album_total": row.get("album_total") or row.get("total") or 0,
             "covers": store.cover_ids(folder_id, 3) if row.get("done") else [],
         })
     return {"albums": out}
@@ -252,6 +254,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
         creds = gd.creds_from_session(creds_data)
         svc = gd.service(creds)
         files = gd.list_images(svc, folder_id)
+        album_total = len(files)
         scope = _scope(store.album(folder_id))
         if scope is not None:           # only the photos the user chose
             files = [f for f in files if f["id"] in scope]
@@ -261,6 +264,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
             folder_id,
             status="indexing",
             total=len(files),
+            album_total=album_total,
             done=len(already),
             message="%d new photos to scan" % len(todo),
         )
@@ -322,7 +326,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
             gem.shutdown(wait=True, cancel_futures=stop.is_set())
 
         row = store.album(folder_id)
-        if stop.is_set():
+        if stop.is_set() and row["done"] < row["total"]:
             store.set_album(folder_id, status="stopped", message=(
                 "Stopped after %d of %d photos. Use them as they are, or carry on later."
                 % (row["done"], row["total"])))
@@ -439,6 +443,10 @@ def stop_index(request: Request, body: dict = Body(...)):
     with _jobs_lock:
         t = _jobs.get(folder_id)
         if t is None:
+            # no scan runs here (the instance restarted mid-scan): say stopped
+            row = store.album(folder_id)
+            if row is not None and row["status"] in ("indexing", "pending"):
+                store.set_album(folder_id, status="stopped", message="Stopped. Photos already scanned are kept.")
             return {"stopping": False}
         t.stop.set()
     return {"stopping": True}
@@ -484,6 +492,9 @@ def search(
     _creds(request)
     _need_album(request, folder_id)
     images = [f.file.read() for f in selfies]
+    if not any(faces.decode(d) is not None for d in images):
+        raise HTTPException(400, "Could not read that photo. Use a JPEG or PNG (iPhone HEIC photos: "
+                                 "share or export them as JPEG first).")
     query = faces.best_query_vector(images)
     if query is None:
         raise HTTPException(
@@ -588,11 +599,20 @@ def face(request: Request, folder_id: str, file_id: str, face_idx: int):
 def thumb(request: Request, file_id: str, s: int = 0):
     creds = _creds(request)
     svc = gd.service(creds)
-    meta = (
-        svc.files()
-        .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
-        .execute()
-    )
+    # Per account, so one person's Drive access never serves another's thumbnail.
+    key = (creds.token, file_id)
+    hit = _thumb_meta.get(key)
+    if hit and time.time() - hit[0] < 600:
+        meta = hit[1]
+    else:
+        meta = (
+            svc.files()
+            .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
+            .execute()
+        )
+        if len(_thumb_meta) > 5000:
+            _thumb_meta.clear()
+        _thumb_meta[key] = (time.time(), meta)
     size = min(max(s, 200), config.THUMB_SIZE) if s else None
     return Response(
         content=gd.fetch_image_bytes(creds, svc, meta, size),

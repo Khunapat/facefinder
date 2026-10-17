@@ -66,11 +66,13 @@ def conn() -> sqlite3.Connection:
                 except sqlite3.OperationalError:
                     pass                # another thread added it first
         # Which photos the user chose to scan (JSON list), NULL for the whole album.
-        if "scope" not in {r["name"] for r in c.execute("PRAGMA table_info(albums)")}:
-            try:
-                c.execute("ALTER TABLE albums ADD COLUMN scope TEXT")
-            except sqlite3.OperationalError:
-                pass
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(albums)")}
+        for col, kind in (("scope", "TEXT"), ("album_total", "INTEGER")):
+            if col not in cols:      # album_total: photos in the album, scope or not
+                try:
+                    c.execute(f"ALTER TABLE albums ADD COLUMN {col} {kind}")
+                except sqlite3.OperationalError:
+                    pass
         c.commit()
         _local.conn = c
     return _local.conn
