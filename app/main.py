@@ -6,6 +6,7 @@ import secrets
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -132,15 +133,23 @@ def login(request: Request):
 
 @app.get("/oauth2/callback")
 def callback(request: Request):
-    if not request.session.get("oauth_state") or not request.session.get("code_verifier"):
-        raise HTTPException(400, "Sign-in expired. Start sign-in again.")
+    # Sign-in started on another address (the cookie with its state is not
+    # here), was cancelled, or ran out: back to the start page, which says so.
+    if request.query_params.get("error") or not request.session.get("oauth_state") \
+            or not request.session.get("code_verifier"):
+        return RedirectResponse("/?signin=retry")
     flow = _flow(state=request.session.get("oauth_state"))
     flow.code_verifier = request.session.get("code_verifier")
     url = str(request.url)
     # Hosts terminate TLS in front of us, so the URL we see can say http.
     if config.PUBLIC_BASE_URL.startswith("https") and url.startswith("http://"):
         url = "https://" + url[len("http://"):]
-    flow.fetch_token(authorization_response=url)
+    try:
+        flow.fetch_token(authorization_response=url)
+    except Exception:
+        request.session.pop("oauth_state", None)
+        request.session.pop("code_verifier", None)
+        return RedirectResponse("/?signin=retry")
     creds = flow.credentials
     request.session.clear()
     request.session["creds"] = gd.creds_to_session(creds)
@@ -173,6 +182,7 @@ def me(request: Request):
         "drive_access": config.DRIVE_ACCESS,
         "gemini": gemini.enabled(),
         "sample_album": config.SAMPLE_ALBUM or None,
+        "public_base_url": config.PUBLIC_BASE_URL,
     }
 
 
@@ -309,6 +319,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
         # wider pool and run alongside the face scan.
         if gemini.enabled():
             gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
+        sent = []                       # Gemini calls in flight, waited on below
 
         def ai_key(meta):
             return "%s:%s" % (meta["id"], meta.get("md5Checksum") or "")
@@ -356,7 +367,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                              curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
             if gem and not from_cache(meta):
-                gem.submit(judge, meta, data)
+                sent.append(gem.submit(judge, meta, data))
 
         def rejudge(meta):
             if stop.is_set() or from_cache(meta):
@@ -365,7 +376,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
             except Exception:
                 return
-            gem.submit(judge, meta, data)
+            sent.append(gem.submit(judge, meta, data))
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))
@@ -374,7 +385,12 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                 missing = {m["id"] for m in store.unjudged(folder_id)} - fresh
                 list(pool.map(rejudge, [f for f in files if f["id"] in missing]))
         if gem:
-            gem.shutdown(wait=True, cancel_futures=stop.is_set())
+            # Wait for Gemini's answers, but not after Stop: a slow or stuck call
+            # must not keep the album "scanning". Late answers are still saved.
+            pending = set(sent)
+            while pending and not stop.is_set():
+                _, pending = futures_wait(pending, timeout=1)
+            gem.shutdown(wait=False, cancel_futures=True)
 
         row = store.album(folder_id)
         if stop.is_set() and row["done"] < row["total"]:
@@ -612,6 +628,31 @@ def search(
 GROUPING = {"loose": -0.06, "balanced": 0.0, "strict": 0.06}
 
 
+@app.get("/api/album/{folder_id}/names")
+def get_names(request: Request, folder_id: str):
+    """The names this account gave people in this album, kept on the server so
+    they survive signing out and work on another device."""
+    _need_album(request, folder_id)
+    user = _user_key(request)
+    return {"people": store.load_names(user, folder_id) if user else []}
+
+
+@app.post("/api/album/{folder_id}/names")
+def put_names(request: Request, folder_id: str, body: dict = Body(...)):
+    _need_album(request, folder_id)
+    user = _user_key(request)
+    if not user:
+        return {"saved": False}
+    clean = []
+    for p in (body.get("people") or [])[:500]:
+        name = str(p.get("name") or "").strip()[:100]
+        files = [f for f in (p.get("files") or []) if isinstance(f, str)][:50]
+        if name and files:
+            clean.append({"name": name, "files": files})
+    store.save_names(user, folder_id, clean)
+    return {"saved": True}
+
+
 @app.post("/api/people")
 def people(request: Request, body: dict = Body(...)):
     """Everyone in the album, grouped by face, with no names given."""
@@ -676,20 +717,28 @@ def thumb(request: Request, file_id: str, s: int = 0):
     # Per account, so one person's Drive access never serves another's thumbnail.
     key = (creds.token, file_id)
     hit = _thumb_meta.get(key)
-    if hit and time.time() - hit[0] < 600:
-        meta = hit[1]
-    else:
-        meta = (
-            svc.files()
-            .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
-            .execute()
-        )
-        if len(_thumb_meta) > 5000:
-            _thumb_meta.clear()
-        _thumb_meta[key] = (time.time(), meta)
-    size = min(max(s, 200), config.THUMB_SIZE) if s else None
+    try:
+        if hit and time.time() - hit[0] < 600:
+            meta = hit[1]
+        else:
+            meta = (
+                svc.files()
+                .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
+                .execute()
+            )
+            if len(_thumb_meta) > 5000:
+                _thumb_meta.clear()
+            _thumb_meta[key] = (time.time(), meta)
+        size = min(max(s, 200), config.THUMB_SIZE) if s else None
+        data = gd.fetch_image_bytes(creds, svc, meta, size)
+    except HttpError as e:
+        # deleted, moved out of the album, or not shared with this account
+        code = 404 if e.resp.status in (403, 404) else 502
+        raise HTTPException(code, "Photo not available") from e
+    except Exception as e:
+        raise HTTPException(502, "Photo not available right now") from e
     return Response(
-        content=gd.fetch_image_bytes(creds, svc, meta, size),
+        content=data,
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )

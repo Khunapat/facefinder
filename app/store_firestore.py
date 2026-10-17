@@ -25,7 +25,7 @@ __all__ = [
     "album", "set_album", "bump_progress", "indexed_file_ids", "save_photo",
     "load_matrix", "save_ai", "photos", "unjudged", "judged_count",
     "clear_album", "face_box", "remember_album", "recent_albums", "forget_album", "cover_ids",
-    "photo_ai", "cache_ai", "cached_ai",
+    "photo_ai", "cache_ai", "cached_ai", "save_names", "load_names",
 ]
 
 _lock = threading.Lock()
@@ -191,6 +191,15 @@ def face_box(folder_id: str, file_id: str, face_idx: int):
 
 def _recent(user: str):
     return db().collection("users").document(user).collection("recent")
+
+
+def save_names(user: str, folder_id: str, people: list):
+    db().collection("users").document(user).collection("names").document(folder_id).set({"people": people})
+
+
+def load_names(user: str, folder_id: str) -> list:
+    snap = db().collection("users").document(user).collection("names").document(folder_id).get()
+    return (snap.to_dict() or {}).get("people") or [] if snap.exists else []
 
 
 def remember_album(user: str, folder_id: str):

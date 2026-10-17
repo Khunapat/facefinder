@@ -220,6 +220,37 @@ def main_test():
     r = c.get("/api/export/no-such-job")
     check("a lost export says how to finish it", r.status_code == 404 and "Export again" in r.json()["detail"], r.text)
 
+    print("Stop does not wait for Gemini")
+    main.store.conn().execute("DELETE FROM ai_cache")
+    main.store.conn().commit()
+
+    def stuck(jpeg):
+        time.sleep(25)          # a Gemini call that hangs
+        return real_judge(jpeg)
+    main.gemini.judge = stuck
+    try:
+        c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] == "indexing" and s["done"] >= 3)
+        t0 = time.time()
+        c.post("/api/index/stop", json={"folder_id": fid})
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] not in ("indexing", "pending"), 60)
+        took = time.time() - t0
+    finally:
+        main.gemini.judge = real_judge
+    check("Stop ends the scan within seconds even while Gemini calls hang",
+          took < 8 and st["status"] in ("stopped", "ready"), (round(took, 1), st["status"]))
+    c.post("/api/index", json={"folder_id": fid})
+    st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    check("resuming afterwards finishes the album", st["status"] == "ready" and st["done"] == 7, st)
+
+    print("Names kept for the account")
+    r = c.post("/api/album/%s/names" % fid, json={"people": [
+        {"name": " Mint ", "files": ["obama.jpg", "obama2.jpg"]}, {"name": "", "files": ["biden.jpg"]}]})
+    got = c.get("/api/album/%s/names" % fid).json()["people"]
+    check("names are saved with their photos, blanks dropped",
+          r.json().get("saved") and got == [{"name": "Mint", "files": ["obama.jpg", "obama2.jpg"]}], got)
+    check("another session cannot read them", other.get("/api/album/%s/names" % fid).status_code == 403)
+
     print("Folders this account cannot open")
     r = c.post("/api/album", json={"folder": "https://drive.google.com/drive/folders/private-folder-00000000000000"})
     d = r.json().get("detail") or {}

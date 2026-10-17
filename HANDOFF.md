@@ -109,6 +109,11 @@ dialogs and always match the address; unticked Keep photos go to "Rejected";
 Gemini notes cannot land on the wrong photo; Gemini results are cached per
 photo (Drive id + checksum) so a rescan pays nothing again; a scan killed by a
 restart shows as stopped with Resume (the worker touches its row every 20 s).
+Names typed on Everyone are saved per account on the server (with each
+person's photos, so they find the right group again after a rescan). Stop no
+longer waits for Gemini; each Gemini call has a 60 s limit. Pages opened on the
+`.run.app` address move to `PUBLIC_BASE_URL` first, since Google only returns
+sign-in there.
 Open: the OAuth app must be published (not Testing) so judges with any Google
 account can sign in; it will show Google's "unverified app" warning.
 

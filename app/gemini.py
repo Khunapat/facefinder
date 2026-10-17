@@ -62,14 +62,20 @@ def client():
             from google import genai
 
             if mode() == "key":
-                _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+                _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"], http_options=_HTTP)
             else:
                 _client = genai.Client(
                     enterprise=True,
                     project=os.environ["GOOGLE_CLOUD_PROJECT"],
                     location=LOCATION,
+                    http_options=_HTTP,
                 )
         return _client
+
+
+# One minute per call at most: a stuck request fails and is retried on the next
+# scan instead of holding the scan open.
+_HTTP = {"timeout": 60_000}     # milliseconds
 
 
 def _call(contents, schema, temperature=0.2):

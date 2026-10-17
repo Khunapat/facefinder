@@ -160,6 +160,8 @@ main{padding:28px var(--pad) 140px}
 .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .opt{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1.5px solid var(--line-strong);border-radius:var(--r-card);cursor:pointer}
 .opt:hover{border-color:var(--field)}
+.opt.off{opacity:.55;cursor:default}.opt.off:hover{border-color:var(--line-strong)}
+.rmosaic img.gone{object-fit:contain;background:var(--page);padding:12px}
 .opt:has(input:checked){border-color:var(--accent);background:#fff8fb}
 .opt input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent);flex:0 0 20px}
 .opt span{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -462,7 +464,8 @@ dialog.done h2{font-size:26px}
   .rhead{gap:8px}.rhead .btn.sm{padding:0 12px}
   .grid,.faces{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
   dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
-  dialog.narrow{height:auto;max-height:100dvh;border-radius:20px 20px 0 0;margin:auto 0 0}
+  dialog.narrow{width:100vw;height:auto;max-height:100dvh;border-radius:20px 20px 0 0;margin:auto 0 0}
+  dialog.preview{width:100vw}
   .dhead{padding:10px 8px 10px 16px}.dbody{padding:0 16px 16px}.dfoot{padding:12px 16px}
   #dlg .dhead{padding-right:16px}#dlg .dhead #dlgFace{order:0}#dlg .dhead #dlgCount{order:1;flex:1}#dlg .dhead #dlgDone{order:2}
   #dlg .dhead .flabel{order:3;flex:1 1 100%!important}#dlg .dhead .btn.ghost,#dlg .dhead #dlgBest{order:4;flex:1 0 auto}
@@ -470,6 +473,7 @@ dialog.done h2{font-size:26px}
   dialog.preview .pfoot{flex-direction:column;align-items:stretch}
   .actionbar{bottom:8px;padding:0 8px}
   .actionbar .inner{min-height:64px;padding:8px 8px 8px 14px}
+  .actionbar .count{white-space:normal;font-size:14px;line-height:1.3}
   .thumbs{display:none}
 }
 @media (prefers-reduced-motion:reduce){
@@ -556,11 +560,11 @@ dialog.done h2{font-size:26px}
       <p>Find people, review the best moments, and save your selections to Drive.</p>
       <div id="signinBox" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
         <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
-        <span class="hint" style="font-size:14px">FaceFinder reads the shared album with your Google account
+        <span class="hint" style="font-size:14px">FaceFinder reads a Google Drive folder with your Google account
           and puts the folders in your own Drive. It never deletes or moves anything.</span>
       </div>
       <div class="openbox" id="albumPill">
-        <label class="flabel" for="album">Shared album link</label>
+        <label class="flabel" for="album">Google Drive folder link</label>
         <div class="row">
           <input class="field" type="text" id="album" placeholder="Paste the Google Drive folder link">
           <button class="btn" id="openAlbum">Open album</button>
@@ -660,7 +664,7 @@ dialog.done h2{font-size:26px}
     <div id="modeEveryone">
       <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Choose people</h2><p class="sub">Select people and name their folders.</p></div>
+          <div class="mtitle"><h2>Choose people</h2><p class="sub">Type a name to make a folder. Tap a face to check their photos.</p></div>
           <div class="mtools">
             <label class="check">Grouping
               <select class="field" id="grouping">
@@ -935,7 +939,7 @@ $("#menuOther").onclick = () => { closeMenus(); goHome(); };
 $("#menuRescan").onclick = async () => {
   closeMenus();
   const k = (state.checkedCount || 0).toLocaleString("en");
-  if(!confirm(`Check these ${k} photos again from the start? Faces are found again and names you typed are cleared. Gemini's notes are kept, so this costs no extra Gemini calls.`))return;
+  if(!confirm(`Check these ${k} photos again from the start? Faces are found again; names you typed and Gemini's notes are kept, so this costs no extra Gemini calls.`))return;
   await startIndex(true);
 };
 // The start screen remembers this account's albums (kept on the server, so
@@ -965,7 +969,8 @@ async function loadRecent(){
   };
   for(const a of albums){
     const [st, warn] = albumState(a);
-    const pics = a.covers.map(id => `<img src="/api/thumb/${encodeURIComponent(id)}?s=300" alt="" loading="lazy">`).join("");
+    const pics = a.covers.map(id => `<img src="/api/thumb/${encodeURIComponent(id)}?s=300" alt="" loading="lazy"
+      onerror="this.onerror=null;this.src='/static/img/cam-stand.png';this.classList.add('gone')">`).join("");
     const c = card(`<button class="ropen" type="button" aria-label="Open ${esc(a.name)}, ${esc(st)}">
         <div class="rmosaic ${a.covers.length === 1 ? "one" : a.covers.length ? "" : "empty"}">${pics || '<img src="/static/img/cam-stand.png" alt="">'}</div>
         <div class="rinfo"><b title="${esc(a.name)}">${esc(a.name)}</b><span class="st ${warn}">${esc(st)}</span>
@@ -1007,6 +1012,16 @@ const picked  = g => visible(g).filter(m => !g.removed.has(m.file_id));
 // ---- auth ----
 async function refreshMe(){
   const me = await api("/api/me");
+  // Google sends sign-in back to the main address only; starting on the Cloud
+  // Run one would lose the sign-in on the way. Move there first.
+  const base = me.public_base_url || "";
+  if(location.hostname.endsWith(".run.app") && /^https:/.test(base) && !base.includes(location.hostname)){
+    location.replace(base + location.pathname + location.search + location.hash); return;
+  }
+  if(new URLSearchParams(location.search).get("signin") === "retry"){
+    history.replaceState(null, "", location.pathname + location.hash);
+    if(!me.signed_in) msg($("#albumMsg"), 'Sign-in did not finish. Please press <b>Sign in with Google</b> again.', "err");
+  }
   state.signedIn = me.signed_in;
   state.gemini = !!me.gemini;
   if(!me.configured)
@@ -1128,7 +1143,9 @@ async function showChooser(adding){
       b.setAttribute("aria-pressed", on); chooseSummary(); };
     box.append(b);
   }
-  $("#optDateN").textContent = byDay.size > 1 ? `${byDay.size} days in this album` : "All on one day";
+  $("#optDateN").textContent = byDay.size > 1 ? `${byDay.size} days in this album` : "All taken on the same day";
+  const dayRadio = card.querySelector('input[value="date"]');
+  dayRadio.disabled = byDay.size < 2; dayRadio.closest(".opt").classList.toggle("off", byDay.size < 2);
   card.querySelector('input[value="all"]').checked = true;
   drawPicks(); chooseMode();
   window.scrollTo({top:0});
@@ -1208,7 +1225,10 @@ function pollStatus(){
       if(!alive())return;failures=0;
       const total=Math.max(0,Number(s.total)||0),done=Math.max(0,Number(s.done)||0),judged=Math.max(0,Number(s.judged)||0);
       const faces=Number(s.faces)||0, n=x=>x.toLocaleString('en');
-      if(s.status!=='ready')$('#scanCard').hidden=false;
+      if(s.status!=='ready'){
+        $('#scanCard').hidden=false;
+        if(state.ready){state.ready=false;lockWork(true);updateBar();}
+      }
       // Faces and the Gemini check run side by side: a photo is "checked"
       // once both are done with it, so the bar never runs ahead of the work.
       const checked=s.gemini?Math.min(done,judged):done;
@@ -1257,7 +1277,9 @@ function pollStatus(){
         $('#menuProg').hidden=done>=whole;$('#menuProg i').style.width=(whole?Math.round(100*done/whole):0)+'%';
         $('#menuMore').hidden=done>=whole;
         state.checkedCount=done;
-        if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
+        if(state.mode==='everyone'&&!state.crowd)loadCrowd();
+        if(state.mode==='cull'&&s.gemini&&!state.culled&&!state.uiBusy)$('#runCull').click();
+        updateBar();return;
       }
     }catch(e){
       if(!alive())return;
@@ -1609,6 +1631,7 @@ function addShots(p, list){
     if(!f.type.startsWith("image/")) continue;
     p.files.push(f); p.urls.push(URL.createObjectURL(f));
   }
+  if($("#searchMsg .msg.err")) msg($("#searchMsg"), "");
   renderRoster();
 }
 function renderRoster(){
@@ -1693,6 +1716,8 @@ $("#th").oninput = e => {
   state.thr = Number(e.target.value);
   $("#thVal").textContent = state.thr.toFixed(2);
   renderResults();
+  const found = state.results.reduce((n, g) => n + (g.error ? 0 : visible(g).length), 0), people = state.results.filter(g => !g.error).length;
+  if(people) msg($("#searchMsg"), `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(people, "person", "people")}. Check them below, then export to Drive.`, "ok");
 };
 
 function renderResults(){
@@ -1719,9 +1744,34 @@ function savedNames(){
   try { return JSON.parse(sessionStorage.getItem(NAMES_KEY()) || "{}"); } catch(e){ return {}; }
 }
 function saveNames(){
-  const out = {};
-  for(const g of state.crowd || []) if(g.on) out[g.id] = g.name;
+  const out = {}, people = [];
+  for(const g of state.crowd || []) if(g.on){
+    out[g.id] = g.name;
+    if(g.name.trim()) people.push({name:g.name.trim(), files:g.all.slice(0, 50).map(m => m.file_id)});
+  }
   try { sessionStorage.setItem(NAMES_KEY(), JSON.stringify(out)); } catch(e){}
+  // also on the server, for this account: names survive signing out and work on
+  // another device. Saved with their photos, since group numbers change.
+  clearTimeout(state.namesTimer);
+  const folder = state.folderId;
+  state.namesTimer = setTimeout(() =>
+    postJSON(`/api/album/${encodeURIComponent(folder)}/names`, {people}).catch(() => {}), 700);
+}
+// Give saved names back to the groups that share the most photos with them.
+function applyServerNames(saved){
+  for(const s of saved || []){
+    if(state.crowd.some(g => g.name.trim().toLowerCase() === s.name.toLowerCase())) continue;
+    const want = new Set(s.files || []);
+    let best = null, score = 0;
+    for(const g of state.crowd){
+      if(g.name.trim()) continue;
+      const k = g.all.reduce((n, m) => n + (want.has(m.file_id) ? 1 : 0), 0);
+      if(k > score){ score = k; best = g; }
+    }
+    if(best && score >= Math.max(1, Math.ceil(0.3 * Math.min(want.size, best.all.length)))){
+      best.name = s.name; best.on = true; best.autoOn = true;   // ticked because named
+    }
+  }
 }
 const faceUrl = g => `/api/face/${encodeURIComponent(state.folderId)}/` +
   `${encodeURIComponent(g.cover.file_id)}/${g.cover.face_idx}`;
@@ -1734,11 +1784,13 @@ async function loadCrowd(){
   $('#faces').replaceChildren();$('#toggleSingles').hidden=true;
   const current=()=>version===state.crowdRequest&&folder===state.folderId&&grouping===$('#grouping').value;
   try{
-    const r=await postJSON('/api/people',{folder_id:folder,grouping});
+    const [r,server]=await Promise.all([postJSON('/api/people',{folder_id:folder,grouping}),
+      api(`/api/album/${encodeURIComponent(folder)}/names`).then(x=>x.people).catch(()=>[])]);
     if(!current())return;
     const names=savedNames();
     state.crowd=r.people.map(p=>({kind:'cluster',id:p.id,cover:p.cover,
       all:p.photos,removed:new Set(),name:names[p.id]||'',on:p.id in names}));
+    applyServerNames(server);
     const regulars=state.crowd.filter(g=>g.all.length>1).length;
     msg($('#everyMsg'),`${regulars} people appear in more than one photo.`,'ok');renderCrowd();
   }catch(e){if(current())msg($('#everyMsg'),esc(e.message),'err');}
@@ -1774,6 +1826,7 @@ function renderCrowd(){
       g.name = e.target.value;
       if(g.name.trim() && !g.on){ g.autoOn = true; setOn(true); }
       else if(!g.name.trim() && g.autoOn){ g.autoOn = false; setOn(false); }
+      else saveNames();
     };
     box.appendChild(card);
   }
@@ -1963,7 +2016,7 @@ $("#runCull").onclick = async () => {
       `${why ? `<p class="whyline">Rejected: ${why}</p>` : ""}
        ${missed ? `<p class="whyline">Gemini could not check ${plural(missed, "photo", "photos")}; they are in Review.
          <button class="linkbtn" id="recheck">Check them again</button></p>` : ""}`;
-    $("#recheck")?.addEventListener("click", () => startIndex(false));
+    $("#recheck")?.addEventListener("click", () => { msg($("#cullMsg"), ""); startIndex(false); });
     $("#alsoRejectedBox").hidden = false;
     renderCull();
   }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
@@ -2052,7 +2105,7 @@ function fillExport(){
   const copies = gs.reduce((n, g) => n + g.file_ids.length, 0);
   $("#xlist").insertAdjacentHTML("beforeend", copies > total
     ? `<li class="note">${plural(total, "photo", "photos")} in several folders: ${copies.toLocaleString("en")} copies in all.</li>` : "");
-  $("#xGo").textContent = `Export ${plural(total, "photo", "photos")}`;
+  $("#xGo").textContent = copies > total ? `Export ${copies.toLocaleString("en")} copies` : `Export ${plural(total, "photo", "photos")}`;
   $("#xGo").disabled = !total;
 }
 $("#export").onclick = () => {

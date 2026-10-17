@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS ai_cache (        -- Gemini's judgement of one photo,
     key         TEXT PRIMARY KEY,            -- through rescans: Drive id + checksum
     ai          TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS names (           -- the names a user gave people in an album
+    user        TEXT NOT NULL,
+    folder_id   TEXT NOT NULL,
+    data        TEXT NOT NULL,               -- JSON [{name, files:[file_id, ...]}]
+    PRIMARY KEY (user, folder_id)
+);
 CREATE TABLE IF NOT EXISTS recent (          -- the albums each user opened
     user        TEXT NOT NULL,               -- a hash of the account's email
     folder_id   TEXT NOT NULL,
@@ -261,6 +267,18 @@ def face_box(folder_id: str, file_id: str, face_idx: int):
     if r is None:
         return None
     return json.loads(r["bbox"] or "[]"), ((r["w"], r["h"]) if r["w"] else None)
+
+
+def save_names(user: str, folder_id: str, people: list):
+    c = conn()
+    c.execute("INSERT OR REPLACE INTO names (user, folder_id, data) VALUES (?,?,?)",
+              (user, folder_id, json.dumps(people, ensure_ascii=False)))
+    c.commit()
+
+
+def load_names(user: str, folder_id: str) -> list:
+    r = conn().execute("SELECT data FROM names WHERE user=? AND folder_id=?", (user, folder_id)).fetchone()
+    return json.loads(r["data"]) if r else []
 
 
 def remember_album(user: str, folder_id: str):
