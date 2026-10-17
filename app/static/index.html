@@ -153,6 +153,9 @@ main{padding:28px var(--pad) 140px}
 .openbox .field{flex:1;min-width:0}
 
 /* choosing photos before a scan */
+.backlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-10px 0 4px;padding:0 10px 0 2px;border:0;
+     background:transparent;color:var(--muted);font-size:14px;font-weight:600;border-radius:10px}
+.backlink:hover{color:var(--ink);background:var(--page)}
 .choose{max-width:960px}
 .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .opt{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1.5px solid var(--line-strong);border-radius:var(--r-card);cursor:pointer}
@@ -583,6 +586,7 @@ dialog.done h2{font-size:26px}
 
   <!-- 2a. before a scan: which photos to check -->
   <section class="choose" id="chooseCard" hidden aria-labelledby="chooseTitle">
+    <button type="button" class="backlink" id="chooseBack">← Back</button>
     <div class="mhead">
       <div class="mtitle"><h2 id="chooseTitle">Which photos should we check?</h2>
         <p class="sub" id="chooseSub">Faces are found and Gemini checks each photo once. You can add more later.</p></div>
@@ -965,7 +969,7 @@ $("#openAlbum").onclick = async () => {
       state.roster.forEach(p=>p.urls.forEach(u=>URL.revokeObjectURL(u)));
       state.roster=[];addPerson();state.sortDefs=[];renderGroupRows();
       state.showSingles=false;state.open=null;$('#dlg').close();$('#dest').value='';
-      $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode('people');
+      $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode(state.wantMode||'people');state.wantMode=null;
     }
     state.folderId = a.folder_id; state.albumName = a.name;
     showAlbum(a.name, "Opening…");
@@ -976,7 +980,7 @@ $("#openAlbum").onclick = async () => {
     // Never scanned: ask which photos first. Otherwise show where it is
     // (ready, still scanning, or stopped with its Use / Resume buttons).
     if(st.status === "pending" && !st.done) await showChooser(false);
-    else pollStatus();
+    else { nav("album"); pollStatus(); }
   }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
 };
 $("#album").addEventListener("keydown", e => { if(e.key === "Enter") $("#openAlbum").click(); });
@@ -1003,6 +1007,8 @@ async function showChooser(adding){
   $("#hero").hidden = true; $("#scanCard").hidden = true; lockWork(true); updateBar();
   card.hidden = false;
   $("#chooseTitle").textContent = adding ? "Choose more photos to check" : "Which photos should we check?";
+  $("#chooseBack").textContent = adding ? "← Back to the album" : "← Back to the start";
+  nav("choose");
   $("#chooseSum").textContent = "Reading the album…"; $("#chooseGo").disabled = true;
   let files;
   try { files = (await api(`/api/album/${encodeURIComponent(state.folderId)}/files`)).files; }
@@ -1071,12 +1077,17 @@ function drawPicks(){
 }
 $("#pickAll").onclick = () => { state.choose.picked = new Set(state.choose.todo.map(f => f.id)); drawPicks(); chooseSummary(); };
 $("#pickNone").onclick = () => { state.choose.picked = new Set(); drawPicks(); chooseSummary(); };
-$("#chooseCancel").onclick = () => {
+// Leaving the chooser: back to the album when adding to it, else to the start.
+function leaveChooser(){
+  // the chooser has its own history entry: going back is just Back
+  if(!popping && state.choosePushed){ state.choosePushed = false; history.back(); return; }
   $("#chooseCard").hidden = true;
-  if(state.choose?.adding) pollStatus(); else goHome();
-};
+  if(state.choose?.adding){ nav("album"); pollStatus(); } else goHome();
+}
+$("#chooseCancel").onclick = $("#chooseBack").onclick = leaveChooser;
 $("#chooseGo").onclick = async () => {
   const ids = chosenIds();
+  nav("album", true);      // the scan takes the chooser's place in history
   try { await startIndex(false, ids ? {file_ids:ids} : {all:true}); }
   catch(e){ $("#chooseSum").textContent = e.message; }
 };
@@ -1122,7 +1133,7 @@ function pollStatus(){
         $('#resumeScan').textContent='Resume scan';return;
       }
       if(s.status==='ready'){
-        state.ready=true;lockWork(false);$('#scanCard').hidden=true;
+        state.ready=true;lockWork(false);$('#scanCard').hidden=true;nav('album');
         showAlbum(state.albumName||s.name,`${n(done)} photos`);
         // anything left over can be retried from the album menu
         const retry=$('#menuRetry');retry.replaceChildren();
@@ -1178,6 +1189,7 @@ $('#menuMore').onclick=()=>showChooser(true);
 // Back to the start screen to paste another link. A scan that is still
 // running carries on in the background; reopening its album shows it.
 function goHome(){
+  nav("home");
   clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
   state.ready=false;lockWork(true);
   $('#scanCard').hidden=true;$('#chooseCard').hidden=true;$('#doneCard').close();showAlbum(null);
@@ -1187,11 +1199,46 @@ function goHome(){
   window.scrollTo({top:0});
 }
 
+// ---- browser history ----
+// Each screen gets an address: the start page, an album (with its tab), and
+// the photo chooser. Back and Forward move between them, and a reload opens
+// the same album again, instead of Back jumping out to Google sign-in.
+let popping = false;
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  return {a:q.get("a"), t:q.get("t"), choose:q.has("choose")};
+}
+function nav(view, replace = false){
+  if(popping) return;
+  let h = "";
+  if(view === "album" && state.folderId) h = `#a=${encodeURIComponent(state.folderId)}&t=${state.mode}`;
+  else if(view === "choose" && state.folderId) h = `#a=${encodeURIComponent(state.folderId)}&choose`;
+  if(location.hash === h || (!h && !location.hash)) return;
+  const cur = readHash(), next = new URLSearchParams(h.slice(1));
+  // switching tabs, or the same album's scan finishing, replaces the entry
+  const same = cur.a && cur.a === next.get("a") && !cur.choose && !next.has("choose");
+  history[same || replace ? "replaceState" : "pushState"](null, "", h || location.pathname);
+  state.choosePushed = view === "choose" && !same && !replace;
+}
+window.addEventListener("popstate", () => {
+  const h = readHash();
+  popping = true;
+  try{
+    if(!h.a){ if($("#hero").hidden) goHome(); return; }
+    if(h.choose){ if(state.folderId === h.a && state.ready) showChooser(true); return; }
+    if(!$("#chooseCard").hidden){ leaveChooser(); return; }
+    if(state.folderId !== h.a || (!state.ready && $("#scanCard").hidden)){
+      state.wantMode = MODES[h.t] ? h.t : null; $("#album").value = h.a; $("#openAlbum").click(); return; }
+    if(h.t && MODES[h.t] && h.t !== state.mode) setMode(h.t);
+  } finally { popping = false; }
+});
+
 // ---- mode switch ----
 const MODES = {people:"#tabPeople", everyone:"#tabEveryone", sort:"#tabSort", cull:"#tabCull"};
 function setMode(mode){
   if(mode !== "cull") closeSide();
   state.mode = mode;
+  if(state.ready) nav("album");
   for(const [m, tab] of Object.entries(MODES)){
     $(tab).setAttribute("aria-selected", m === mode);
     $(tab).tabIndex = m === mode ? 0 : -1;
@@ -1958,7 +2005,13 @@ window.addEventListener('beforeunload',e=>{if(state.exporting||state.uiBusy){e.p
 
 setMode(state.mode);
 addPerson();
-refreshMe().catch(e => msg($("#setupWarn"), esc("Cannot connect. Reload to try again. " + e.message), "err"));
+refreshMe().then(() => {
+  const h = readHash();
+  if(state.signedIn && h.a){
+    state.wantMode = MODES[h.t] ? h.t : null;
+    $("#album").value = h.a; $("#openAlbum").click();
+  }
+}).catch(e => msg($("#setupWarn"), esc("Cannot connect. Reload to try again. " + e.message), "err"));
 </script>
 </body>
 </html>
