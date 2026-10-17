@@ -506,8 +506,8 @@ dialog.done h2{font-size:26px}
   </div>
 
   <nav class="tabs" role="tablist" aria-label="What to do with the album" id="tabs" hidden>
-    <button role="tab" id="tabPeople" aria-selected="true">Find people</button>
-    <button role="tab" id="tabEveryone" aria-selected="false">Everyone</button>
+    <button role="tab" id="tabEveryone" aria-selected="true">Everyone</button>
+    <button role="tab" id="tabPeople" aria-selected="false">Find people</button>
     <button role="tab" id="tabSort" aria-selected="false" data-ai>Sort</button>
     <button role="tab" id="tabCull" aria-selected="false" data-ai>Cull photos</button>
   </nav>
@@ -617,7 +617,7 @@ dialog.done h2{font-size:26px}
          then the work. The heading's top edge and left edge never move. -->
 
     <!-- mode: find people -->
-    <div id="modePeople">
+    <div id="modePeople" hidden>
       <section class="mode">
         <div class="mhead">
           <div class="mtitle"><h2>Find your photos</h2><p class="sub">Add a clear photo of each person.</p></div>
@@ -643,7 +643,7 @@ dialog.done h2{font-size:26px}
     </div>
 
     <!-- mode: everyone -->
-    <div id="modeEveryone" hidden>
+    <div id="modeEveryone">
       <section class="mode">
         <div class="mhead">
           <div class="mtitle"><h2>Choose people</h2><p class="sub">Select people and name their folders.</p></div>
@@ -797,7 +797,7 @@ const ARROW_R = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" ari
 const FOLDER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 
 const state = {
-  signedIn:false, gemini:false, folderId:null, albumName:"", ready:false, mode:"people", thr:0.38,
+  signedIn:false, gemini:false, folderId:null, albumName:"", ready:false, mode:"everyone", thr:0.38,
   roster:[],        // people the user described: {id, name, files, urls}
   results:[],       // one group per searched person
   crowd:null,       // one group per face cluster, when "everyone" was loaded
@@ -969,7 +969,7 @@ $("#openAlbum").onclick = async () => {
       state.roster.forEach(p=>p.urls.forEach(u=>URL.revokeObjectURL(u)));
       state.roster=[];addPerson();state.sortDefs=[];renderGroupRows();
       state.showSingles=false;state.open=null;$('#dlg').close();$('#dest').value='';
-      $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode(state.wantMode||'people');state.wantMode=null;
+      $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode(state.wantMode||'everyone');state.wantMode=null;
     }
     state.folderId = a.folder_id; state.albumName = a.name;
     showAlbum(a.name, "Opening…");
@@ -1234,7 +1234,7 @@ window.addEventListener("popstate", () => {
 });
 
 // ---- mode switch ----
-const MODES = {people:"#tabPeople", everyone:"#tabEveryone", sort:"#tabSort", cull:"#tabCull"};
+const MODES = {everyone:"#tabEveryone", people:"#tabPeople", sort:"#tabSort", cull:"#tabCull"};
 function setMode(mode){
   if(mode !== "cull") closeSide();
   state.mode = mode;
