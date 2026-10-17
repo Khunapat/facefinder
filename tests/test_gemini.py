@@ -220,6 +220,15 @@ def main_test():
     r = c.get("/api/export/no-such-job")
     check("a lost export says how to finish it", r.status_code == 404 and "Export again" in r.json()["detail"], r.text)
 
+    print("Folders this account cannot open")
+    r = c.post("/api/album", json={"folder": "https://drive.google.com/drive/folders/private-folder-00000000000000"})
+    d = r.json().get("detail") or {}
+    check("a private folder is refused with a reason the page can explain",
+          r.status_code == 403 and isinstance(d, dict) and d.get("code") == "no_access"
+          and d.get("folder_id") == "private-folder-00000000000000" and "email" in d, r.text)
+    r = c.post("/api/album", json={"folder": "https://drive.google.com/drive/folders/drive-down-000000000000000"})
+    check("Drive not answering is not mistaken for no access", r.status_code == 503 and "Try again" in r.json()["detail"], r.text)
+
     print("Access and retries")
     r = c.post("/api/export", json={"folder_id": fid, "groups": [{"name": "x", "file_ids": ["not-in-album"]}]})
     check("export refuses photos from outside the album", r.status_code == 400, r.status_code)

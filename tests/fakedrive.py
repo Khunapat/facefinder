@@ -69,7 +69,10 @@ class FakeDrive:
         if folder_id in self.folders:
             f = self.folders[folder_id]
             return {"id": f["id"], "name": f["name"], "mimeType": gd.FOLDER_MIME}
-        raise FileNotFoundError(folder_id)
+        if folder_id.startswith("drive-down"):
+            raise HttpError(httplib2.Response({"status": 503}), b"backend error")
+        # what Drive says for a private folder this account may not see
+        raise HttpError(httplib2.Response({"status": 404}), b"File not found")
 
     def list_images(self, svc, folder_id, recursive=True):
         return [{"id": n, "name": n, "mimeType": "image/jpeg",

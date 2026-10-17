@@ -92,7 +92,12 @@ def _need_album(request: Request, folder_id: str):
         meta = gd.folder_meta(gd.service(creds), folder_id)
     except HttpError as exc:
         if exc.resp.status in (401, 403, 404):
-            raise HTTPException(403, "Album access is no longer available. Reopen it with an authorised account.") from exc
+            raise HTTPException(403, {
+                "code": "no_access", "removed": True,
+                "message": "You no longer have access to this album in Google Drive.",
+                "email": (request.session.get("user") or {}).get("emailAddress", ""),
+                "folder_id": folder_id,
+            }) from exc
         raise HTTPException(503, "Cannot verify album access. Try again.") from exc
     if meta.get("mimeType") != gd.FOLDER_MIME:
         raise HTTPException(403, "Album access is no longer available")
@@ -112,7 +117,9 @@ def _job_owner(request: Request):
 def login(request: Request):
     flow = _flow()
     url, state = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true", prompt="consent"
+        # select_account: someone whose album lives on another Google account
+        # can pick that account instead of being signed straight back in
+        access_type="offline", include_granted_scopes="true", prompt="consent select_account"
     )
     request.session["oauth_state"] = state
     # google-auth-oauthlib turns on PKCE by default: authorization_url() above
@@ -217,10 +224,22 @@ async def open_album(request: Request):
     svc = gd.service(creds)
     try:
         meta = gd.folder_meta(svc, folder_id)
+    except HttpError as e:
+        status = e.resp.status
+        if status in (403, 404):
+            # Drive answers "not found" for a folder this account may not see,
+            # so the page explains sharing instead of just failing.
+            raise HTTPException(403, {
+                "code": "no_access",
+                "message": "This Google account cannot open that folder.",
+                "email": (request.session.get("user") or {}).get("emailAddress", ""),
+                "folder_id": folder_id,
+            }) from e
+        if status == 401:
+            raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from e
+        raise HTTPException(503, "Google Drive did not answer. Try again in a minute.") from e
     except Exception as e:
-        raise HTTPException(
-            404, "Cannot open that folder. Check it is shared with your account."
-        ) from e
+        raise HTTPException(503, "Google Drive did not answer. Try again in a minute.") from e
     if meta["mimeType"] != gd.FOLDER_MIME:
         raise HTTPException(400, "That link points at a file, not a folder")
     row = store.album(folder_id)

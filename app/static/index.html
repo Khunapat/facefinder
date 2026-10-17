@@ -226,6 +226,14 @@ main{padding:28px var(--pad) 140px}
 .msg.err{background:var(--error-bg);color:var(--error)}
 .msg.ok{background:var(--page);color:var(--ink)}
 .msg.info{background:#f6f6f9;color:var(--muted)}
+.msg.access{background:#fff;color:var(--ink);border:1px solid var(--line);padding:18px 20px;text-align:left}
+.msg.access h3{font-size:17px;margin:0 0 6px;color:var(--error)}
+.msg.access p{margin:6px 0}
+.msg.access ol{margin:8px 0 0;padding-left:22px;display:grid;gap:12px}
+.msg.access li b{display:block}
+.msg.access .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.msg.access .why{color:var(--muted);font-size:14px}
+.msg.access a.btn{text-decoration:none;color:#fff}
 
 /* ---------------------------------------------------- find people */
 .roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
@@ -816,6 +824,38 @@ const state = {
 function msg(el, html, kind="info"){
   el.innerHTML = html ? `<div class="msg ${kind}">${html}</div>` : "";
 }
+// This account cannot open the folder: say why and what to do, on the start page.
+function showNoAccess(info, link, removed){
+  const email = info?.email || "this Google account";
+  const id = info?.folder_id || "";
+  const url = /^https?:/.test(link || "") ? link : `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+  $("#album").value = link || id;
+  const ask = `Hi! Could you share this Google Drive folder with me (${info?.email || "my Google account"}) as Viewer, ` +
+    `or set General access to "Anyone with the link"? ${url}\nI want to sort the photos with FaceFinder. ` +
+    `It only reads the photos; it never changes, moves or deletes them.`;
+  $("#albumMsg").innerHTML = `<div class="msg access" role="alert">
+    <h3>${removed ? "You no longer have access to this folder" : "This account can't open that folder"}</h3>
+    <p>You are signed in as <b>${esc(email)}</b>, and Google Drive does not let this account open the folder.</p>
+    <p class="why">Why: the folder is private, or it is shared only with other Google accounts. FaceFinder can only
+      see what your Google account can see in Drive, and it never changes who a folder is shared with.</p>
+    <ol>
+      <li><b>Ask the owner for access</b>Open the folder in Drive and press "Request access"; Google emails the owner.
+        <span class="row"><a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">Open in Drive</a>
+        <button class="btn ghost sm" type="button" id="naCopy">Copy a message for the owner</button></span></li>
+      <li><b>If you own the folder: share it</b>In Drive, right-click the folder, choose Share, then under
+        "General access" pick "Anyone with the link" (Viewer). Or add ${esc(info?.email || "the account")} as a Viewer.
+        <span class="row"><button class="btn ghost sm" type="button" id="naRetry">I shared it, try again</button></span></li>
+      <li><b>Signed in with the wrong account?</b>The folder may belong to your other Google account.
+        <span class="row"><button class="btn ghost sm" type="button" id="naSwitch">Use another Google account</button></span></li>
+    </ol></div>`;
+  $("#naRetry").onclick = () => $("#openAlbum").click();
+  $("#naSwitch").onclick = async () => { try { await api("/api/logout", {method:"POST"}); } catch(e){} location.href = "/oauth2/login"; };
+  $("#naCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(ask); }
+    catch(e){ const t = document.createElement("textarea"); t.value = ask; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); }
+    $("#naCopy").textContent = "Copied. Paste it to the owner";
+  };
+}
 // An error from the album menu or a scan start: shown where the user is now.
 function notice(text){
   const where = !$("#chooseCard").hidden ? $("#chooseSum") : !$("#hero").hidden ? $("#albumMsg") : null;
@@ -826,7 +866,10 @@ function notice(text){
 async function api(url, opts={}){
   const r = await fetch(url, {credentials:"same-origin", ...opts});
   const body = await r.json().catch(()=>({}));
-  if(!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status});
+  if(!r.ok){
+    const d = body.detail, text = typeof d === "object" && d ? d.message : d;
+    throw Object.assign(new Error(text || r.statusText), {status:r.status, info:typeof d === "object" ? d : null});
+  }
   return body;
 }
 const postJSON = (url, data) => api(url, {
@@ -1021,6 +1064,12 @@ $("#openAlbum").onclick = async () => {
     if(st.status === "pending" && !st.done) await showChooser(false);
     else { nav("album"); pollStatus(); }
   }catch(e){
+    if(e.info?.code === "no_access"){
+      if(fromPop) history.replaceState(null, "", location.pathname);
+      if($("#hero").hidden) goHome();
+      showNoAccess(e.info, v);
+      return;
+    }
     if(!fromPop) notice(e.message);
     else {      // Back/Forward to an album that cannot open: the start page, with the reason
       history.replaceState(null, "", location.pathname);
@@ -1211,7 +1260,9 @@ function pollStatus(){
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();updateBar();return;
       }
     }catch(e){
-      if(!alive())return;failures++;
+      if(!alive())return;
+      if(e.info?.code === "no_access"){ goHome(); showNoAccess(e.info, "", true); return; }
+      failures++;
       $('#pstat').textContent='Connection interrupted. Retrying…';
       if(failures>=3){$('#pstat').textContent='Cannot reconnect. Try again when your connection is back.';
         scanButtons('stopped');$('#resumeScan').textContent='Retry';return;}
