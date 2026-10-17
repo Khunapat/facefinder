@@ -44,12 +44,21 @@ instead. Paste a Drive folder link to put the person folders inside a folder you
 already have — see `DRIVE_ACCESS` below, because Google only allows that with
 the wider permission.
 
-### There is no LLM and no AI API key involved
+### Who is in a photo: a face model, not Gemini
 
 Face recognition is not a language-model job. It uses **InsightFace buffalo_l**
-(an ArcFace model) running locally in the container through ONNX Runtime. It is
-free, needs no account, and has no token limit. Asking Gemini "is this the same
-person?" would be slower, more expensive, and *less* accurate.
+(an ArcFace model) running locally in the container through ONNX Runtime. It
+costs nothing per photo and has no token limit. Asking Gemini "is this the same
+person?" would be slower, more expensive, and *less* accurate. Gemini does the
+jobs a face model cannot: judging photo quality for culling, describing photos
+for search and sorting, and suggesting folders.
+
+**Model licence.** The `insightface` Python library is MIT-licensed, but its
+pretrained model packs, buffalo_l included, are released by the InsightFace
+project for non-commercial research use only. FaceFinder uses them as a
+non-commercial competition prototype. A commercial release would need a
+commercial licence from InsightFace or a face model with a commercial licence;
+only `app/faces.py` would change.
 
 Measured on the bundled sample photos (`python -m tests.test_matching`):
 

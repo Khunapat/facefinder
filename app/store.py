@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS faces (
     PRIMARY KEY (folder_id, file_id, face_idx)
 );
 CREATE INDEX IF NOT EXISTS faces_folder ON faces(folder_id);
+CREATE TABLE IF NOT EXISTS ai_cache (        -- Gemini's judgement of one photo, kept
+    key         TEXT PRIMARY KEY,            -- through rescans: Drive id + checksum
+    ai          TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS recent (          -- the albums each user opened
     user        TEXT NOT NULL,               -- a hash of the account's email
     folder_id   TEXT NOT NULL,
@@ -181,6 +185,20 @@ def save_ai(folder_id: str, file_id: str, judgement: dict):
         (json.dumps(judgement, ensure_ascii=False), folder_id, file_id),
     )
     c.commit()
+
+
+def cache_ai(key: str, judgement: dict):
+    """Keep Gemini's judgement of a photo apart from the album, so a rescan
+    (which clears the album) does not pay Gemini again for the same photo."""
+    c = conn()
+    c.execute("INSERT OR REPLACE INTO ai_cache (key, ai) VALUES (?,?)",
+              (key, json.dumps(judgement, ensure_ascii=False)))
+    c.commit()
+
+
+def cached_ai(key: str):
+    r = conn().execute("SELECT ai FROM ai_cache WHERE key=?", (key,)).fetchone()
+    return json.loads(r["ai"]) if r else None
 
 
 def photos(folder_id: str) -> list:

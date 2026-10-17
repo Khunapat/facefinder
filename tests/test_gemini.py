@@ -193,6 +193,33 @@ def main_test():
     check("opening it again puts it back", any(a["folder_id"] == fid for a in c.get("/api/albums/recent").json()["albums"]))
     check("signed out, there is no list", TestClient(main.app).get("/api/albums/recent").status_code == 401)
 
+    print("Rescans and restarts")
+    calls = []
+    real_judge = main.gemini.judge
+
+    def counted(jpeg):
+        calls.append(1)
+        return real_judge(jpeg)
+    main.gemini.judge = counted
+    try:
+        c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    finally:
+        main.gemini.judge = real_judge
+    check("a rescan from the start keeps Gemini's notes and pays for none again",
+          not calls and st["judged"] == st["done"] == 7, (len(calls), st.get("judged"), st.get("done")))
+    main.store.set_album(fid, status="indexing")
+    check("a scan that is still alive is not called stopped",
+          c.get("/api/album/%s/status" % fid).json()["status"] == "indexing")
+    main.store.conn().execute("UPDATE albums SET updated_at=? WHERE folder_id=?", (time.time() - 300, fid))
+    main.store.conn().commit()
+    st = c.get("/api/album/%s/status" % fid).json()
+    check("a scan left behind by a restarted server shows as stopped, ready to resume",
+          st["status"] == "stopped" and "interrupted" in st["message"], st)
+    main.store.set_album(fid, status="ready")
+    r = c.get("/api/export/no-such-job")
+    check("a lost export says how to finish it", r.status_code == 404 and "Export again" in r.json()["detail"], r.text)
+
     print("Access and retries")
     r = c.post("/api/export", json={"folder_id": fid, "groups": [{"name": "x", "file_ids": ["not-in-album"]}]})
     check("export refuses photos from outside the album", r.status_code == 400, r.status_code)

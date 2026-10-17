@@ -100,6 +100,18 @@ other jobs (section 7.1), not to replace the matching.
 
 ## 5. Where things stand
 
+**Update, 17 October 2026.** Most of what follows in this section is history.
+Now: the app runs on Cloud Run (one instance, Firestore store) behind Firebase
+Hosting, deployed with `CPU=4 bash scripts/deploy-cloudrun.sh` from Cloud Shell.
+Work is on `claude/eloquent-feynman-0cbszg`, not yet merged to `main`.
+Recent fixes: refused scan starts keep the screen as it was; Back/Forward close
+dialogs and always match the address; unticked Keep photos go to "Rejected";
+Gemini notes cannot land on the wrong photo; Gemini results are cached per
+photo (Drive id + checksum) so a rescan pays nothing again; a scan killed by a
+restart shows as stopped with Resume (the worker touches its row every 20 s).
+Open: the OAuth app must be published (not Testing) so judges with any Google
+account can sign in; it will show Google's "unverified app" warning.
+
 **Code:** `main` on GitHub has the two-mode app described above, merged with the
 Codespaces fixes. Last commit before this brief: `8b7f6f7`.
 
@@ -348,7 +360,8 @@ it is `limited`.
 
 - Online only; the owner does not want to run anything on his own PC.
 - No LLM for face matching.
-- The OAuth app stays in Testing mode with test users; no Google verification.
+- No Google verification. The OAuth app is published (In production) so judges
+  can sign in; they see the "unverified app" warning and click through.
 - The pink direction and the camera mascot are chosen.
 - Theme: Media, Content & Digital Experiences.
 - Imagen, Veo and BigQuery are not being added just to tick boxes.

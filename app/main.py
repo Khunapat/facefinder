@@ -36,7 +36,7 @@ _jobs_lock = threading.Lock()
 _exports = {}       # job_id -> progress dict, read by the page while it runs
 _mat_cache = {}     # folder_id -> (stamp, matrix, meta)
 _people_cache = {}  # (folder_id, faces, threshold) -> grouped people
-_face_cache = {}    # (folder_id, file_id, face_idx) -> small JPEG, memory only
+_face_cache = {}    # (access token, folder_id, file_id, face_idx) -> small JPEG, memory only
 _thumb_meta = {}    # (access token, file_id) -> (time, Drive metadata), ten minutes
 _sorts = {}         # job_id -> sort-by-description progress and result
 
@@ -185,7 +185,7 @@ def recent_albums(request: Request):
     user = _user_key(request)
     out = []
     for folder_id, opened_at in (store.recent_albums(user, 6) if user else []):
-        row = store.album(folder_id)
+        row = _settled(folder_id, store.album(folder_id))
         if row is None:
             continue
         row = dict(row)
@@ -243,13 +243,23 @@ async def open_album(request: Request):
     }
 
 
-def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
+def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved_ai: dict = None):
     """Walk the album once: cache an embedding for every face found, a burst
     fingerprint for every photo and, when Gemini is on, its judgement of the
     photo. Photos scanned before Gemini was switched on get judged too.
     Setting `stop` ends it early; what is already scanned is kept, and opening
     the album again carries on from there."""
     gem = None
+    alive = threading.Event()
+
+    def heartbeat():            # lets a status check tell a slow scan from a dead one
+        while not alive.wait(20):
+            try:
+                store.set_album(folder_id)
+            except Exception:
+                pass
+
+    threading.Thread(target=heartbeat, daemon=True).start()
     try:
         creds = gd.creds_from_session(creds_data)
         svc = gd.service(creds)
@@ -260,6 +270,12 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
             files = [f for f in files if f["id"] in scope]
         already = store.indexed_file_ids(folder_id)
         todo = [f for f in files if f["id"] not in already]
+        for f in files:                 # notes kept from before a rescan
+            if saved_ai and f["id"] in saved_ai:
+                try:
+                    store.cache_ai("%s:%s" % (f["id"], f.get("md5Checksum") or ""), saved_ai[f["id"]])
+                except Exception:
+                    pass
         store.set_album(
             folder_id,
             status="indexing",
@@ -275,11 +291,27 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
         if gemini.enabled():
             gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
 
-        def judge(file_id, data):
+        def ai_key(meta):
+            return "%s:%s" % (meta["id"], meta.get("md5Checksum") or "")
+
+        def from_cache(meta):
+            """Gemini's notes from an earlier scan of the same photo, if any."""
+            try:
+                cached = store.cached_ai(ai_key(meta))
+                if cached:
+                    store.save_ai(folder_id, meta["id"], cached)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        def judge(meta, data):
             if stop.is_set():
                 return
             try:
-                store.save_ai(folder_id, file_id, gemini.judge(gemini.shrink(data)))
+                result = gemini.judge(gemini.shrink(data))
+                store.save_ai(folder_id, meta["id"], result)
+                store.cache_ai(ai_key(meta), result)
             except Exception:
                 pass            # left unjudged; the next scan retries it
 
@@ -304,17 +336,17 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
             store.save_photo(folder_id, meta["id"], meta["name"], found, size,
                              curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
-            if gem:
-                gem.submit(judge, meta["id"], data)
+            if gem and not from_cache(meta):
+                gem.submit(judge, meta, data)
 
         def rejudge(meta):
-            if stop.is_set():
+            if stop.is_set() or from_cache(meta):
                 return
             try:
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
             except Exception:
                 return
-            gem.submit(judge, meta["id"], data)
+            gem.submit(judge, meta, data)
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))
@@ -342,6 +374,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event):
     except Exception as e:
         store.set_album(folder_id, status="error", message=str(e)[:300])
     finally:
+        alive.set()
         if gem:
             gem.shutdown(wait=False, cancel_futures=True)
         with _jobs_lock:
@@ -370,7 +403,10 @@ async def start_index(request: Request):
             # a rescan starts from nothing, so it keeps only what is picked now
             kept = set() if body.get("rebuild") else store.indexed_file_ids(folder_id) | (scope or set())
             scope = picked | kept
+        saved_ai = None
         if body.get("rebuild"):
+            # Gemini's notes are kept, so the rescan does not pay for them again
+            saved_ai = {p["file_id"]: p["ai"] for p in store.photos(folder_id) if p.get("ai")}
             store.clear_album(folder_id)
             if old is not None:
                 store.set_album(folder_id, name=old["name"], status="pending")
@@ -379,7 +415,7 @@ async def start_index(request: Request):
                 if key[0] == folder_id:
                     _people_cache.pop(key, None)
             for key in list(_face_cache):
-                if key[0] == folder_id:
+                if key[1] == folder_id:
                     _face_cache.pop(key, None)
         # Say so before the thread starts, so a status poll right after this
         # never sees the previous scan's "ready".
@@ -388,13 +424,31 @@ async def start_index(request: Request):
         stop = threading.Event()
         t = threading.Thread(
             target=_index_worker,
-            args=(folder_id, request.session["creds"], stop),
+            args=(folder_id, request.session["creds"], stop, saved_ai),
             daemon=True,
         )
         t.stop = stop
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
+
+
+def _settled(folder_id: str, row):
+    """A scan marked as running but with no thread here, and no sign of life
+    for a while, died with its server (a restart or a new deploy; Cloud Run runs
+    one instance). Say it stopped, so the page offers Resume instead of waiting
+    forever. A live scan touches its row every 20 seconds."""
+    if row is None or row["status"] != "indexing":
+        return row
+    with _jobs_lock:
+        if folder_id in _jobs:
+            return row
+    if time.time() - (dict(row).get("updated_at") or 0) < 90:
+        return row
+    store.set_album(folder_id, status="stopped", message=(
+        "The scan was interrupted (the server restarted). Photos already scanned "
+        "are kept; resume to carry on."))
+    return store.album(folder_id)
 
 
 def _scope(row):
@@ -455,7 +509,7 @@ def stop_index(request: Request, body: dict = Body(...)):
 @app.get("/api/album/{folder_id}/status")
 def album_status(request: Request, folder_id: str):
     _need_album(request, folder_id)
-    row = store.album(folder_id)
+    row = _settled(folder_id, store.album(folder_id))
     if row is None:
         raise HTTPException(404, "Unknown album")
     out = dict(row)
@@ -570,7 +624,8 @@ def face(request: Request, folder_id: str, file_id: str, face_idx: int):
     """A small crop of one face, so a person can be recognised and named."""
     creds = _creds(request)
     _need_album(request, folder_id)
-    key = (folder_id, file_id, face_idx)
+    # per sign-in: a crop is only reused for someone Drive already let see the photo
+    key = (creds.token, folder_id, file_id, face_idx)
     data = _face_cache.get(key)
     if data is None:
         box = store.face_box(folder_id, file_id, face_idx)
@@ -790,9 +845,9 @@ def sort_album(request: Request, body: dict = Body(...)):
 def sort_status(request: Request, job_id: str):
     job = _sorts.get(job_id)
     if job is None:
-        raise HTTPException(404, "Unknown sort")
+        raise HTTPException(404, "This sort was interrupted (the server restarted). Run it again.")
     if job.get("owner") != _job_owner(request):
-        raise HTTPException(404, "Unknown sort")
+        raise HTTPException(404, "This sort was interrupted (the server restarted). Run it again.")
     _need_album(request, job["folder_id"])
     with job["lock"]:
         return {k: v for k, v in job.items() if k not in ("lock", "owner")}
@@ -963,7 +1018,8 @@ def export(request: Request, body: dict = Body(...)):
 def export_status(request: Request, job_id: str):
     job = _exports.get(job_id)
     if job is None or job.get("owner") != _job_owner(request):
-        raise HTTPException(404, "Unknown export")
+        raise HTTPException(404, "This export was interrupted (the server restarted). Export again: "
+                                 "photos already copied are skipped, so nothing is copied twice.")
     _need_album(request, job["folder_id"])
     out = {k: v for k, v in job.items() if k not in ("people", "failed", "owner")}
     out["failed"] = len(job["failed"])

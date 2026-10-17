@@ -505,7 +505,7 @@ dialog.done h2{font-size:26px}
           <span><b>Open another album</b><small>This one stays saved on the start page</small></span></button>
         <div class="msep" id="menuRescanSep"></div>
         <button type="button" class="mi danger" id="menuRescan"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6L20 8.7M20 4v4.7h-4.7"/></svg></span>
-          <span><b>Rescan from the start</b><small>Checks the same photos again; clears their results</small></span></button>
+          <span><b>Rescan from the start</b><small>Finds the faces again; keeps Gemini's notes</small></span></button>
       </div>
     </div>
   </div>
@@ -538,6 +538,7 @@ dialog.done h2{font-size:26px}
 
 <main>
   <div id="setupWarn"></div>
+  <div id="appMsg" role="alert"></div>
 
   <!-- 1. start -->
   <div id="hero">
@@ -815,10 +816,17 @@ const state = {
 function msg(el, html, kind="info"){
   el.innerHTML = html ? `<div class="msg ${kind}">${html}</div>` : "";
 }
+// An error from the album menu or a scan start: shown where the user is now.
+function notice(text){
+  const where = !$("#chooseCard").hidden ? $("#chooseSum") : !$("#hero").hidden ? $("#albumMsg") : null;
+  if(where === $("#chooseSum")) { where.textContent = text; return; }
+  if(where) { msg(where, esc(text), "err"); return; }
+  msg($("#appMsg"), `${esc(text)} <button class="linkbtn" type="button" onclick="msg($('#appMsg'),'')">Dismiss</button>`, "err");
+}
 async function api(url, opts={}){
   const r = await fetch(url, {credentials:"same-origin", ...opts});
   const body = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(body.detail || r.statusText);
+  if(!r.ok) throw Object.assign(new Error(body.detail || r.statusText), {status:r.status});
   return body;
 }
 const postJSON = (url, data) => api(url, {
@@ -829,7 +837,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function retrying(fn, tries = 5){
   for(let i = 1; ; i++){
     try { return await fn(); }
-    catch(e){ if(i >= tries) throw new Error("Lost the connection. The work carries on; check your Drive in a minute."); await sleep(1500 * i); }
+    catch(e){
+      if(e.status === 404) throw e;      // the server no longer knows the job (it restarted)
+      if(i >= tries) throw new Error("Lost the connection. The work carries on; check your Drive in a minute."); await sleep(1500 * i); }
   }
 }
 
@@ -882,8 +892,8 @@ $("#menuOther").onclick = () => { closeMenus(); goHome(); };
 $("#menuRescan").onclick = async () => {
   closeMenus();
   const k = (state.checkedCount || 0).toLocaleString("en");
-  if(!confirm(`Check these ${k} photos again from the start? This takes a while, clears their results and runs Gemini on them again.`))return;
-  try{ await startIndex(true); }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
+  if(!confirm(`Check these ${k} photos again from the start? Faces are found again and names you typed are cleared. Gemini's notes are kept, so this costs no extra Gemini calls.`))return;
+  await startIndex(true);
 };
 // The start screen remembers this account's albums (kept on the server, so
 // they survive signing out) and offers the sample album when there is one.
@@ -985,6 +995,7 @@ $("#auth").onclick = async () => {
 
 // ---- the album ----
 $("#openAlbum").onclick = async () => {
+  const fromPop = popping;   // opened by Back/Forward
   const v = $("#album").value.trim();
   if(!v) return;
   if(!state.signedIn)
@@ -1009,11 +1020,22 @@ $("#openAlbum").onclick = async () => {
     // (ready, still scanning, or stopped with its Use / Resume buttons).
     if(st.status === "pending" && !st.done) await showChooser(false);
     else { nav("album"); pollStatus(); }
-  }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
+  }catch(e){
+    if(!fromPop) notice(e.message);
+    else {      // Back/Forward to an album that cannot open: the start page, with the reason
+      history.replaceState(null, "", location.pathname);
+      if($("#hero").hidden) goHome();
+      msg($("#albumMsg"), esc(e.message), "err");
+    }
+  }
 };
 $("#album").addEventListener("keydown", e => { if(e.key === "Enter") $("#openAlbum").click(); });
 
 async function startIndex(rebuild, choice = {}){
+  // Ask first: if the server says no, the screen stays as it was.
+  try { await postJSON("/api/index", {folder_id:state.folderId, rebuild, ...choice}); }
+  catch(e){ notice(e.message); return false; }
+  msg($("#appMsg"), "");
   if(rebuild){try{sessionStorage.removeItem(NAMES_KEY());}catch(e){}}
   state.results=[];state.crowd=null;state.sorted=[];state.culled=null;state.open=null;
   $('#dlg').close();$('#strict').hidden=true;$('#alsoRejected').checked=false;
@@ -1021,8 +1043,8 @@ async function startIndex(rebuild, choice = {}){
   state.ready = false; lockWork(true); updateBar();
   state.stopping = false; scanButtons('running');
   $("#chooseCard").hidden = true;
-  await postJSON("/api/index", {folder_id:state.folderId, rebuild, ...choice});
   pollStatus();
+  return true;
 }
 
 // ---- before a scan: which photos to check ----
@@ -1119,9 +1141,10 @@ function leaveChooser(){
 $("#chooseCancel").onclick = $("#chooseBack").onclick = leaveChooser;
 $("#chooseGo").onclick = async () => {
   const ids = chosenIds();
-  nav("album", true);      // the scan takes the chooser's place in history
-  try { await startIndex(false, ids ? {file_ids:ids} : {all:true}); }
-  catch(e){ $("#chooseSum").textContent = e.message; }
+  $("#chooseGo").disabled = true;
+  const started = await startIndex(false, ids ? {file_ids:ids} : {all:true});
+  if(started) nav("album", true);      // the scan takes the chooser's place in history
+  else $("#chooseGo").disabled = false;
 };
 function pollStatus(){
   clearTimeout(state.poll);
@@ -1172,7 +1195,7 @@ function pollStatus(){
         const retry=$('#menuRetry');retry.replaceChildren();
         const add=(label,sub,fn)=>{const b=document.createElement('button');b.type='button';b.className='mi primary';
           b.innerHTML=`<span class="ico">${PLAY}</span><span><b>${esc(label)}</b><small>${esc(sub)}</small></span>`;
-          b.onclick=async()=>{closeMenus();try{await fn();}catch(e){msg($('#albumMsg'),esc(e.message),'err');}};retry.append(b);};
+          b.onclick=async()=>{closeMenus();try{await fn();}catch(e){notice(e.message);}};retry.append(b);};
         const mins=k=>{const m=Math.max(1,Math.round(k*SECONDS_PER_PHOTO()/60));return `about ${m} ${m===1?'minute':'minutes'}`;};
         // total: the photos chosen for the scan; whole: every photo in the album
         const whole=Math.max(total,Number(s.album_total)||0);
@@ -1229,8 +1252,7 @@ $('#menuMore').onclick=()=>showChooser(true);
 // running carries on in the background; reopening its album shows it.
 function goHome(){
   nav("home");
-  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg"]) document.querySelector(d)?.open && document.querySelector(d).close();
-  closeSide(); closeMenus();
+  closeOverlays(); msg($("#appMsg"), "");
   clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
   state.ready=false;lockWork(true);
   $('#scanCard').hidden=true;$('#chooseCard').hidden=true;$('#doneCard').close();showAlbum(null);
@@ -1261,16 +1283,21 @@ function nav(view, replace = false){
   history[same || replace ? "replaceState" : "pushState"](null, "", h || location.pathname);
   state.choosePushed = view === "choose" && !same && !replace;
 }
+function closeOverlays(){
+  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg", "#doneCard"]) document.querySelector(d)?.open && document.querySelector(d).close();
+  closeSide(); closeMenus();
+}
 window.addEventListener("popstate", () => {
   const h = readHash();
   popping = true;
   try{
+    closeOverlays();
     if(!h.a){ if($("#hero").hidden) goHome(); return; }
     if(h.choose){
       if(state.folderId === h.a && state.ready) showChooser(true);
       else { $("#album").value = h.a; $("#openAlbum").click(); }   // a new album opens on its chooser
       return; }
-    if(!$("#chooseCard").hidden){ leaveChooser(); return; }
+    if(!$("#chooseCard").hidden){ if(h.t && MODES[h.t] && h.a === state.folderId) setMode(h.t); leaveChooser(); return; }
     if(state.folderId !== h.a || (!state.ready && $("#scanCard").hidden)){
       state.wantMode = MODES[h.t] ? h.t : null; $("#album").value = h.a; $("#openAlbum").click(); return; }
     if(h.t && MODES[h.t] && h.t !== state.mode) setMode(h.t);
@@ -1351,12 +1378,13 @@ async function showNotes(el, id){
   el.hidden = true;
   if(!state.gemini) return;
   const key = state.folderId + "/" + id;
+  el.dataset.for = key;      // a slower answer for the photo before must not land here
   let n = notes.get(key);
   if(!n){
     try { n = await api(`/api/photo/${encodeURIComponent(state.folderId)}/${encodeURIComponent(id)}`); } catch(e){ return; }
     notes.set(key, n);
   }
-  if(!el.isConnected || !n.description) return;
+  if(!el.isConnected || el.dataset.for !== key || !n.description) return;
   const FL = {blurry:"blur", eyes_closed:"closed eyes", cut_off:"someone cut off", poor_exposure:"light",
               blocked:"something in the way", awkward_moment:"awkward moment", no_subject:"no clear subject"};
   el.innerHTML = `<b>What Gemini saw</b>${esc(n.description)}` +
@@ -1885,7 +1913,7 @@ $("#runCull").onclick = async () => {
        ${missed ? `<p class="whyline">Gemini could not check ${plural(missed, "photo", "photos")}; they are in Review.
          <button class="linkbtn" id="recheck">Check them again</button></p>` : ""}`;
     $("#recheck")?.addEventListener("click", () => startIndex(false));
-    $("#alsoRejectedBox").hidden = !(r.reject.length || r.review.length);
+    $("#alsoRejectedBox").hidden = false;
     renderCull();
   }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
   $("#runCull").disabled = false;
@@ -1934,8 +1962,7 @@ function exportGroups(){
     const {keep, review, reject} = state.culled;
     groups = [{name:"Keep", ids:picked(keep).concat(picked(review), picked(reject))}];
     if($("#alsoRejected").checked)
-      groups.push({name:"Rejected", ids:reject.all.concat(review.all).filter(m =>
-        (reject.removed.has(m.file_id) && reject.all.includes(m)) || (review.removed.has(m.file_id) && review.all.includes(m)))});
+      groups.push({name:"Rejected", ids:[keep, review, reject].flatMap(g => g.all.filter(m => g.removed.has(m.file_id)))});
   } else groups = [];
   const merged = new Map();     // same name, any case: one folder, each photo once
   for(const x of groups){
@@ -1970,8 +1997,7 @@ function fillExport(){
   $("#xlist").innerHTML = gs.map(g =>
     `<li>${FOLDER}<span>${esc(g.name)}</span><em>${plural(g.file_ids.length, "photo", "photos")}</em></li>`).join("");
   $("#destHint").textContent = `Leave it empty to make "FaceFinder - ${state.albumName || "album"}" in My Drive.`;
-  $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled &&
-    (state.culled.reject.all.length || state.culled.review.all.length));
+  $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled);
   const copies = gs.reduce((n, g) => n + g.file_ids.length, 0);
   $("#xlist").insertAdjacentHTML("beforeend", copies > total
     ? `<li class="note">${plural(total, "photo", "photos")} in several folders: ${copies.toLocaleString("en")} copies in all.</li>` : "");

@@ -105,7 +105,7 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
         while True:
             resp = svc.files().list(
                 q=f"'{current}' in parents and trashed=false",
-                fields="nextPageToken, files(id,name,mimeType,size,thumbnailLink,createdTime,imageMediaMetadata(width,time))",
+                fields="nextPageToken, files(id,name,mimeType,size,md5Checksum,thumbnailLink,createdTime,imageMediaMetadata(width,time))",
                 pageSize=1000,
                 pageToken=page,
                 supportsAllDrives=True,

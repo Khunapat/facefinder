@@ -25,7 +25,7 @@ __all__ = [
     "album", "set_album", "bump_progress", "indexed_file_ids", "save_photo",
     "load_matrix", "save_ai", "photos", "unjudged", "judged_count",
     "clear_album", "face_box", "remember_album", "recent_albums", "forget_album", "cover_ids",
-    "photo_ai",
+    "photo_ai", "cache_ai", "cached_ai",
 ]
 
 _lock = threading.Lock()
@@ -126,6 +126,15 @@ def load_matrix(folder_id: str):
 
 def save_ai(folder_id: str, file_id: str, judgement: dict):
     _photos(folder_id).document(file_id).update({"ai": judgement, "judged": True})
+
+
+def cache_ai(key: str, judgement: dict):
+    db().collection("ai_cache").document(key).set({"ai": judgement})
+
+
+def cached_ai(key: str):
+    snap = db().collection("ai_cache").document(key).get()
+    return (snap.to_dict() or {}).get("ai") if snap.exists else None
 
 
 def photos(folder_id: str) -> list:
