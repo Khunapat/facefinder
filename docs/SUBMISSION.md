@@ -35,13 +35,13 @@ changed, and FaceFinder keeps no photo library.
 
 FaceFinder turns one shared Google Drive event album into one folder per person.
 Paste the album link and FaceFinder scans it once: an InsightFace face model,
-running inside our Cloud Run container, groups every face into people, and
+running inside our Cloud Run container, detects faces and groups them into people, and
 Gemini on Vertex AI writes one short note per photo with a quality score, flaws
 and a description. Anyone can then name a face or upload a selfie to find a
 person, let Gemini suggest Keep, Review or Rejected with a reason for each
 photo, sort the album by a plain-word description, and copy one folder per
-person into their own Drive. Originals are never changed and photos are never
-stored.
+person into their own Drive. Originals are never changed, and FaceFinder keeps
+no photo library: photos are processed temporarily.
 
 Google services: **Cloud Run** runs the whole app (FastAPI, the face model and
 background scans). **Firestore** stores face data, Gemini's notes, typed names
