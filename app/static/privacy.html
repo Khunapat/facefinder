@@ -32,7 +32,7 @@ email address and name to show who is signed in.</p>
 
 <h2>What FaceFinder keeps</h2>
 <ul>
-<li><b>Your photos are not stored.</b> They are read from Google Drive when needed and then discarded.</li>
+<li><b>FaceFinder does not keep a photo library.</b> Photos are read from Google Drive when needed and processed temporarily in memory. A resized copy of each photo is sent to Gemini on Vertex AI to make its notes (see below).</li>
 <li><b>Face data:</b> for each face, 512 numbers that describe it and where it sits in the photo. This is not a
 picture. It is used only to match faces in that album, by a face-recognition model that runs inside FaceFinder.</li>
 <li><b>Gemini's notes:</b> a short description and quality score for each photo. To make them, a copy of each photo

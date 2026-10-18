@@ -55,7 +55,7 @@
     <text x="728" y="473" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">Face matching happens here</text>
     <text x="558" y="534" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600">InsightFace face model</text>
     <text x="558" y="564" font-size="20" fill="#5b6178">buffalo_l, on the CPU</text>
-    <text x="558" y="606" font-size="20">Finds every face</text>
+    <text x="558" y="606" font-size="20">Detects and matches faces</text>
     <text x="558" y="634" font-size="20">Makes 512 numbers per face</text>
     <text x="558" y="662" font-size="20">Compares them to find</text>
     <text x="558" y="690" font-size="20">who is in each photo</text>
