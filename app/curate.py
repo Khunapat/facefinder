@@ -108,7 +108,8 @@ def cull(photos: list, strictness: str = "normal") -> dict:
                 row["similar_to"], row["similar_name"] = b["file_id"], b.get("name")
                 same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
                 if same and best_pile == "keep" and ai["keeper"] <= b["ai"]["keeper"] - 2:
-                    pile, row["reason"] = "reject", "A clearly better copy is kept (%s)" % b.get("name")
+                    pile, row["reason"] = "reject", ("Almost the same shot as %s, which Gemini scored "
+                                                     "higher, so that one is kept" % b.get("name"))
                 else:
                     pile, row["reason"] = "review", "Looks like %s; keep both if the moment differs" % b.get("name")
             out[pile].append(row)

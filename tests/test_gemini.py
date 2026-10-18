@@ -116,7 +116,7 @@ def main_test():
           [x["file_id"] for x in near["review"]] == ["x2"], near)
     copy = curate.cull([ph("y1", 8, dh="0000000000000000"), ph("y2", 5, dh="0000000000000003")])
     check("a near-identical, clearly weaker copy of a kept frame is rejected",
-          [x["file_id"] for x in copy["reject"]] == ["y2"] and "better copy" in copy["reject"][0]["reason"], copy)
+          [x["file_id"] for x in copy["reject"]] == ["y2"] and "same shot as y1" in copy["reject"][0]["reason"], copy)
     weak = curate.cull([ph("z1", 5, dh="0000000000000000"), ph("z2", 3, dh="0000000000000003")])
     check("a copy is not rejected when the better frame is itself only in review",
           not weak["reject"], weak)

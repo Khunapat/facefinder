@@ -317,6 +317,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .grow-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;border:1px solid var(--line-strong);border-radius:var(--r-card)}
 .grow-row .gname{flex:1 1 160px;min-width:0}
 .grow-row .gdesc{flex:3 1 280px;min-width:0}
+@media (max-width:640px){.grow-row .gname{flex:1 1 100%}.grow-row .gdesc{flex:1 1 0}.grow-row .iconbtn{flex:0 0 auto}}
 .whyline{font-size:14px;color:var(--muted)}
 
 /* ---------------------------------------------------- cull */
@@ -707,7 +708,10 @@ dialog.done h2{font-size:26px}
         <div class="main">
           <div id="everyMsg"></div>
           <div class="faces" id="faces"></div>
-          <div><button class="linkbtn" id="toggleSingles" hidden></button></div>
+          <div><button class="linkbtn" id="toggleSingles" hidden></button>
+            <p class="hint" id="singlesHint" hidden style="font-size:14px;margin-top:2px">Someone seen from the side or
+              laughing can show up here as a new person. Give them the same name as their other card and their photos
+              go into one folder.</p></div>
         </div>
       </section>
     </div>
@@ -1135,7 +1139,7 @@ $("#openAlbum").onclick = async () => {
     clearTimeout(state.poll); state.pollEpoch=(state.pollEpoch||0)+1;
     if(state.folderId!==a.folder_id){
       state.roster.forEach(p=>p.urls.forEach(u=>URL.revokeObjectURL(u)));
-      state.roster=[];addPerson();state.sortDefs=[];renderGroupRows();
+      state.roster=[];addPerson();state.folderId=a.folder_id;loadSortDefs();renderGroupRows();
       state.showSingles=false;state.open=null;$('#dlg').close();$('#dest').value='';
       $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode(state.wantMode||'everyone');state.wantMode=null;
     }
@@ -1302,13 +1306,15 @@ function pollStatus(){
       }
       // Faces and the Gemini check run side by side: a photo is "checked"
       // once both are done with it, so the bar never runs ahead of the work.
-      const checked=s.gemini?Math.min(done,judged):done;
+      const checked=s.gemini?Math.floor((done+Math.min(done,judged))/2):done;
       const box=$('#pbarBox');box.classList.toggle('busy',!total && s.status!=='error' && s.status!=='stopped');
       const pct=total?Math.min(100,Math.round(100*checked/total)):0;
       $('#pbar').style.width=pct+'%';
       if(total)box.setAttribute('aria-valuenow',pct);else box.removeAttribute('aria-valuenow');
       $('#scanTitle').textContent='Preparing your album';
-      $('#pstat').textContent=total?`${n(checked)} of ${n(total)} photos checked`:'Reading the photo list…';
+      $('#pstat').textContent=!total?'Reading the photo list…'
+        :!done?'Getting ready. The first photos take a little longer…'
+        :`${n(checked)} of ${n(total)} photos checked`;
       $('#pact').textContent=!total?'':s.gemini
         ?`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found\nGemini quality check: ${n(judged)} of ${n(total)}`
         :`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found`;
@@ -1898,6 +1904,8 @@ function renderCrowd(){
     tick.onclick = () => { g.autoOn = false; setOn(!g.on); };
     card.querySelector(".fname").oninput = e => {
       g.name = e.target.value;
+      card.querySelector(".fpic").setAttribute("aria-label", `Review ${crowdName(g)}: ${g.all.length} photos`);
+      tick.setAttribute("aria-label", `Create a folder for ${crowdName(g)}`);
       if(g.name.trim() && !g.on){ g.autoOn = true; setOn(true); }
       else if(!g.name.trim() && g.autoOn){ g.autoOn = false; setOn(false); }
       else saveNames();
@@ -1909,6 +1917,7 @@ function renderCrowd(){
   t.textContent = state.showSingles
     ? "Hide people who appear in only one photo"
     : `Show ${singles === 1 ? "1 person who appears" : singles + " people who appear"} in only one photo`;
+  $("#singlesHint").hidden = !singles && !state.showSingles;
   updateBar();
 }
 $("#toggleSingles").onclick = () => { state.showSingles = !state.showSingles; renderCrowd(); };
@@ -1917,6 +1926,7 @@ function openPerson(g){
   state.open = g;
   $("#dlgFace").src = faceUrl(g);
   $("#dlgName").value = g.name;
+  $("#dlgBest").hidden = !state.gemini || g.all.length <= 10;
   msg($("#dlgMsg"), "");
   const tally = () => $("#dlgCount").textContent =
     `${picked(g).length.toLocaleString("en")} of ${g.all.length.toLocaleString("en")} selected`;
@@ -1970,7 +1980,15 @@ for(const ex of EXAMPLES){
   };
   $("#sortChips").append(b);
 }
+const SORT_KEY = () => "ff.sort." + state.folderId;
+function saveSortDefs(){
+  try { localStorage.setItem(SORT_KEY(), JSON.stringify(state.sortDefs.filter(d => d.name.trim() || d.description.trim()))); } catch(e){}
+}
+function loadSortDefs(){
+  try { state.sortDefs = JSON.parse(localStorage.getItem(SORT_KEY()) || "[]"); } catch(e){ state.sortDefs = []; }
+}
 function renderGroupRows(){
+  saveSortDefs();
   const box = $("#groupRows"); box.innerHTML = "";
   state.sortDefs.forEach((d, i) => {
     const row = document.createElement("div");
@@ -1982,8 +2000,8 @@ function renderGroupRows(){
          <input class="field" type="text" maxlength="300"
                 placeholder="e.g. people in blue staff shirts" value="${esc(d.description)}"></label>
        <button class="iconbtn" type="button" aria-label="Remove this group">${CLOSE}</button>`;
-    row.querySelector(".gname input").oninput = e => d.name = e.target.value;
-    row.querySelector(".gdesc input").oninput = e => d.description = e.target.value;
+    row.querySelector(".gname input").oninput = e => { d.name = e.target.value; saveSortDefs(); };
+    row.querySelector(".gdesc input").oninput = e => { d.description = e.target.value; saveSortDefs(); };
     row.querySelector(".iconbtn").onclick = () => { state.sortDefs.splice(i, 1); renderGroupRows(); };
     box.appendChild(row);
   });
@@ -2010,6 +2028,7 @@ $("#runSort").onclick = async () => {
     .filter(d => d.name);
   if(!groups.length) return msg($("#sortMsg"), "Give at least one group a name.", "err");
   $("#runSort").disabled = true; $("#sbarBox").hidden = false; $("#sbar").style.width = "0%";
+  state.sorted = []; renderSorted();          // old results go, so a re-run is visible
   msg($("#sortMsg"), "Sorting…");
   try{
     const {job_id} = await postJSON("/api/sort", {folder_id:state.folderId, groups});
@@ -2023,6 +2042,7 @@ $("#runSort").onclick = async () => {
     }
     if(job.status === "error") throw new Error(job.message || "Sorting failed");
     const row = f => ({file_id:f, name:job.names[f] || f});
+    state.sortTotal = job.total;
     state.sorted = job.groups.map(gr => ({kind:"set", name:gr.name, note:gr.description,
                                            all:gr.file_ids.map(row), removed:new Set(), limit:24}));
     if(job.unchecked?.length)
@@ -2038,7 +2058,8 @@ $("#runSort").onclick = async () => {
     if(job.none.length) notes.push(`${plural(job.none.length, "photo fits", "photos fit")} none of the groups`);
     if(job.check.length) notes.push(`${plural(job.check.length, "photo needs", "photos need")} a look`);
     if(job.unchecked?.length) notes.push(`${plural(job.unchecked.length, "photo was", "photos were")} not checked by Gemini yet`);
-    msg($("#sortMsg"), `Done: ${plural(placed, "photo", "photos")} sorted into folders` +
+    const at = new Date().toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
+    msg($("#sortMsg"), `Sorted at ${at}: ${plural(placed, "photo", "photos")} put into folders` +
       (notes.length ? `; ${notes.join(", and ")}.` : "."), "ok");
     renderSorted();
     $("#sortResults").scrollIntoView({behavior:"smooth", block:"start"});
@@ -2050,7 +2071,9 @@ function renderSorted(){
   for(const g of state.sorted){
     if(!g.all.length){
       const c = document.createElement("section"); c.className = "card";
-      c.innerHTML = `<div class="rname">${esc(g.name)}</div><p class="hint" style="margin-top:6px">No photos matched this folder. Try describing it differently.</p>`;
+      c.innerHTML = `<div class="rname">${esc(g.name)}</div><p class="hint" style="margin-top:6px">None of the
+        ${plural(state.sortTotal || 0, "photo", "photos")} matches "${esc(g.note || g.name)}". Gemini compared it with what it
+        saw in every photo, so it may simply not be in this album. You can also try other words.</p>`;
       box.append(c); continue;
     }
     box.appendChild(groupCard(g, {title:g.name, note:g.note ? esc(g.note) : ""}));
@@ -2069,7 +2092,7 @@ $("#runCull").onclick = async () => {
                    awkward_moment:"Awkward moment", no_subject:"No clear subject"};
     const base = n => (n || "another photo").replace(/\.[a-z0-9]+$/i, "");
     const short = (x, pile) =>
-        x.similar_to ? (pile === "reject" ? `Copy of ${base(x.similar_name)}` : `Looks like ${base(x.similar_name)}`)
+        x.similar_to ? (pile === "reject" ? `Weaker shot of ${base(x.similar_name)}` : `Looks like ${base(x.similar_name)}`)
       : x.reason === "Gemini could not check this photo" ? "Not checked by Gemini"
       : x.reason?.startsWith("Gemini was not sure") ? "Gemini was not sure"
       : x.flaws?.length ? x.flaws.map(f => SHORT[f] || f).join(" · ")
@@ -2088,7 +2111,7 @@ $("#runCull").onclick = async () => {
     const counts = {};
     for(const x of r.reject){ const k = short(x, "reject").split(" · ")[0]; counts[k] = (counts[k] || 0) + 1; }
     const why = Object.entries(counts).sort((a, b) => b[1] - a[1])
-      .map(([k, n]) => `${n.toLocaleString("en")} ${esc(k.toLowerCase())}`).join(" · ");
+      .map(([k, n]) => `${n.toLocaleString("en")} ${esc(k[0].toLowerCase() + k.slice(1))}`).join(" · ");
     const missed = r.review.filter(x => x.reason === "Gemini could not check this photo").length;
     state.cullPile = r.review.length ? "review" : "keep";
     $("#cullMsg").innerHTML =
@@ -2179,7 +2202,10 @@ function fillExport(){
   const gs = exportGroups(), total = new Set(gs.flatMap(g => g.file_ids)).size;
   $("#xlist").innerHTML = gs.map(g =>
     `<li>${FOLDER}<span>${esc(g.name)}</span><em>${plural(g.file_ids.length, "photo", "photos")}</em></li>`).join("");
-  $("#destHint").textContent = `Leave it empty to make "FaceFinder - ${state.albumName || "album"}" in My Drive.`;
+  const parent = `"FaceFinder - ${state.albumName || "album"}"`;
+  $("#destHint").textContent = state.mode === "cull"
+    ? `Your picks go into a "Keep" folder inside ${parent}, or inside the folder you name here (for example "Instagram").`
+    : `Leave it empty to make ${parent} in My Drive.`;
   $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled);
   const copies = gs.reduce((n, g) => n + g.file_ids.length, 0);
   $("#xlist").insertAdjacentHTML("beforeend", copies > total

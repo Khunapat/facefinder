@@ -249,7 +249,8 @@ Do not force two groups if the descriptions do not support them.
 Prefer visible clothing colours or items, and visible scenes or activities.
 Do not infer staff, student, age, identity or sensitive attributes from appearance.
 Use a role only if explicitly established by the supplied event information.
-Use name: a short English folder name of one to three words.
+Use name: a short English folder name of one to three words, then " / ", then the
+same name in Thai (for example "Group photos / รูปหมู่").
 Use description: an observable inclusion rule, specific enough for one photo.
 Allow overlapping categories. Do not claim the sample describes every album photo.
 Skip anything nearly every photo shares (the same gown, a folder or prop almost
