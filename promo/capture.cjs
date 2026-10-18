@@ -181,7 +181,7 @@ const TOTAL = 800;
   await shot('cull_1', '#modeCull');
 
   // ---- Sort by description: a Thai rule, then the folders ----
-  const THAI = 'เสื้อค่ายสีฟ้า';
+  const THAI = 'people in blue camp shirts';
   const typed = [0, 3, 6, 9, 12, THAI.length].map((n) => THAI.slice(0, n));
   await page.evaluate(() => {
     state.sortDefs = [{ name: 'Blue team', description: '' }, { name: 'Orange team', description: 'people in orange camp shirts' }];

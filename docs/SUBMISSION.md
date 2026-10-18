@@ -5,6 +5,11 @@ Live app: <https://facefinder-508213.web.app>
 
 Numbers marked **[TIME FROM TEST]** still need a measured value.
 
+Submission checklist (from the official rules): theme **Media, Content & Digital
+Experiences**; working deployed link; public GitHub repository; deck as a PDF;
+a public YouTube, Vimeo or Google Drive video **under 3 minutes**; everything in
+English.
+
 ---
 
 ## 1. Pitch and description
@@ -177,19 +182,23 @@ On screen at the start and whenever the sample album is visible:
    - Firebase Hosting in front of one Cloud Run service.
    - Firestore for face data, Gemini notes, names and recent albums.
    - Drive API with the user's sign-in; Gemini on Vertex AI without API keys.
-6. **Face model accuracy**
+6. **Feasibility and scale**
+   - Works today: deployed on Cloud Run behind Firebase Hosting, tested end to end on a real Drive album.
+   - One scan per album, shared by everyone who can open it; Gemini results are cached per photo, so cost grows with photos, not with users.
+   - Next step to scale: move scans and exports from the one instance to Cloud Run jobs or Cloud Tasks; Firestore already holds all state.
+7. **Face model accuracy**
    - InsightFace buffalo_l, running in the container.
    - Same person scores 0.75 to 0.98; a different person scores -0.05.
    - Measured on the repo's sample photos (`tests/test_matching`).
-7. **Impact**
+8. **Impact**
    - Finding one person: [TIME FROM TEST] instead of [TIME FROM TEST].
    - Scanning a test album of [PHOTOS FROM TEST] photos: [TIME FROM TEST].
    - Server-side copy: no photo is downloaded or uploaded again.
-8. **Privacy**
+9. **Privacy**
    - Photos are never stored; exports are copies, the album is never changed.
    - Face data is 512 numbers per face, not a picture; deletable from the album menu.
    - Gemini data via Vertex AI is not used to train Google's models.
-9. **What's next**
+10. **What's next**
    - Licensed face model for a commercial release.
    - Google verification so the "unverified app" warning goes away.
    - More events beyond graduation: weddings, sports days, conferences.

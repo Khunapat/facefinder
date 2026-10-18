@@ -244,27 +244,20 @@ service scale to many instances while the workers scale on their own.
   (`app/store_firestore.py:77-84`). With many workers on one album, that
   counter would need batching first.
 
-## 8. Does it support Thai?
+## 8. Does it work in other languages?
 
-Partly, and we can say exactly where. The screens are in English only (the page
-is `lang="en"`). The fonts (Mitr for headings, Noto Sans Thai for text) cover
-Thai, so Thai names typed on Everyone can be shown, and the code only trims
-spaces and cuts a folder name at 100 characters, so a Thai name is kept as the
-Drive folder name. In **Sort**, a folder can be described in Thai or English. The prompt
-tells Gemini "Folder definitions can be Thai or English", Thai text is sent
-unchanged, and four one-tap Thai example folders show it (บนเวที, รูปหมู่,
-ดอกไม้และของขวัญ, ซุ้มถ่ายรูป). Gemini writes its photo notes and suggested
-folder names in English, so a Thai sort means Gemini matching a Thai rule
-against English descriptions.
+The screens are in English. Gemini reads a folder description written in plain
+words, and it also understands other languages (for example Thai, the language
+of our first users), because the description is sent to Gemini unchanged and
+matched against Gemini's own notes on each photo. Names typed for people are
+kept as written, so a name in any script becomes the Drive folder name (the
+code only trims spaces and cuts a name at 100 characters). Gemini writes its
+photo notes and folder suggestions in English.
 
-- Where: `app/static/index.html:2`, `10`, `27-28` (fonts), `719`, `727` and
-  `1957-1960` (Thai examples); `app/gemini.py:295` (Thai or English),
-  `317-318` (`ensure_ascii=False`), `123` and `252` (notes and suggestions in
-  English); `app/main.py:975-976` (folder names: spaces trimmed, cut at 100
-  characters).
-- Note for us: the repo's tests use a stand-in for Gemini and only English
-  names, so neither Thai sorting quality nor Thai folder names are tested in
-  the repo.
+- Where: `app/gemini.py` (sort prompt and `ensure_ascii=False`),
+  `app/main.py` `_clean_name` (folder names).
+- Not tested: sorting quality in languages other than English; the automatic
+  tests use English descriptions.
 
 ## 9. What about the face model's licence?
 
