@@ -208,6 +208,10 @@ main{padding:28px var(--pad) 140px}
 .rmosaic.one img{grid-column:1 / 3}
 .rmosaic.empty{display:grid;place-items:center;grid-template-columns:1fr;grid-template-rows:1fr}
 .rmosaic.empty img{width:96px;height:96px;object-fit:contain;grid-row:auto}
+/* every cover failed: show one mascot, not one per tile */
+.rmosaic:not(:has(img:not(.gone))){grid-template-columns:1fr;grid-template-rows:1fr;place-items:center}
+.rmosaic:not(:has(img:not(.gone))) img{width:96px;height:96px;padding:0;background:none;grid-row:auto;grid-column:auto}
+.rmosaic:not(:has(img:not(.gone))) img:not(:first-child){display:none}
 .rinfo{display:flex;flex-direction:column;gap:2px;padding:12px 14px 14px;min-width:0}
 .rinfo b{font-size:15px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .rinfo span{font-size:13px;color:var(--muted)}
@@ -482,6 +486,11 @@ dialog.done h2{font-size:26px}
 }
 @media (max-width:360px){
   .tabs button{padding:3px 6px 0;font-size:13px;flex:1 1 auto}
+}
+@media (max-width:340px){
+  .piles{gap:0}
+  .piles button{padding:0 7px;font-size:13.5px;gap:4px}
+  .piles .n{font-size:12px;padding:1px 6px}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
@@ -821,7 +830,8 @@ dialog.done h2{font-size:26px}
         rel="noopener">myaccount.google.com/permissions</a>.</li>
       <li><b>How long:</b> until it is deleted. In an open album, use the album menu, then <b>Delete this album's
         data</b>. People who can open the same Drive folder share its scan, so it is not done twice; FaceFinder checks
-        with Drive that they can open the folder first.</li>
+        with Drive that they can open the folder first. Deleting removes the scan for everyone who uses this folder in
+        FaceFinder; they can scan it again.</li>
     </ul>
   </div>
 </dialog>
