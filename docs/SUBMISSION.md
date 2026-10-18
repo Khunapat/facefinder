@@ -39,7 +39,7 @@ image. It runs in `asia-southeast1` with **one instance** (`--max-instances 1`)
 and CPU always on (`--no-cpu-throttling`), deployed with 4 CPUs. The reason:
 album scans and folder exports run as background jobs inside the web process,
 and their progress is kept in memory, so they need one instance that keeps its
-CPU between requests. Long jobs are allowed up to 3600 s per request.
+CPU between requests. A request may run for up to 3600 s.
 
 **Firestore.** Cloud Run's disk is wiped on every restart, so everything that
 must last lives in Firestore: the album's scan status; for each photo its size,
@@ -47,7 +47,7 @@ a fingerprint for spotting near-identical frames, the **face data** (a
 512-number embedding and box per face) and **Gemini's notes** (description,
 quality score, flaws, reason); the **names** each account types for people; and
 each account's **recent albums**. Accounts are stored under a hash of the email
-address. One document per photo keeps a scan to one write per photo.
+address. Each photo is one Firestore document.
 
 **Firebase.** Firebase **Hosting** gives the app its public address
 (`facefinder-508213.web.app`) and forwards every request to the Cloud Run
@@ -74,7 +74,8 @@ Results are cached per photo (Drive file id plus checksum), so a rescan of the
 same photos costs nothing.
 
 **Google Drive API.** FaceFinder reads the album with the **user's own Google
-sign-in** and downloads Drive's thumbnails, not the full originals. Export uses
+sign-in** and downloads Drive's 1600 px previews instead of the full originals (the
+original only when Drive has no preview). Export uses
 Drive's server-side `files.copy`: it creates new folders in the user's Drive and
 **copies** photos into them. It never moves, changes or deletes anything in the
 album.
@@ -149,7 +150,7 @@ On screen at the start and whenever the sample album is visible:
 | 0:40 | Find people: add Ploy with one face photo, results appear. Open Best 10 with Gemini's reasons. Untick one wrong photo. | "I add Ploy with one photo. Her photos appear in seconds. Best 10 shows her best shots, and Gemini says why for each one. If something is wrong, I untick it." |
 | 1:10 | Sort tab: Gemini's folder suggestions, then a folder described in Thai. Matching photos fill in. | "Sort lets me describe a folder in plain words, Thai or English. Gemini suggests ideas, and sorts from the descriptions it wrote once during the scan, so it does not read every photo again." |
 | 1:45 | Cull photos: Keep, Review, Rejected piles. Open one rejected photo with its reason; tick it back. | "For the photographer, Cull sorts the album into Keep, Review and Rejected. Every photo says why: blurry, eyes closed, a near-copy. I stay in control and can tick any photo back." |
-| 2:15 | Create folders: progress, done card. Then a phone showing Google Drive with Ploy, Ton, Mint, Bank and Fah folders. | "One click creates a folder per person in my own Drive and copies their photos in. The original album is never changed. On my phone, everyone's folder is ready to share." |
+| 2:15 | Press Export to Drive: progress, done card. Then a phone showing Google Drive with Ploy, Ton, Mint, Bank and Fah folders. | "One click creates a folder per person in my own Drive and copies their photos in. The original album is never changed. On my phone, everyone's folder is ready to share." |
 | 2:45 | "What FaceFinder keeps" window, then the time-saved number. | "Photos are never stored. Face data and Gemini's notes can be deleted at any time. In our test, finding one person took [TIME FROM TEST] instead of [TIME FROM TEST]. FaceFinder, on Google Cloud." |
 
 ---
@@ -210,5 +211,5 @@ On screen at the start and whenever the sample album is visible:
    open Best 10 to read Gemini's reasons.
 3. **Sort:** describe a folder in Thai or English and watch photos fill it.
 4. **Cull photos:** see Keep, Review and Rejected, each photo with a reason.
-5. **Create folders:** copies land in a new `FaceFinder - <album name>` folder in
+5. **Export to Drive:** copies land in a new `FaceFinder - <album name>` folder in
    your own Drive. You can delete that folder afterwards.
