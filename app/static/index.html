@@ -1038,7 +1038,7 @@ async function loadRecent(){
   }
   if(state.sampleAlbum)
     card(`<button class="ropen" type="button"><div class="rmosaic empty"><img src="/static/img/cam-photo.png" alt=""></div>
-      <div class="rinfo"><b>Sample album</b><span>Try FaceFinder with example photos.</span></div></button>`, state.sampleAlbum, "sample");
+      <div class="rinfo"><b>Sample album</b><span>Try it on example photos of made-up people, created with Gemini.</span></div></button>`, state.sampleAlbum, "sample");
   $("#recentTitle").textContent = albums.length ? "Pick up where you left off" : "Try it first";
   $("#recentBox").hidden = !grid.children.length;
 }

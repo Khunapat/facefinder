@@ -21,6 +21,15 @@ PROJECT="${PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
 REGION="${REGION:-asia-southeast1}"
 MIN_INSTANCES="${MIN_INSTANCES:-0}"
 CPU="${CPU:-2}"
+# The sample album on the start page (a Drive folder shared "Anyone with the
+# link"). Given once, it is remembered for later deploys in ~/.facefinder-sample.
+SAMPLE_FILE="$HOME/.facefinder-sample"
+if [ -n "${SAMPLE_ALBUM:-}" ]; then
+  SAMPLE_ALBUM="${SAMPLE_ALBUM%%\?*}"          # drop ?usp=sharing
+  printf '%s' "$SAMPLE_ALBUM" > "$SAMPLE_FILE"
+elif [ -f "$SAMPLE_FILE" ]; then
+  SAMPLE_ALBUM="$(cat "$SAMPLE_FILE")"
+fi
 MEMORY="$([ "$CPU" -ge 4 ] && echo 8Gi || echo 4Gi)"
 WORKERS="$([ "$CPU" -ge 4 ] && echo 6 || echo 4)"
 SERVICE=facefinder
@@ -108,7 +117,7 @@ gcloud run deploy "$SERVICE" --source . --region "$REGION" \
   --memory "$MEMORY" --cpu "$CPU" --no-cpu-throttling \
   --min-instances "$MIN_INSTANCES" --max-instances 1 --concurrency 40 \
   --timeout 3600 \
-  --set-env-vars "STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT,GEMINI_LOCATION=global,PUBLIC_BASE_URL=$BASE_URL,INDEX_WORKERS=$WORKERS" \
+  --set-env-vars "STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT,GEMINI_LOCATION=global,PUBLIC_BASE_URL=$BASE_URL,INDEX_WORKERS=$WORKERS${SAMPLE_ALBUM:+,SAMPLE_ALBUM=$SAMPLE_ALBUM}" \
   --set-secrets "GOOGLE_CLIENT_ID=ff-google-client-id:latest,GOOGLE_CLIENT_SECRET=ff-google-client-secret:latest,SESSION_SECRET=ff-session-secret:latest" \
   --quiet
 RUN_URL="$(gcloud run services describe "$SERVICE" --region "$REGION" --format='value(status.url)')"
