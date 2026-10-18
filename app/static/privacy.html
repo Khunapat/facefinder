@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FaceFinder privacy policy</title>
+<link rel="icon" href="/static/img/cam-stand.png">
+<style>
+:root{--page:#fdf0f5;--panel:#fff;--ink:#1f2540;--muted:#5b6178;--accent:#d6336c;--line:#efe6ec}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:16px/1.6 'Segoe UI',system-ui,sans-serif}
+main{max-width:760px;margin:32px auto;padding:32px;background:var(--panel);border-radius:24px;box-shadow:0 10px 32px rgba(31,37,64,.06)}
+h1{font-size:30px;line-height:1.2;margin:0 0 6px}h2{font-size:19px;margin:28px 0 6px}
+p,li{color:var(--ink)}.muted{color:var(--muted);font-size:14px}a{color:var(--accent)}
+header{display:flex;align-items:center;gap:12px;margin-bottom:18px}header img{width:48px;height:48px}
+header b{font-size:20px;color:var(--accent)}
+@media (max-width:640px){main{margin:0;border-radius:0;padding:24px 16px}}
+</style>
+</head>
+<body><main>
+<header><img src="/static/img/cam-stand.png" alt=""><b>FaceFinder</b></header>
+<h1>Privacy policy</h1>
+<p class="muted">Last updated 18 October 2026. Contact: khunapat36795@gmail.com</p>
+<p>FaceFinder sorts a shared Google Drive photo album into one folder per person. This page says what it reads,
+what it keeps, where, for how long, and how to delete it.</p>
+
+<h2>What FaceFinder reads</h2>
+<p>When you sign in with Google, FaceFinder asks to read your Google Drive (so it can open the album you paste)
+and to create files (so it can put copies in new folders in your Drive). It reads only the folders you open in
+FaceFinder. It never changes, moves or deletes anything in your Drive; an export makes copies. It also reads your
+email address and name to show who is signed in.</p>
+
+<h2>What FaceFinder keeps</h2>
+<ul>
+<li><b>Your photos are not stored.</b> They are read from Google Drive when needed and then discarded.</li>
+<li><b>Face data:</b> for each face, 512 numbers that describe it and where it sits in the photo. This is not a
+picture. It is used only to match faces in that album, by a face-recognition model that runs inside FaceFinder.</li>
+<li><b>Gemini's notes:</b> a short description and quality score for each photo. To make them, a copy of each photo
+made smaller (768 pixels on the long side) is sent to Gemini through Google Cloud's Vertex AI. Google Cloud's terms
+say this data is not used to train Google's models.</li>
+<li><b>Your names and recent albums:</b> the names you type for people and the albums you opened, kept under a coded
+form of your email address. Only you see them.</li>
+<li><b>Your Google sign-in</b> is kept in a signed cookie in your browser and removed when you sign out.</li>
+</ul>
+
+<h2>Where</h2>
+<p>In FaceFinder's own Google Cloud project (Cloud Run and a Firestore database). Face crops and thumbnails are made
+when shown and kept only in memory. FaceFinder does not sell or share data, shows no ads and uses no tracking.</p>
+
+<h2>How long, and how to delete it</h2>
+<p>Data is kept until it is deleted. In an open album, use the album menu, then <b>Delete this album's data</b>: this
+removes its face data, Gemini's notes and your names. People who can open the same Drive folder share its scan, so
+deleting removes the scan for everyone who uses that folder in FaceFinder; they can scan it again. You can remove
+FaceFinder's access to your Google account at any time at
+<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
+
+<h2>Google user data</h2>
+<p>FaceFinder's use of information received from Google APIs follows the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+including the Limited Use requirements. Drive data is used only to provide FaceFinder's features to you.</p>
+
+<p class="muted"><a href="/">Back to FaceFinder</a> · <a href="/terms">Terms</a></p>
+</main></body></html>

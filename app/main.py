@@ -1164,3 +1164,14 @@ def healthz():
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC, "index.html"))
+
+
+# Public pages Google's sign-in screen links to (OAuth branding).
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(os.path.join(STATIC, "privacy.html"))
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse(os.path.join(STATIC, "terms.html"))
