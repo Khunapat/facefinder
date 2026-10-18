@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>FaceFinder intro</title>
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@500;600&family=Noto+Sans+Thai:wght@500;600;700&display=block" rel="stylesheet">
+<style>
+html,body{margin:0;background:#1f2540}
+canvas{display:block;width:100vw;height:auto;max-height:100vh;margin:0 auto}
+body.render canvas{width:auto}
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script src="../promo/lib/cast.js"></script>
+<script src="../promo/lib/photos.js"></script>
+<script src="timeline.js"></script>
+<script>
+// A 19-second 16:9 intro for the FaceFinder demo video, as a pure function of
+// time: window.seek(t) paints frame t. No timers, no carried state.
+const { W, H, DUR } = TL;
+const cv = document.getElementById('c'), g = cv.getContext('2d');
+
+const INK = '#1f2540', PAGE = '#fdf0f5', PAPER = '#FFFFFF', ACCENT = '#d6336c',
+      SOFT = '#f6dbe6', MUTED = '#5b6178', PINK_LT = '#ff8fb5';
+const DISPLAY = 'Mitr, "Noto Sans Thai", sans-serif';
+const UI = '"Noto Sans Thai", sans-serif';
+
+// ------------------------------------------------------------- motion kit
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, u) => a + (b - a) * u;
+const inv = (a, b, x) => clamp((x - a) / (b - a));
+const smooth = (u) => u * u * (3 - 2 * u);
+function spring(t, k = 170, d = 26) {
+  if (t <= 0) return 0;
+  const w0 = Math.sqrt(k), z = d / (2 * w0);
+  if (z < 1) {
+    const wd = w0 * Math.sqrt(1 - z * z);
+    return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
+  }
+  return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+}
+const SNAPPY = [320, 30], SOFTS = [170, 26], BOUNCY = [260, 16];
+function rrect(x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function shadow(blur, dy, a) { g.shadowColor = `rgba(31,37,64,${a})`; g.shadowBlur = blur; g.shadowOffsetY = dy; }
+function noShadow() { g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; }
+
+// ----------------------------------------------------------------- assets
+const IMG = {}, wall = [], snaps = {};
+const UI_NAMES = [...Array.from({ length: 9 }, (_, i) => 'scan_' + i), 'everyone_4'];
+const MASCOTS = ['cam-wave', 'cam-search', 'cam-celebrate'];
+const TW = 300, TH = 225;
+const load = (key, src) => new Promise((res, rej) => {
+  const im = new Image(); im.onload = res; im.onerror = () => rej(src); im.src = src; IMG[key] = im;
+});
+const canvasOf = (w, h, fn) => { const c = document.createElement('canvas'); c.width = w; c.height = h; fn(c.getContext('2d'), w, h); return c; };
+window.ready = (async () => {
+  for (let i = 0; i < 36; i++) wall.push(canvasOf(TW * 2, TH * 2, (c, w, h) => Photos.draw(c, w, h, 'w-' + i)));
+  for (const id of ['blue-1', 'cull-2', 'blue-0', 'cull-4']) snaps[id] = canvasOf(480, 360, (c, w, h) => Photos.draw(c, w, h, id));
+  snaps.ploy = canvasOf(240, 240, (c, s) => Cast.portrait(c, s, Photos.CREW[2]));
+  await Promise.all([
+    ...UI_NAMES.map((n) => load(n, '../promo/assets/ui/' + n + '.png')),
+    ...MASCOTS.map((n) => load(n, '../design-canvas/assets/' + n + '.png')),
+  ]);
+  for (const f of ['600 100px Mitr', '500 100px Mitr', '500 40px "Noto Sans Thai"', '600 40px "Noto Sans Thai"', '700 40px "Noto Sans Thai"'])
+    await document.fonts.load(f);
+  return true;
+})();
+
+// ------------------------------------------------------------ type helpers
+function words(lines, x, y, size, t, tIn, tOut, color, opt = {}) {
+  const lh = size * (opt.lh || 1.1);
+  g.font = `${opt.weight || 600} ${size}px ${opt.font || DISPLAY}`;
+  g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  if ('letterSpacing' in g) g.letterSpacing = (opt.track ?? -0.02) * size + 'px';
+  let i = 0;
+  lines.forEach((line, li) => {
+    let cx = x;
+    const parts = line.split(' ');
+    parts.forEach((wd, wi) => {
+      const ws = wd + (wi < parts.length - 1 ? ' ' : '');
+      const w = g.measureText(ws).width;
+      const s = spring(t - tIn - i * 0.06, ...SNAPPY);
+      const out = tOut == null ? 0 : smooth(inv(tOut, tOut + 0.22, t + (lines.length * 2 - i) * 0.012));
+      const a = clamp(s * 1.6) * (1 - out);
+      if (a > 0.001) {
+        const dy = (1 - s) * size * 0.6 - out * size * 0.55;
+        g.save();
+        g.beginPath(); g.rect(cx - 10, y + li * lh - size * 1.05, w + 40, size * 1.45); g.clip();
+        g.globalAlpha = a; g.fillStyle = (opt.accent || []).includes(wd) ? (opt.accentColor || ACCENT) : color;
+        g.fillText(ws, cx, y + li * lh + dy);
+        g.restore();
+      }
+      cx += w; i++;
+    });
+  });
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+}
+function text(s, x, y, size, color, weight = 600, font = UI, align = 'left') {
+  g.font = `${weight} ${size}px ${font}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'alphabetic';
+  g.fillText(s, x, y); g.textAlign = 'left';
+}
+function ui(im, x, y, s, r, opt = {}) {
+  const sy = opt.sy || 0, sh = opt.sh ?? (im.height - sy);
+  const w = im.width * s, h = sh * s;
+  g.save();
+  shadow(60, 24, 0.14); rrect(x, y, w, h, r); g.fillStyle = PAPER; g.fill(); noShadow();
+  rrect(x, y, w, h, r); g.clip();
+  g.drawImage(im, 0, sy, im.width, sh, x, y, w, h);
+  g.restore();
+  return { x, y, w, h, s };
+}
+function mascot(name, cx, cy, size, t, tIn, opt = {}) {
+  const s = spring(t - tIn, ...BOUNCY);
+  if (s <= 0.001) return;
+  const bob = Math.sin((t - tIn) * Math.PI * 2 / 2.4) * size * 0.025 * clamp(t - tIn - 0.3);
+  const sq = 1 + (1 - s) * 0.25;
+  g.save(); g.globalAlpha = clamp(s * 3) * (opt.alpha ?? 1);
+  g.translate(cx, cy + (1 - s) * size * 0.4 + bob);
+  g.scale(s / sq, s * sq);
+  g.drawImage(IMG[name], -size / 2, -size / 2, size, size);
+  g.restore();
+}
+function mark(x, y, size, ring) {
+  const s = size / 24;
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.lineCap = 'round'; g.strokeStyle = ring; g.fillStyle = ring; g.lineWidth = 2.2;
+  g.beginPath(); g.arc(10.5, 10.5, 7, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(15.8, 15.8); g.lineTo(21, 21); g.stroke();
+  g.beginPath(); g.arc(8, 9.2, 1, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(13, 9.2, 1, 0, Math.PI * 2); g.fill();
+  g.lineWidth = 1.6;
+  g.beginPath(); g.moveTo(8, 12.6); g.bezierCurveTo(9.5, 13.9, 11.5, 13.9, 13, 12.6); g.stroke();
+  g.restore();
+}
+function wordmark(x0, y, size, color) {
+  g.font = `600 ${size}px ${DISPLAY}`; g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+  if ('letterSpacing' in g) g.letterSpacing = (-0.01 * size) + 'px';
+  const m = size * 0.95, gap = size * 0.25;
+  g.fillStyle = PAPER; shadow(30, 10, 0.08);
+  g.beginPath(); g.arc(x0 + m / 2, y - size * 0.36, m / 2, 0, Math.PI * 2); g.fill(); noShadow();
+  mark(x0 + m * 0.2, y - size * 0.36 - m * 0.3, m * 0.6, ACCENT);
+  g.fillStyle = color; g.fillText('FaceFinder', x0 + m + gap, y);
+  if ('letterSpacing' in g) g.letterSpacing = '0px';
+}
+// A mouse pointer
+function pointer(x, y, a = 1) {
+  if (a <= 0) return;
+  g.save(); g.globalAlpha = a; g.translate(x, y); g.scale(1.6, 1.6);
+  shadow(8, 3, 0.3);
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(0, 26); g.lineTo(7, 20); g.lineTo(12, 31); g.lineTo(17, 29); g.lineTo(12, 18); g.lineTo(21, 18); g.closePath();
+  g.fillStyle = PAPER; g.fill(); noShadow(); g.lineWidth = 2; g.strokeStyle = INK; g.lineJoin = 'round'; g.stroke();
+  g.restore();
+}
+
+// ================================================================== SHOTS
+// 0-8 s: a shared Drive folder, 800 photos, scrolled by hand.
+const WX = 70, WY = 50, WW = W - 140;
+const COLS = 6, GAP = 26, CW = (WW - 2 * 44 - (COLS - 1) * GAP) / COLS, CH = CW * 0.75, RH = CH + 64;
+function scrollOff(t) {
+  // gentle, then a pause while reading the chat, then faster and faster
+  let o = 260 * smooth(inv(0, 2.2, t)) + 60 * inv(2.2, 5, t);
+  const f = inv(4.9, 8.2, t);
+  o += 5200 * Math.pow(f, 1.7) + 140 * Math.sin(f * Math.PI * 5) * f;
+  return o;
+}
+function drawDrive(t) {
+  g.fillStyle = '#e7eaf1'; g.fillRect(0, 0, W, H);
+  g.save(); shadow(50, 18, 0.12); rrect(WX, WY, WW, H, 28); g.fillStyle = PAPER; g.fill(); noShadow();
+  rrect(WX, WY, WW, H, 28); g.clip();
+  // grid
+  const off = scrollOff(t), top = WY + 150;
+  const r0 = Math.floor(off / RH) - 1;
+  for (let r = r0; r < r0 + Math.ceil(H / RH) + 2; r++) for (let c = 0; c < COLS; c++) {
+    if (r < 0) continue;
+    const idx = r * COLS + c, x = WX + 44 + c * (CW + GAP), y = top + r * RH - off;
+    if (y > H || y + RH < top - 10) continue;
+    g.save(); rrect(x, y, CW, CH, 14); g.clip();
+    g.drawImage(wall[(idx * 7 + r) % wall.length], x, y, CW, CH); g.restore();
+    text(`IMG_${String(4210 + idx).padStart(4, '0')}.jpg`, x + 4, y + CH + 40, 26, MUTED, 500);
+  }
+  // header over the grid
+  g.fillStyle = PAPER; g.fillRect(WX, WY, WW, 130);
+  g.fillStyle = '#eef0f5'; g.fillRect(WX, WY + 129, WW, 2);
+  // folder icon
+  g.fillStyle = '#9aa3b8'; rrect(WX + 48, WY + 46, 50, 40, 7); g.fill(); rrect(WX + 48, WY + 38, 24, 14, 5); g.fill();
+  text('Shared with me', WX + 124, WY + 82, 36, MUTED, 500);
+  g.font = `500 36px ${UI}`; const sw = g.measureText('Shared with me').width;
+  text('›', WX + 140 + sw, WY + 82, 36, MUTED, 500);
+  text('Camp 2026', WX + 180 + sw, WY + 82, 40, INK, 700);
+  // the count
+  const n = Math.round(800 * smooth(inv(TL.count, TL.count + 0.8, t)));
+  g.fillStyle = SOFT; rrect(WX + WW - 330, WY + 36, 280, 62, 31); g.fill();
+  text(`${n} photos`, WX + WW - 190, WY + 80, 34, ACCENT, 700, UI, 'center');
+  // scrollbar
+  const prog = clamp(off / (Math.ceil(800 / COLS) * RH));
+  g.fillStyle = '#c9cfdc'; rrect(WX + WW - 22, top + 10 + prog * 700, 10, 150, 5); g.fill();
+  g.restore();
+
+  // dark wash under the big words
+  const wash = 0.62 * (smooth(inv(0, 0.25, t)) * (1 - smooth(inv(TL.wordOut, TL.wordOut + 0.4, t)))
+    + smooth(inv(TL.frantic, TL.frantic + 0.3, t)));
+  if (wash > 0) { g.fillStyle = `rgba(31,37,64,${wash})`; g.fillRect(0, 0, W, H); }
+  words([String(n), ], 130, 560, 300, t, TL.count, TL.wordOut, PAPER, { track: -0.04 });
+  words(['photos in one', 'shared folder.'], 140, 760, 110, t, TL.word2, TL.wordOut, PAPER, { accent: ['shared', 'folder.'], accentColor: PINK_LT });
+  words(['Scroll. Zoom.', 'Squint.'], 130, 470, 170, t, TL.cap3, TL.cap4 - 0.3, PAPER, { accent: ['Squint.'], accentColor: PINK_LT });
+  words(['Still 762', 'photos to go.'], 130, 470, 170, t, TL.cap4, TL.capOut, PAPER, { accent: ['762'], accentColor: PINK_LT });
+
+  // pointer near the scrollbar, flicking while it scrolls
+  const f = inv(4.9, 8.2, t);
+  const py = 520 + 120 * Math.sin(t * 1.3) + 70 * Math.sin(t * 9) * f;
+  pointer(WX + WW - 160 + 30 * Math.sin(t * 0.7), py, 1 - smooth(inv(0, 0.1, t)) * 0 - wash * 0.3);
+
+  // Ploy's message: the phone comes up, then leaves
+  phone(t, TL.phoneIn, TL.phoneOut, 1);
+}
+
+// ---------------------------------------------------------------- phone
+const PW = 560, PH = 1000;
+function bubble(t, tIn, x, y, w, h, mine) {
+  const s = spring(t - tIn, ...BOUNCY);
+  if (s <= 0.001) return false;
+  g.save();
+  const ox = mine ? x + w : x, oy = y + h;
+  g.translate(ox, oy); g.scale(clamp(s, 0, 1.2), clamp(s, 0, 1.2)); g.translate(-ox, -oy);
+  g.globalAlpha = clamp(s * 3);
+  shadow(10, 3, 0.08);
+  rrect(x, y, w, h, 30); g.fillStyle = mine ? ACCENT : PAPER; g.fill(); noShadow();
+  g.restore();
+  return s;
+}
+function phone(t, tIn, tOut, stage) {
+  const u = spring(t - tIn, ...SOFTS) - spring(t - tOut, ...SOFTS);
+  if (u <= 0.001 && t > tIn) return;
+  if (t < tIn) return;
+  const x = W - PW - 150, y = lerp(H + 40, 70, u);
+  g.save();
+  g.translate(x + PW / 2, y + PH / 2); g.rotate((1 - u) * 0.08); g.translate(-x - PW / 2, -y - PH / 2);
+  shadow(80, 30, 0.35); rrect(x, y, PW, PH + 200, 76); g.fillStyle = INK; g.fill(); noShadow();
+  const sx = x + 18, sy = y + 18, sw = PW - 36;
+  g.save(); rrect(sx, sy, sw, PH + 200, 60); g.clip();
+  g.fillStyle = '#eef1f7'; g.fillRect(sx, sy, sw, PH + 200);
+  // header
+  g.fillStyle = PAPER; g.fillRect(sx, sy, sw, 150);
+  g.save(); g.beginPath(); g.arc(sx + 90, sy + 88, 44, 0, Math.PI * 2); g.clip();
+  g.drawImage(snaps.ploy, sx + 46, sy + 44, 88, 88); g.restore();
+  text('Ploy', sx + 154, sy + 84, 40, INK, 700);
+  text('online', sx + 154, sy + 122, 28, '#2e9e6a', 600);
+  // messages, stacked from the bottom of the visible screen
+  const bx = sx + 30, maxW = sw - 60;
+  let by = sy + 200;
+  // typing dots, then message 1 and 2
+  const tp = t >= TL.typing && t < TL.msg1;
+  if (tp) {
+    bubble(t, TL.typing, bx, by, 140, 80, false);
+    for (let i = 0; i < 3; i++) {
+      const a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 10 - i * 1.1));
+      g.fillStyle = `rgba(91,97,120,${a})`; g.beginPath(); g.arc(bx + 40 + i * 30, by + 40, 9, 0, Math.PI * 2); g.fill();
+    }
+  }
+  const s1 = bubble(t, TL.msg1, bx, by, 440, 140, false);
+  if (s1) { g.globalAlpha = clamp(s1 * 2); text('Can you send me all', bx + 30, by + 58, 36, INK, 600); text('the photos of us?', bx + 30, by + 108, 36, INK, 600); g.globalAlpha = 1; }
+  by += 160;
+  const s2 = bubble(t, TL.msg2, bx, by, 430, 90, false);
+  if (s2) { g.globalAlpha = clamp(s2 * 2); text('Just the ones with me!', bx + 30, by + 58, 36, INK, 600); g.globalAlpha = 1; }
+  by += 110;
+  if (stage === 2) {
+    // my reply: a stack of her photos and the count
+    const rw = 390, rx = sx + sw - 30 - rw;
+    const s3 = bubble(t, TL.sent, rx, by, rw, 330, true);
+    if (s3) {
+      g.save(); g.globalAlpha = clamp(s3 * 2);
+      ['blue-1', 'cull-2', 'blue-0', 'cull-4'].forEach((id, i) => {
+        const tx = rx + 18 + (i % 2) * 180, ty = by + 18 + Math.floor(i / 2) * 128;
+        g.save(); rrect(tx, ty, 174, 122, 16); g.clip(); g.drawImage(snaps[id], tx, ty, 174, 122); g.restore();
+      });
+      text('143 photos', rx + 26, by + 306, 36, PAPER, 700);
+      g.restore();
+    }
+    by += 350;
+    const s4 = bubble(t, TL.reply, bx, by, 400, 90, false);
+    if (s4) { g.globalAlpha = clamp(s4 * 2); text('Wow, that was fast!', bx + 30, by + 58, 36, INK, 600); g.globalAlpha = 1; }
+  }
+  g.restore(); g.restore();
+}
+
+// 8-12.5 s: the pink page opens; FaceFinder takes the link and scans.
+const LINK = 'drive.google.com/drive/folders/1gK…';
+function drawApp(t) {
+  g.fillStyle = PAGE; g.fillRect(0, 0, W, H);
+  // the slide over to the folder result
+  const slide = spring(t - (TL.everyIn - 0.2), ...SOFTS);
+  g.save(); g.translate(0, -H * 1.1 * slide);
+  words(["There's a", 'faster way.'], 130, 470, 150, t, TL.faster, TL.appIn - 0.05, INK, { accent: ['faster'] });
+  mascot('cam-wave', 1420, 560, 600, t, TL.wipe + 0.1, { alpha: 1 - smooth(inv(TL.appIn - 0.1, TL.appIn + 0.2, t)) });
+  words(['Paste the', 'Drive link.'], 130, 420, 130, t, TL.appIn + 0.3, TL.scanIn - 0.15, INK, { accent: ['link.'] });
+  words(['Every face,', 'found.'], 130, 420, 130, t, TL.scanIn + 0.25, null, INK, { accent: ['found.'] });
+
+  // the link box, then the scan card in the same place
+  const a = spring(t - TL.appIn, ...SOFTS), toScan = spring(t - TL.scanIn, ...SOFTS);
+  if (a > 0.001) {
+    const bxw = 900, bx = 900, byy = lerp(H + 60, 430, a) - toScan * 900;
+    g.save(); shadow(60, 24, 0.14); rrect(bx, byy, bxw, 250, 40); g.fillStyle = PAPER; g.fill(); noShadow();
+    text('Paste a Google Drive folder link', bx + 50, byy + 70, 34, MUTED, 600);
+    g.lineWidth = 3; g.strokeStyle = '#e3d3db'; rrect(bx + 46, byy + 100, 560, 96, 20); g.stroke();
+    const k = Math.round(LINK.length * inv(TL.typeFrom, TL.typeTo, t));
+    g.save(); rrect(bx + 46, byy + 100, 560, 96, 20); g.clip();
+    text(LINK.slice(0, k), bx + 74, byy + 162, 32, INK, 500);
+    g.restore();
+    const press = t > TL.open - 0.06 && t < TL.open + 0.14 ? 0.94 : 1;
+    g.save(); g.translate(bx + 730, byy + 148); g.scale(press, press);
+    rrect(-110, -48, 220, 96, 48); g.fillStyle = ACCENT; g.fill();
+    text('Open', 0, 12, 36, PAPER, 700, UI, 'center'); g.restore();
+    const pa = smooth(inv(TL.typeTo - 0.3, TL.typeTo, t)) * (1 - smooth(inv(TL.open + 0.15, TL.open + 0.35, t)));
+    pointer(bx + 740 + (1 - smooth(inv(TL.typeTo - 0.3, TL.open, t))) * 120, byy + 150 + (1 - smooth(inv(TL.typeTo - 0.3, TL.open, t))) * 90, pa);
+    g.restore();
+  }
+  if (toScan > 0.001) {
+    const k = Math.min(8, Math.floor(9 * inv(TL.scanFrom, TL.scanTo, t)));
+    const im = IMG['scan_' + k], cs = 0.8, sh = 940;
+    const y = lerp(H + 80, 300, toScan);
+    ui(im, 900, y, cs, 40, { sy: im.height - sh, sh });
+    mascot('cam-search', 900 + 1029 * cs / 2, y - 50 + 14 * Math.sin(t * 5), 230, t, TL.scanIn + 0.15);
+    TL.stages.forEach((ts) => {
+      const p = t - ts;
+      if (p > 0 && p < 0.5) {
+        g.save(); g.globalAlpha = 0.3 * (1 - p / 0.5); g.fillStyle = ACCENT;
+        g.beginPath(); g.arc(900 + 1029 * cs / 2, y + 560, 60 + p * 500, 0, Math.PI * 2); g.fill(); g.restore();
+      }
+    });
+  }
+  g.restore();
+  if (slide > 0.001) { g.save(); g.translate(0, H * 1.1 * (1 - slide)); drawFolder(t); g.restore(); }
+  // the wipe in from the Drive shot
+  const rv = spring(t - TL.wipe, 130, 24);
+  if (rv < 0.999) {
+    g.save(); g.beginPath(); g.rect(0, 0, W, H); g.arc(1700, 560, rv * 2300, 0, Math.PI * 2, true); g.clip('evenodd');
+    drawDrive(Math.min(t, TL.wipe + 0.5)); g.restore();
+  }
+}
+
+// 12.5-16.5 s: a folder for each person; Ploy's is ready, and sent.
+// Ploy's card in everyone_4.png (image px)
+const PLOY = { x: 52, y: 1640, w: 446, h: 680 };
+function drawFolder(t) {
+  g.fillStyle = PAGE; g.fillRect(0, 0, W, H);
+  words(['A folder for', 'each person.'], 130, 400, 130, t, TL.everyIn + 0.1, TL.ploy + 0.1, INK, { accent: ['folder'] });
+  words(['Ploy:', '143 photos.'], 130, 400, 150, t, TL.ploy + 0.25, null, INK, { accent: ['143'] });
+  const sub = spring(t - TL.ploy - 0.6, ...SNAPPY);
+  g.save(); g.globalAlpha = clamp(sub * 2);
+  text('Ready to copy into her own Drive folder.', 136, 640 + (1 - sub) * 20, 44, MUTED, 600);
+  g.restore();
+  const im = IMG.everyone_4, cs = 0.66, sy = 900, sh = 1460;
+  const ph = spring(t - TL.phone2In, ...SOFTS);
+  g.save(); g.globalAlpha = 1 - 0.65 * ph;
+  const c = ui(im, 1060, 60, cs, 40, { sy, sh });
+  // a ring round Ploy
+  const p = spring(t - TL.ploy, ...BOUNCY);
+  if (p > 0.001) {
+    g.save(); g.globalAlpha = clamp(p * 2);
+    g.lineWidth = 10; g.strokeStyle = ACCENT;
+    const rx = c.x + PLOY.x * cs - 12, ry = c.y + (PLOY.y - sy) * cs - 12, rw = PLOY.w * cs + 24, rh = PLOY.h * cs + 24;
+    g.translate(rx + rw / 2, ry + rh / 2); g.scale(lerp(1.15, 1, p), lerp(1.15, 1, p)); g.translate(-rx - rw / 2, -ry - rh / 2);
+    rrect(rx, ry, rw, rh, 30); g.stroke(); g.restore();
+  }
+  g.restore();
+  phone(t, TL.phone2In, 99, 2);
+}
+
+// 16.5-19 s: lockup on accent
+function drawEnd(t) {
+  const u = spring(t - TL.endIn, 160, 26);
+  const left = W * (1 - u);
+  g.fillStyle = ACCENT; g.fillRect(left, 0, W - left + 2, H);
+  g.save(); g.translate(left * 0.4, 0);
+  mascot('cam-celebrate', 1400, 520, 640, t, TL.endIn + 0.15);
+  const s = spring(t - TL.endIn - 0.25, ...SNAPPY);
+  g.save(); g.globalAlpha = clamp(s * 2); g.translate(0, (1 - s) * 40);
+  wordmark(130, 420, 130, PAPER);
+  g.restore();
+  words(['Find everyone', 'in your album.'], 130, 640, 104, t, TL.endLine, null, PAPER, { accent: ['everyone'], accentColor: INK });
+  const s3 = spring(t - TL.endSub, ...SNAPPY);
+  g.globalAlpha = clamp(s3 * 2);
+  text('Google Drive · Gemini · Cloud Run', 136, 900 + (1 - s3) * 30, 44, '#ffe3ee', 600);
+  text('Illustrative animation. Everyone shown is made up.', 136, 966 + (1 - s3) * 30, 30, '#ffc9dc', 500);
+  g.restore();
+}
+
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; noShadow();
+  if (t < TL.wipe) drawDrive(t); else drawApp(t);
+  if (t >= TL.endIn) drawEnd(t);
+}
+window.seek = (t) => { draw(Math.max(0, Math.min(DUR - 1e-6, t))); return true; };
+window.ready.then(() => {
+  if (navigator.webdriver) return;
+  const t0 = performance.now();
+  (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })();
+});
+</script>
+</body>
+</html>
