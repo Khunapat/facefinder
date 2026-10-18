@@ -215,6 +215,29 @@ def recent_albums(request: Request):
     return {"albums": out}
 
 
+@app.post("/api/album/{folder_id}/delete")
+def delete_album_data(request: Request, folder_id: str):
+    """Delete everything FaceFinder keeps about this album: face data, Gemini's
+    notes, and this account's names and recent entry. Nothing in Drive changes."""
+    _need_album(request, folder_id)
+    with _jobs_lock:
+        if folder_id in _jobs:
+            raise HTTPException(409, "Stop the scan first, then delete.")
+        ids = [p["file_id"] for p in store.photos(folder_id)]
+        store.clear_album(folder_id)
+        store.forget_ai(ids)
+        _mat_cache.pop(folder_id, None)
+        for cache, pos in ((_people_cache, 0), (_face_cache, 1)):
+            for key in [k for k in cache if k[pos] == folder_id]:
+                cache.pop(key, None)
+    user = _user_key(request)
+    if user:
+        store.save_names(user, folder_id, [])
+        store.forget_album(user, folder_id)
+    request.session["albums"] = [a for a in request.session.get("albums", []) if a != folder_id]
+    return {"deleted": len(ids)}
+
+
 @app.post("/api/albums/forget")
 def forget_album(request: Request, body: dict = Body(...)):
     """Take an album off this account's recent list. The scan is kept."""
@@ -227,6 +250,9 @@ def forget_album(request: Request, body: dict = Body(...)):
 @app.post("/api/album")
 async def open_album(request: Request):
     body = await request.json()
+    problem = gd.link_problem(body.get("folder", ""))
+    if problem:
+        raise HTTPException(400, problem)
     folder_id = gd.parse_folder_id(body.get("folder", ""))
     if not folder_id:
         raise HTTPException(400, "Paste a Google Drive folder link")
@@ -867,7 +893,7 @@ def _sort_worker(job: dict, photos: list, groups: list):
             list(pool.map(one, batches))
         with job["lock"]:
             unchecked = [p["file_id"] for p in photos if not p["ai"]]
-            job["check"].extend(unchecked)
+            job["unchecked"].extend(unchecked)
             job["done"] += len(unchecked)
             job["status"] = "done"
     except Exception as e:
@@ -898,7 +924,7 @@ def sort_album(request: Request, body: dict = Body(...)):
         _sorts.pop(old, None)
     job = {
         "status": "running", "folder_id": folder_id, "total": len(photos), "done": 0,
-        "groups": [dict(g, file_ids=[]) for g in groups], "check": [], "none": [],
+        "groups": [dict(g, file_ids=[]) for g in groups], "check": [], "unchecked": [], "none": [],
         "names": {p["file_id"]: p["name"] for p in photos},
         "message": None, "lock": threading.Lock(),
     }

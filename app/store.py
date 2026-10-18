@@ -202,6 +202,13 @@ def cache_ai(key: str, judgement: dict):
     c.commit()
 
 
+def forget_ai(file_ids):
+    c = conn()
+    for f in file_ids:
+        c.execute("DELETE FROM ai_cache WHERE key LIKE ?", (f.replace("%", "") + ":%",))
+    c.commit()
+
+
 def cached_ai(key: str):
     r = conn().execute("SELECT ai FROM ai_cache WHERE key=?", (key,)).fetchone()
     return json.loads(r["ai"]) if r else None

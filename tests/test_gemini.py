@@ -41,6 +41,7 @@ cv2.imwrite(os.path.join(ALBUM, "obama-b.jpg"), cv2.convertScaleAbs(img, alpha=1
 img = cv2.imread(os.path.join(ALBUM, "biden.jpg"))
 cv2.imwrite(os.path.join(ALBUM, "zz_blur.jpg"), cv2.GaussianBlur(img, (0, 0), 9))
 
+fakedrive_real_list = main.gd.list_images     # the real one, before the stand-in replaces it
 drive = fakedrive.install(os.path.join(TMP, "drive"), image_dirs=[ALBUM])
 checks = []
 
@@ -346,6 +347,51 @@ def main_test():
     c.post("/api/index", json={"folder_id": fid})
     st = ready()
     check("the rest can be scanned later", st["status"] == "ready" and st["done"] == st["total"] == 7, st)
+
+    print("Sorting a partly checked album")
+    main.store.conn().execute("UPDATE photos SET ai=NULL WHERE folder_id=? AND file_id='biden.jpg'", (fid,))
+    main.store.conn().commit()
+    sug = c.post("/api/groups/suggest", json={"folder_id": fid}).json().get("groups") or [{"name": "x", "description": "people"}]
+    job = c.post("/api/sort", json={"folder_id": fid, "groups": sug}).json()
+    res = wait(lambda: c.get("/api/sort/" + job["job_id"]).json(), lambda j: j["status"] != "running")
+    check("a photo Gemini has not checked is listed as not checked, not as Gemini being unsure",
+          res["unchecked"] == ["biden.jpg"] and "biden.jpg" not in res["check"], (res["unchecked"], res["check"]))
+
+    print("Links that are not Drive folders")
+    for link, words in (("not a drive link", "does not look like"), ("https://photos.app.goo.gl/x", "Google Photos"),
+                        ("https://example.com/a", "not a Google Drive link")):
+        r = c.post("/api/album", json={"folder": link})
+        check("'%s' gets its own advice" % link, r.status_code == 400 and words in r.json()["detail"], r.text)
+
+    print("FaceFinder's own copies are not scanned")
+
+    class Req:
+        def __init__(self, out): self.out = out
+        def execute(self): return self.out
+
+    class Files:
+        tree = {"root": [{"id": "a", "name": "a.jpg", "mimeType": "image/jpeg"},
+                         {"id": "copy", "name": "a.jpg", "mimeType": "image/jpeg", "appProperties": {"ff_src": "a"}},
+                         {"id": "exp", "name": "FaceFinder - x", "mimeType": main.gd.FOLDER_MIME, "appProperties": {"ff": "1"}},
+                         {"id": "sub", "name": "Day 2", "mimeType": main.gd.FOLDER_MIME}],
+                "sub": [{"id": "b", "name": "b.jpg", "mimeType": "image/jpeg"}],
+                "exp": [{"id": "c", "name": "c.jpg", "mimeType": "image/jpeg", "appProperties": {"ff_src": "b"}}]}
+        def list(self, q, **kw): return Req({"files": self.tree[q.split("'")[1]]})
+
+    class Svc:
+        def files(self): return Files()
+    got = sorted(f["id"] for f in fakedrive_real_list(Svc(), "root"))
+    check("exports saved inside the album are left out of the scan", got == ["a", "b"], got)
+
+    print("Delete an album's data")
+    before = {k: set(v) for k, v in drive.copies.items()}
+    r = c.post("/api/album/%s/delete" % fid, json={})
+    check("another session cannot delete it", other.post("/api/album/%s/delete" % fid, json={}).status_code == 403)
+    check("deleting removes the scan", r.status_code == 200 and r.json()["deleted"] == 7 and main.store.album(fid) is None, r.text)
+    check("...the Gemini notes kept for rescans", main.store.cached_ai("obama.jpg:") is None)
+    check("...and this account's names", c.post("/api/album", json={"folder": fakedrive.ALBUM_URL}).status_code == 200
+          and c.get("/api/album/%s/names" % fid).json()["people"] == [])
+    check("nothing in Drive changed", {k: set(v) for k, v in drive.copies.items()} == before)
 
     print()
     print("%d of %d checks passed" % (sum(checks), len(checks)))

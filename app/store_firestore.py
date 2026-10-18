@@ -25,7 +25,7 @@ __all__ = [
     "album", "set_album", "bump_progress", "indexed_file_ids", "save_photo",
     "load_matrix", "save_ai", "photos", "unjudged", "judged_count",
     "clear_album", "face_box", "remember_album", "recent_albums", "forget_album", "cover_ids",
-    "photo_ai", "cache_ai", "cached_ai", "save_names", "load_names",
+    "photo_ai", "cache_ai", "cached_ai", "save_names", "load_names", "forget_ai",
 ]
 
 _lock = threading.Lock()
@@ -129,7 +129,16 @@ def save_ai(folder_id: str, file_id: str, judgement: dict):
 
 
 def cache_ai(key: str, judgement: dict):
-    db().collection("ai_cache").document(key).set({"ai": judgement})
+    db().collection("ai_cache").document(key).set({"ai": judgement, "file_id": key.split(":")[0]})
+
+
+def forget_ai(file_ids):
+    from google.cloud.firestore_v1.base_query import FieldFilter
+
+    col = db().collection("ai_cache")
+    for f in file_ids:
+        for snap in col.where(filter=FieldFilter("file_id", "==", f)).select([]).stream():
+            snap.reference.delete()
 
 
 def cached_ai(key: str):

@@ -160,6 +160,10 @@ main{padding:28px var(--pad) 140px}
 .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .opt{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1.5px solid var(--line-strong);border-radius:var(--r-card);cursor:pointer}
 .opt:hover{border-color:var(--field)}
+.privline{margin-top:6px;font-size:14px;max-width:620px}
+.ailine{margin-top:10px;font-size:15px;color:var(--muted);max-width:560px}
+.privlist{margin:0;padding-left:20px;display:grid;gap:10px;font-size:15px;line-height:1.45}
+.privlist b{color:var(--ink)}
 .opt.off{opacity:.55;cursor:default}.opt.off:hover{border-color:var(--line-strong)}
 .rmosaic img.gone{object-fit:contain;background:var(--page);padding:12px}
 .opt:has(input:checked){border-color:var(--accent);background:#fff8fb}
@@ -476,6 +480,9 @@ dialog.done h2{font-size:26px}
   .actionbar .count{white-space:normal;font-size:14px;line-height:1.3}
   .thumbs{display:none}
 }
+@media (max-width:360px){
+  .tabs button{padding:3px 6px 0;font-size:13px;flex:1 1 auto}
+}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
@@ -518,6 +525,8 @@ dialog.done h2{font-size:26px}
         <div class="msep" id="menuRescanSep"></div>
         <button type="button" class="mi danger" id="menuRescan"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6L20 8.7M20 4v4.7h-4.7"/></svg></span>
           <span><b>Rescan from the start</b><small>Finds the faces again; keeps Gemini's notes</small></span></button>
+        <button type="button" class="mi danger" id="menuDelete"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></span>
+          <span><b>Delete this album's data</b><small>Face data, Gemini's notes, your names. Drive is not touched</small></span></button>
       </div>
     </div>
   </div>
@@ -542,6 +551,7 @@ dialog.done h2{font-size:26px}
         <div class="mhd"><span class="mic initial2" id="acctInitial2"></span>
           <div><span>Signed in as</span><b id="who"></b></div></div>
         <div class="msep"></div>
+        <button type="button" class="mi privlink" id="acctPrivacy"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><span><b>What FaceFinder keeps</b></span></button>
         <button type="button" class="mi" id="auth"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l4-4-4-4M14 12H4"/></svg></span><span><b>Sign out</b></span></button>
       </div>
     </div>
@@ -558,10 +568,13 @@ dialog.done h2{font-size:26px}
     <div class="copy">
       <h1>Find your photos. <em>Choose your moments.</em></h1>
       <p>Find people, review the best moments, and save your selections to Drive.</p>
+      <p class="ailine">A face-recognition model finds who is in each photo. Gemini judges photo quality and
+        describes each photo, so you can sort and search in Thai or English.</p>
       <div id="signinBox" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
         <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
         <span class="hint" style="font-size:14px">FaceFinder reads a Google Drive folder with your Google account
-          and puts the folders in your own Drive. It never deletes or moves anything.</span>
+          and puts the folders in your own Drive. It never deletes or moves anything.
+          <button type="button" class="linkbtn privlink">What FaceFinder keeps</button></span>
       </div>
       <div class="openbox" id="albumPill">
         <label class="flabel" for="album">Google Drive folder link</label>
@@ -571,6 +584,8 @@ dialog.done h2{font-size:26px}
         </div>
       </div>
       <div id="albumMsg" style="margin-top:12px;max-width:620px"></div>
+      <p class="hint privline" id="privLine">FaceFinder only reads your photos and makes copies; it never changes your Drive.
+        <button type="button" class="linkbtn privlink">What FaceFinder keeps</button></p>
     </div>
     <div class="art"><img class="mascot" src="/static/img/cam-wave.png" alt="FaceFinder's camera mascot waving hello"></div>
   </section>
@@ -784,6 +799,32 @@ dialog.done h2{font-size:26px}
 
 <dialog id="doneCard" class="narrow done" aria-label="Export finished"></dialog>
 
+<dialog id="privacyDlg" class="narrow" aria-labelledby="privacyTitle">
+  <div class="dhead"><h2 id="privacyTitle">What FaceFinder keeps</h2>
+    <button type="button" class="iconbtn" id="privacyClose" aria-label="Close"></button></div>
+  <div class="dbody" style="padding-top:18px">
+    <ul class="privlist">
+      <li><b>Your photos are not stored.</b> FaceFinder reads them from Google Drive with your sign-in when it needs
+        them. It never changes, moves or deletes anything in your Drive; an export makes copies.</li>
+      <li><b>Face data:</b> for each face, 512 numbers that describe it and where it sits in the photo. This is not a
+        picture. It is used only to match faces in that album. Faces are matched by a face-recognition model that runs
+        inside FaceFinder, not by Gemini.</li>
+      <li><b>Gemini's notes:</b> a short description and a quality score for each photo. To make them, each photo is
+        sent to Gemini through Google Cloud's Vertex AI, made smaller first (768 pixels on the long side). Google
+        Cloud's terms say this data is not used to train Google's models.</li>
+      <li><b>Your names and recent albums:</b> the names you type and the albums you opened, kept under a coded form of
+        your email address. Only you see them.</li>
+      <li><b>Where:</b> in FaceFinder's own Google Cloud project (Firestore database, Cloud Run). Face crops and
+        thumbnails are made when shown and kept only in memory.</li>
+      <li><b>Your Google sign-in</b> is kept in a signed cookie in this browser and removed when you sign out. You can
+        remove FaceFinder's access at any time at <a href="https://myaccount.google.com/permissions" target="_blank"
+        rel="noopener">myaccount.google.com/permissions</a>.</li>
+      <li><b>How long:</b> until it is deleted. In an open album, use the album menu, then <b>Delete this album's
+        data</b>. People who can open the same Drive folder share its scan, so it is not done twice; FaceFinder checks
+        with Drive that they can open the folder first.</li>
+    </ul>
+  </div>
+</dialog>
 <dialog id="helpDlg" class="narrow" aria-labelledby="helpTitle">
   <div class="dhead"><h2 id="helpTitle">How it works</h2>
     <button type="button" class="iconbtn" id="helpClose" aria-label="Close"></button></div>
@@ -904,7 +945,7 @@ function showAlbum(name, count){
   $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
   $("#albumBtn").title = name;
   $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
-  $("#menuRescan").hidden = $("#menuRescanSep").hidden = !state.ready; if(!state.ready) $("#menuMore").hidden = true;
+  $("#menuRescan").hidden = $("#menuRescanSep").hidden = $("#menuDelete").hidden = !state.ready; if(!state.ready) $("#menuMore").hidden = true;
   if(!state.ready){ $("#menuRetry").replaceChildren(); $("#menuProg").hidden = true; }
 }
 // Small drop-down menus: one open at a time, Escape or a click outside closes.
@@ -936,6 +977,19 @@ document.addEventListener("keydown", e => {
   if(open){ closeMenus(); $(open === "#albumMenu" ? "#albumBtn" : "#acctBtn").focus(); }
 });
 $("#menuOther").onclick = () => { closeMenus(); goHome(); };
+$("#menuDelete").onclick = async () => {
+  closeMenus();
+  const name = state.albumName || "this album";
+  if(!confirm(`Delete FaceFinder's data for "${name}"?\n\nThis removes its face data, Gemini's notes and the names you typed. ` +
+              `Nothing in your Google Drive changes. People who share this folder would need to scan it again.`)) return;
+  try {
+    await postJSON(`/api/album/${encodeURIComponent(state.folderId)}/delete`, {});
+    try { sessionStorage.removeItem(NAMES_KEY()); } catch(e){}
+    state.folderId = null;
+    goHome();
+    msg($("#albumMsg"), `Deleted FaceFinder's data for "${esc(name)}". Nothing in your Drive changed.`, "ok");
+  } catch(e){ notice(e.message); }
+};
 $("#menuRescan").onclick = async () => {
   closeMenus();
   const k = (state.checkedCount || 0).toLocaleString("en");
@@ -999,6 +1053,8 @@ $("#helpBtn").onclick = () => {
   $("#helpDlg").showModal();
 };
 $("#helpClose").innerHTML = CLOSE; $("#helpClose").onclick = () => $("#helpDlg").close();
+$("#privacyClose").innerHTML = CLOSE; $("#privacyClose").onclick = () => $("#privacyDlg").close();
+document.querySelectorAll(".privlink").forEach(b => b.onclick = () => { closeMenus(); $("#privacyDlg").showModal(); });
 
 /* A "group" is a set of photos that becomes one folder, however it was found:
    kind "search"  -> all = every match down to 0.20, filtered live by the slider
@@ -1032,6 +1088,7 @@ async function refreshMe(){
   $("#gsiNav").hidden = me.signed_in;
   $("#acct").hidden = !me.signed_in;
   $("#signinBox").hidden = me.signed_in;
+  $("#privLine").hidden = !me.signed_in;
   $("#albumPill").hidden = !me.signed_in;
   state.sampleAlbum = me.sample_album || null;
   state.limitedDrive = me.drive_access !== "full";
@@ -1357,7 +1414,7 @@ function nav(view, replace = false){
   state.choosePushed = view === "choose" && !same && !replace;
 }
 function closeOverlays(){
-  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg", "#doneCard"]) document.querySelector(d)?.open && document.querySelector(d).close();
+  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg", "#privacyDlg", "#doneCard"]) document.querySelector(d)?.open && document.querySelector(d).close();
   closeSide(); closeMenus();
 }
 window.addEventListener("popstate", () => {
@@ -1951,6 +2008,10 @@ $("#runSort").onclick = async () => {
     const row = f => ({file_id:f, name:job.names[f] || f});
     state.sorted = job.groups.map(gr => ({kind:"set", name:gr.name, note:gr.description,
                                            all:gr.file_ids.map(row), removed:new Set(), limit:24}));
+    if(job.unchecked?.length)
+      state.sorted.push({kind:"set", name:"Not checked by Gemini yet", check:true, all:job.unchecked.map(row),
+                         removed:new Set(job.unchecked), limit:24,
+                         note:"The scan stopped before Gemini described these, so they could not be sorted. Finish the scan from the album menu, then sort again."});
     if(job.check.length)
       state.sorted.push({kind:"set", name:"Check these", check:true, all:job.check.map(row),
                          removed:new Set(job.check), limit:24,
@@ -1959,6 +2020,7 @@ $("#runSort").onclick = async () => {
     const notes = [];
     if(job.none.length) notes.push(`${plural(job.none.length, "photo fits", "photos fit")} none of the groups`);
     if(job.check.length) notes.push(`${plural(job.check.length, "photo needs", "photos need")} a look`);
+    if(job.unchecked?.length) notes.push(`${plural(job.unchecked.length, "photo was", "photos were")} not checked by Gemini yet`);
     msg($("#sortMsg"), `Done: ${plural(placed, "photo", "photos")} sorted into folders` +
       (notes.length ? `; ${notes.join(", and ")}.` : "."), "ok");
     renderSorted();

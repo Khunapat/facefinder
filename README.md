@@ -93,6 +93,26 @@ Drive; the app never takes ownership of the album.
 
 ---
 
+## Privacy: what FaceFinder keeps
+
+- **Photos are not stored.** They are read from Google Drive with the user's own
+  sign-in when needed. Nothing in Drive is changed, moved or deleted; exports are
+  copies. FaceFinder's own export folders and copies are skipped by later scans.
+- **Face data:** per face, a 512-number embedding and its box in the photo, used
+  only to match faces within that album. Matching runs in the container; Gemini
+  never decides who is in a photo.
+- **Gemini's notes:** per photo, a short description and quality score from
+  Gemini on Vertex AI, from a copy shrunk to 768 px on the long side.
+- **Per account:** the names typed for people and the recent albums, under a
+  hash of the email address.
+- **Where:** Firestore and Cloud Run in the project's own Google Cloud project.
+  Face crops and thumbnails stay in memory only. The Google sign-in lives in a
+  signed session cookie and is removed on sign-out.
+- **How long:** until deleted. The album menu's "Delete this album's data"
+  removes the face data, Gemini's notes and the user's names for that album.
+- **Who:** a scan is shared by everyone who can open the same Drive folder;
+  every album request is checked against Drive first (`_need_album`).
+
 ## Setup: Google OAuth credentials
 
 You need these before the app can do anything.
