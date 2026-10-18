@@ -22,7 +22,7 @@ photos) means scrolling for an hour.
    open Best 10 to read Gemini's reasons.
 3. **Sort:** describe a folder in Thai or English and watch photos fill it.
 4. **Cull photos:** see Keep, Review and Rejected, each photo with a reason.
-5. **Create folders:** copies land in a new `FaceFinder - <album name>` folder in
+5. **Export to Drive:** copies land in a new `FaceFinder - <album name>` folder in
    your own Drive. You can delete that folder afterwards.
 
 Submission notes, architecture and video script: [`docs/SUBMISSION.md`](docs/SUBMISSION.md).
