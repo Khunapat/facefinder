@@ -7,7 +7,7 @@ Numbers marked **[TIME FROM TEST]** still need a measured value.
 
 Submission checklist (from the official rules): theme **Media, Content & Digital
 Experiences**; working deployed link; public GitHub repository; deck as a PDF;
-a public YouTube, Vimeo or Google Drive video **under 3 minutes**; everything in
+a public YouTube, Vimeo or Google Drive video of **3 to 4 minutes** (the submission form's rule; aim for about 3:30); everything in
 English.
 
 ---
@@ -31,6 +31,26 @@ in your own Drive and copies their photos in. Nothing in the original album is
 changed, and photos are never stored by FaceFinder.
 
 ---
+
+## Brief description for the submission form
+
+FaceFinder turns one shared Google Drive event album into one folder per person.
+Paste the album link and FaceFinder scans it once: an InsightFace face model,
+running inside our Cloud Run container, groups every face into people, and
+Gemini on Vertex AI writes one short note per photo with a quality score, flaws
+and a description. Anyone can then name a face or upload a selfie to find a
+person, let Gemini suggest Keep, Review or Rejected with a reason for each
+photo, sort the album by a plain-word description, and copy one folder per
+person into their own Drive. Originals are never changed and photos are never
+stored.
+
+Google services: **Cloud Run** runs the whole app (FastAPI, the face model and
+background scans). **Firestore** stores face data, Gemini's notes, typed names
+and recent albums, so scans survive restarts. **Firebase Hosting** gives the
+public address and forwards every request to Cloud Run. **Gemini** (Vertex AI)
+judges and describes each photo once (cached, so rescans cost nothing), sorts
+by description and suggests folders. The **Google Drive API** reads albums and
+copies photos with the user's own sign-in.
 
 ## 2. How we use Google Cloud
 
@@ -143,22 +163,24 @@ real people and no public figures.
 
 ---
 
-## 5. Video script (under 3 minutes)
+## 5. Video script (3 to 4 minutes, aim for 3:30)
 
+The submission form asks for 3 to 4 minutes and penalises longer videos. Show the
+live app working; say on screen when a scan is sped up.
 On screen at the start and whenever the sample album is visible:
 *"Ploy, Ton, Mint, Bank and Fah are made-up people, created with Gemini."*
 
 | Time | On screen | What I say |
 |---|---|---|
-| 0:00 | A Drive folder with hundreds of graduation photos, scrolling fast. | "After graduation, the photographer shares one folder with thousands of photos. Finding yourself, or sending friends their photos, takes an hour of scrolling." |
-| 0:20 | Start page, sign in, open the Sample album card. Caption: face model vs Gemini. | "FaceFinder uses two kinds of AI. A face model, InsightFace, decides who is in each photo. Gemini on Vertex AI judges, describes and sorts photos. Gemini never decides who someone is." |
-| 0:40 | Find people: add Ploy with one face photo, results appear. Open Best 10 with Gemini's reasons. Untick one wrong photo. | "I add Ploy with one photo. Her photos appear in seconds. Best 10 shows her best shots, and Gemini says why for each one. If something is wrong, I untick it." |
-| 1:10 | Sort tab: Gemini's folder suggestions, then a folder described in plain words ("graduates throwing their caps"). Matching photos fill in. | "Sort lets me describe a folder in plain words. Gemini suggests ideas, and sorts from the descriptions it wrote once during the scan, so it does not read every photo again." |
-| 1:45 | Cull photos: Keep, Review, Rejected piles. Open one rejected photo with its reason; tick it back. | "For the photographer, Cull sorts the album into Keep, Review and Rejected. Every photo says why: blurry, eyes closed, a near-copy. I stay in control and can tick any photo back." |
-| 2:15 | Press Export to Drive: progress, done card. Then a phone showing Google Drive with Ploy, Ton, Mint, Bank and Fah folders. | "One click creates a folder per person in my own Drive and copies their photos in. The original album is never changed. On my phone, everyone's folder is ready to share." |
-| 2:45 | "What FaceFinder keeps" window, then the time-saved number. | "Photos are never stored. Face data and Gemini's notes can be deleted at any time. In our test, finding one person took [TIME FROM TEST] instead of [TIME FROM TEST]. FaceFinder, on Google Cloud." |
-
----
+| 0:00 | A Drive folder with many graduation photos, scrolling fast. | "After a graduation, the photographer shares one Google Drive folder with hundreds of photos. Finding yourself, or sending each friend their photos, takes an hour of scrolling. And the photographer still has to throw out the blurry shots by hand." |
+| 0:25 | Start page; the line about the face model and Gemini. | "FaceFinder fixes that with two kinds of AI. A face-recognition model decides who is in each photo. Gemini on Vertex AI judges how good each photo is and describes what is in it. Gemini never decides who someone is." |
+| 0:45 | Sign in with Google, open the Sample album card, the scan screen (caption: "sped up"). | "I sign in with Google and open a shared album. FaceFinder scans it once: it finds every face, and Gemini writes one short note per photo. The album itself is never changed." |
+| 1:10 | Everyone: faces grouped; type Ploy, Ton and Mint; the cards tick themselves. | "Everyone shows each person in the album. I type a name, and that person gets a folder. If someone appears twice, giving both cards the same name joins them." |
+| 1:35 | Find people: upload Mint's selfie, her photos appear; open Best 10 and read a reason; untick one photo. | "Or I upload one selfie. Mint's photos appear in about a second. Best 10 picks her best shots, and Gemini says why for each one. I stay in control and untick anything I don't want." |
+| 2:05 | Sort: tap "Throwing caps", press Sort; then "Suggest folders with Gemini". | "Sort lets me describe a folder in plain words, like 'graduates throwing their caps'. Gemini fills it from the notes it wrote during the scan, so it does not look at every photo again, and it can suggest folders itself." |
+| 2:35 | Cull photos: Keep, Review, Rejected; open the blurry photo and a burst look-alike with "tap to switch". | "For the photographer, Cull sorts the album into Keep, Review and Rejected, with a reason for every photo: blurry, eyes closed, or a weaker shot of the same moment." |
+| 3:00 | Export to Drive, the done card, then Google Drive on a phone with the folders. | "One click copies each person's photos into a folder in my own Drive. Copies are made inside Google, so it takes seconds, and the original album is never touched." |
+| 3:20 | "What FaceFinder keeps" window, then the architecture picture, then the logo. | "Photos are never stored, and every album's data can be deleted at any time. FaceFinder runs on Cloud Run with Firestore and Firebase Hosting, with Gemini on Vertex AI. FaceFinder: every friend's photos, sorted." |
 
 ## 6. Deck outline
 
