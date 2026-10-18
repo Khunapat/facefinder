@@ -70,8 +70,9 @@ the wider permission.
 
 Face recognition is not a language-model job. It uses **InsightFace buffalo_l**
 (an ArcFace model) running locally in the container through ONNX Runtime. It
-costs nothing per photo and has no token limit. Asking Gemini "is this the same
-person?" would be slower, more expensive, and *less* accurate. Gemini does the
+has no per-photo fee and no token limit, and its decisions are repeatable. We
+have not benchmarked Gemini for identity matching; we keep that job on a
+dedicated face model on purpose. Gemini does the
 jobs a face model cannot: judging photo quality for culling, describing photos
 for search and sorting, and suggesting folders.
 
@@ -110,7 +111,8 @@ See [Privacy: what FaceFinder keeps](#privacy-what-facefinder-keeps) below.
 
 ## Privacy: what FaceFinder keeps
 
-- **Photos are not stored.** They are read from Google Drive with the user's own
+- **No photo library is kept.** Photos are processed temporarily; a resized copy
+  goes to Gemini on Vertex AI. They are read from Google Drive with the user's own
   sign-in when needed. Nothing in Drive is changed, moved or deleted; exports are
   copies. FaceFinder's own export folders and copies are skipped by later scans.
 - **Face data:** per face, a 512-number embedding and its box in the photo, used

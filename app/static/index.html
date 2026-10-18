@@ -818,8 +818,9 @@ dialog.done h2{font-size:26px}
     <button type="button" class="iconbtn" id="privacyClose" aria-label="Close"></button></div>
   <div class="dbody" style="padding-top:18px">
     <ul class="privlist">
-      <li><b>Your photos are not stored.</b> FaceFinder reads them from Google Drive with your sign-in when it needs
-        them. It never changes, moves or deletes anything in your Drive; an export makes copies.</li>
+      <li><b>Your photos are not kept.</b> FaceFinder reads them from Google Drive with your sign-in when it needs
+        them and processes them in memory; it does not keep a copy. A resized copy of each photo is sent to Gemini on
+        Vertex AI (see below). It never changes, moves or deletes anything in your Drive; an export makes copies.</li>
       <li><b>Face data:</b> for each face, 512 numbers that describe it and where it sits in the photo. This is not a
         picture. It is used only to match faces in that album. Faces are matched by a face-recognition model that runs
         inside FaceFinder, not by Gemini.</li>
@@ -1067,7 +1068,7 @@ $("#helpBtn").onclick = () => {
   const how = panel?.querySelector(".how p");
   $("#helpTitle").textContent = how ? "How " + panel.querySelector("h2").textContent.toLowerCase() + " works" : "How FaceFinder works";
   $("#helpText").textContent = how ? how.textContent.replace(/\s+/g, " ").trim()
-    : "Paste the link of a shared Google Drive album. FaceFinder finds every face and Gemini checks every photo once. Then you can find people, choose people to get folders, sort by a description, or cull the weak shots. Everything you pick is copied into folders in your own Drive; the album itself is never changed.";
+    : "Paste the link of a shared Google Drive album. FaceFinder detects and matches faces, and Gemini checks every photo once. Then you can find people, choose people to get folders, sort by a description, or cull the weak shots. Everything you pick is copied into folders in your own Drive; the album itself is never changed.";
   $("#helpDlg").showModal();
 };
 $("#helpClose").innerHTML = CLOSE; $("#helpClose").onclick = () => $("#helpDlg").close();

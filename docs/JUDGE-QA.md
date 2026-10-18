@@ -7,9 +7,7 @@
 Each question has a short answer you can say out loud. "Where" shows the proof
 in the repo. "Note for us" is for the team only; do not read it out.
 
-Placeholders: **[TIME FROM TEST]** is a time we still have to measure.
-**[PRICE ...]** is a price to look up on the day. **[TOKENS ...]** is a token
-count to read from Vertex AI usage after a real scan.
+No measured per-album cost is claimed: the cost answer gives the formula and the number of calls only.
 
 ---
 
@@ -171,31 +169,31 @@ attempts are billed.
 **Cost formula for N = 1,000 photos (first scan):**
 
 ```
-Gemini  = N × [ (T_image + T_prompt) × [PRICE per input token]
-              + (T_answer + T_thinking) × [PRICE per output token] ]
-        + per Sort run:      ceil(J/40) × (T_sort_in × [PRICE per input token] + T_sort_out × [PRICE per output token])
-        + per Suggest press: 1 × (T_sug_in × [PRICE per input token] + T_sug_out × [PRICE per output token])
+Gemini  = N × [ (T_image + T_prompt) × (today's price, not quoted)
+              + (T_answer + T_thinking) × (today's price, not quoted) ]
+        + per Sort run:      ceil(J/40) × (T_sort_in × (today's price, not quoted) + T_sort_out × (today's price, not quoted))
+        + per Suggest press: 1 × (T_sug_in × (today's price, not quoted) + T_sug_out × (today's price, not quoted))
 
-Cloud Run = T_scan × (4 × [PRICE per vCPU-second] + 8 × [PRICE per GiB-second])
+Cloud Run = T_scan × (4 × (today's price, not quoted) + 8 × (today's price, not quoted))
 
-Firestore ≈ N × (4 × [PRICE per document write] + 1 to 2 × [PRICE per document read])
-          + N × [PRICE per document read] for each Cull, Best 10, Sort or Suggest press
-          + stored data × [PRICE per GiB-month]
+Firestore ≈ N × (4 × (today's price, not quoted) + 1 to 2 × (today's price, not quoted))
+          + N × (today's price, not quoted) for each Cull, Best 10, Sort or Suggest press
+          + stored data × (today's price, not quoted)
 
 Total for 1,000 photos ≈ Gemini + Cloud Run + Firestore
 ```
 
 - `T_image` = tokens for one image of 768 px on the long side:
-  [TOKENS per 768 px image]. `T_prompt` = the judge prompt
+  read from Vertex AI usage. `T_prompt` = the judge prompt
   (`app/gemini.py:122-173`). `T_answer` = the JSON note. `T_thinking` =
   thinking tokens; the code sets thinking level LOW (`app/gemini.py:90`). Read
   the real numbers from Vertex AI usage after one scan of the sample album:
-  [TOKENS FROM TEST].
+  not measured yet.
 - Cloud Run: deployed with `CPU=4` (`README.md:208`, `HANDOFF.md:105`), which
   gives 8 GiB; the script's own default is 2 CPUs and 4 GiB
   (`scripts/deploy-cloudrun.sh:23`, `33`, `115-120`). The CPU is always on, so the
   instance is billed for as long as it is up, not only during requests.
-  `T_scan` for 1,000 photos = [TIME FROM TEST]. The page's own time estimate
+  `T_scan` for 1,000 photos has not been measured. The page's own time estimate
   uses 2 s per photo with Gemini (0.6 s without), and the code comment says
   this was "measured on Cloud Run, 4 CPUs" (`app/static/index.html:1188`).
   There is no test log for it in the repo.
@@ -207,7 +205,7 @@ Total for 1,000 photos ≈ Gemini + Cloud Run + Firestore
   (`app/main.py:421`). Small extras: one read and one write every 20 s while a
   scan runs (the heartbeat), and the status checks while the page is open
   (`app/main.py:320-327`, `594-603`).
-- Drive API calls and network traffic are not in the formula: [PRICE].
+- Drive API calls and network traffic are not in the formula.
 - What keeps it low: the sample album is scanned once for all judges, and
   visitors cannot delete it, stop its scan or rescan it from the start
   (`app/main.py:229`, `462`, `513-517`, `581`); users can also choose to scan
@@ -238,7 +236,7 @@ service scale to many instances while the workers scale on their own.
 - Gemini calls are already parallel: up to 24 at a time per scan, and Sort
   uses a pool of the same size (`app/config.py:73`, `app/main.py:357`, `916`).
 - `MIN_INSTANCES` is 0 by default, so the service sleeps when idle and the
-  first visit after a quiet time waits for a cold start: [TIME FROM TEST]
+  first visit after a quiet time waits for a cold start (not measured)
   (`scripts/deploy-cloudrun.sh:14-15`).
 - Note for us: each photo adds 1 to the same album document in Firestore
   (`app/store_firestore.py:77-84`). With many workers on one album, that
