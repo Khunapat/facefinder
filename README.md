@@ -7,6 +7,26 @@ Built for the graduation-photo problem: the photographer hands over one folder
 with 4,000 photos in it, and finding yourself (or sorting out who gets which
 photos) means scrolling for an hour.
 
+## For judges
+
+- **Open:** <https://facefinder-508213.web.app>
+- **Sign in with Google.** Google may show "Google hasn't verified this app".
+  Press **Advanced**, then **Go to FaceFinder**. The app asks to read Drive so
+  it can open the shared album.
+- **Open the Sample album card** on the start page (it shows after sign-in). It
+  holds photos of made-up people created with Gemini.
+
+**What to try in 2 minutes:**
+1. **Everyone:** see the album grouped into people; type a name on a face.
+2. **Find people:** add a person with one face photo and see their photos;
+   open Best 10 to read Gemini's reasons.
+3. **Sort:** describe a folder in Thai or English and watch photos fill it.
+4. **Cull photos:** see Keep, Review and Rejected, each photo with a reason.
+5. **Create folders:** copies land in a new `FaceFinder - <album name>` folder in
+   your own Drive. You can delete that folder afterwards.
+
+Submission notes, architecture and video script: [`docs/SUBMISSION.md`](docs/SUBMISSION.md).
+
 ## How it works
 
 1. You sign in with Google.
