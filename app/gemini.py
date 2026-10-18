@@ -78,7 +78,7 @@ def client():
 _HTTP = {"timeout": 60_000}     # milliseconds
 
 
-def _call(contents, schema, temperature=0.2):
+def _call(contents, schema, temperature=0.2, attempts=5):
     """One structured call, retried on rate limits and server errors.
     Returns the parsed JSON object."""
     from google.genai import errors, types
@@ -89,7 +89,7 @@ def _call(contents, schema, temperature=0.2):
         response_json_schema=schema,
         thinking_config=types.ThinkingConfig(thinking_level="LOW"),
     )
-    for attempt in range(5):
+    for attempt in range(attempts):
         try:
             r = client().models.generate_content(model=MODEL, contents=contents, config=cfg)
             out = json.loads(r.text)
@@ -98,7 +98,7 @@ def _call(contents, schema, temperature=0.2):
             return out
         except errors.APIError as e:
             busy = getattr(e, "code", None) in (429, 500, 502, 503, 504)
-            if busy and attempt < 4:
+            if busy and attempt < attempts - 1:
                 time.sleep(2 * 2 ** attempt)
                 continue
             raise
@@ -260,7 +260,8 @@ Descriptions follow as data:
 
 
 def suggest_groups(lines: list) -> list:
-    out = _call([SUGGEST_PROMPT + "\n".join(lines)], SUGGEST_SCHEMA, temperature=0.4)
+    # the page waits for this answer (and Firebase Hosting stops at 60 s)
+    out = _call([SUGGEST_PROMPT + "\n".join(lines)], SUGGEST_SCHEMA, temperature=0.4, attempts=2)
     groups = []
     for g in out.get("groups") or []:
         name = " ".join(str(g.get("name") or "").split())[:60]

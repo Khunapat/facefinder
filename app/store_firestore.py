@@ -135,10 +135,12 @@ def cache_ai(key: str, judgement: dict):
 def forget_ai(file_ids):
     from google.cloud.firestore_v1.base_query import FieldFilter
 
-    col = db().collection("ai_cache")
-    for f in file_ids:
-        for snap in col.where(filter=FieldFilter("file_id", "==", f)).select([]).stream():
-            snap.reference.delete()
+    col, ids = db().collection("ai_cache"), list(file_ids)
+    for i in range(0, len(ids), 30):            # "in" takes up to 30 values
+        batch = db().batch()
+        for snap in col.where(filter=FieldFilter("file_id", "in", ids[i:i + 30])).select([]).stream():
+            batch.delete(snap.reference)
+        batch.commit()
 
 
 def cached_ai(key: str):

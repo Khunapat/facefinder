@@ -383,12 +383,27 @@ def main_test():
     got = sorted(f["id"] for f in fakedrive_real_list(Svc(), "root"))
     check("exports saved inside the album are left out of the scan", got == ["a", "b"], got)
 
+    print("The shared sample album is protected")
+    main.config.SAMPLE_ALBUM = fakedrive.ALBUM_URL
+    try:
+        r1 = c.post("/api/album/%s/delete" % fid, json={})
+        r2 = c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        r3 = c.post("/api/index/stop", json={"folder_id": fid})
+        me = c.get("/api/me").json()
+    finally:
+        main.config.SAMPLE_ALBUM = ""
+    check("nobody can delete, rescan or stop the sample album for everyone",
+          r1.status_code == r2.status_code == r3.status_code == 403 and "sample album" in r1.json()["detail"], (r1.text, r2.text, r3.text))
+    check("the page is told which folder is the sample", me.get("sample_folder_id") == fid, me.get("sample_folder_id"))
+    check("the sample album was left as it was", main.store.album(fid)["status"] == "ready")
+
     print("Delete an album's data")
     before = {k: set(v) for k, v in drive.copies.items()}
     r = c.post("/api/album/%s/delete" % fid, json={})
     check("another session cannot delete it", other.post("/api/album/%s/delete" % fid, json={}).status_code == 403)
     check("deleting removes the scan", r.status_code == 200 and r.json()["deleted"] == 7 and main.store.album(fid) is None, r.text)
-    check("...the Gemini notes kept for rescans", main.store.cached_ai("obama.jpg:") is None)
+    gone = wait(lambda: main.store.cached_ai("obama.jpg:"), lambda v: v is None, 20)   # cleared in the background
+    check("...the Gemini notes kept for rescans", gone is None)
     check("...and this account's names", c.post("/api/album", json={"folder": fakedrive.ALBUM_URL}).status_code == 200
           and c.get("/api/album/%s/names" % fid).json()["people"] == [])
     check("nothing in Drive changed", {k: set(v) for k, v in drive.copies.items()} == before)

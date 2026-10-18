@@ -205,7 +205,7 @@ def cache_ai(key: str, judgement: dict):
 def forget_ai(file_ids):
     c = conn()
     for f in file_ids:
-        c.execute("DELETE FROM ai_cache WHERE key LIKE ?", (f.replace("%", "") + ":%",))
+        c.execute("DELETE FROM ai_cache WHERE substr(key, 1, ?) = ?", (len(f) + 1, f + ":"))
     c.commit()
 
 

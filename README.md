@@ -104,14 +104,7 @@ exposes a slider.
 
 ### Privacy
 
-The server stores face vectors, face box positions and file IDs. It does not
-store the photos — image bytes are fetched, embedded, and discarded. The small
-face crops shown on the "everyone" screen are cut from the photo on request and
-held in memory only. The index is shared between users of the same album, so a
-session can only read an album after opening it through its own Drive access. Copies land in the user's own
-Drive; the app never takes ownership of the album.
-
----
+See [Privacy: what FaceFinder keeps](#privacy-what-facefinder-keeps) below.
 
 ## Privacy: what FaceFinder keeps
 
@@ -155,9 +148,11 @@ scope. Google classes that as a **restricted** scope: publishing the app to
 unlimited users requires Google verification plus a third-party CASA security
 assessment, which costs money and takes weeks.
 
-For a graduation class this does not matter — leave the app in **Testing** mode
-and add your friends' emails as test users. The only cost is that their consent
-expires after 7 days and they sign in again.
+FaceFinder is **published (In production) without verification**, so anyone
+can sign in: Google first shows a "Google hasn't verified this app" warning
+(press Advanced, then Go to FaceFinder). Google limits an unverified app to 100
+users. Do not leave the app in Testing mode: then only listed test users can
+sign in, and their sign-in expires after 7 days.
 
 If you later want it fully public, the route is to switch to the
 `drive.file` scope with the Google Picker, which is *not* restricted, at the
@@ -175,7 +170,7 @@ environment variables.
 |------------------------|----------|------------------------------------------------|
 | `GOOGLE_CLIENT_ID`     | yes      | from the step above                            |
 | `GOOGLE_CLIENT_SECRET` | yes      | from the step above                            |
-| `PUBLIC_BASE_URL`      | yes      | e.g. `https://you-facefinder.hf.space`         |
+| `PUBLIC_BASE_URL`      | yes      | e.g. `https://facefinder-508213.web.app`; sign-in returns here |
 | `SESSION_SECRET`       | yes      | any long random string                         |
 | `DATA_DIR`             | no       | mount a volume here to keep the index          |
 | `DEFAULT_THRESHOLD`    | no       | default match strictness (0.38)                |
@@ -184,6 +179,12 @@ environment variables.
 | `COPY_WORKERS`         | no       | parallel copies while creating folders (4)     |
 | `INDEX_WORKERS`        | no       | parallel downloads while scanning (4)          |
 | `THUMB_SIZE`           | no       | pixels on the long edge when scanning (1600)   |
+| `STORE`                | no       | `sqlite` (default) or `firestore` (Cloud Run)  |
+| `GOOGLE_CLOUD_PROJECT` | for Gemini/Firestore | the Google Cloud project           |
+| `GEMINI_MODEL`         | no       | default `gemini-3.5-flash`                     |
+| `GEMINI_LOCATION`      | no       | Vertex AI location (`global` on Cloud Run)     |
+| `GEMINI_WORKERS`       | no       | parallel Gemini calls while scanning (24)      |
+| `SAMPLE_ALBUM`         | no       | a Drive folder shared "Anyone with the link", shown as the sample album |
 
 #### `DRIVE_ACCESS`: writing into a folder the user already has
 
@@ -199,93 +200,26 @@ see, edit, create and delete all of the user's Drive files, and everyone has to
 sign in again once. Google classes both `drive.readonly` and `drive` as
 restricted, so this does not change the 100-test-user situation.
 
-### Option A - GitHub Codespaces (free, and the quickest to try)
+### Google Cloud Run (what FaceFinder uses)
 
-Runs the app on GitHub's machines straight from this repo, with a public
-HTTPS URL anyone can open on a phone. Free tier is 120 core-hours a month,
-which is about 60 hours on a 2-core machine.
-
-Worth knowing: a codespace has proper datacenter cores and no thermal
-throttling, so indexing an album is typically several times faster than on a
-thin laptop, where a 15 W CPU throttles hard under a sustained scan.
-
-1. Add your OAuth credentials as **Codespaces secrets** (not in the repo):
-   <https://github.com/settings/codespaces> -> New secret ->
-   `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`, granted to this repository.
-2. **Code -> Codespaces -> Create codespace**. The devcontainer installs the
-   dependencies and pulls the face model on first build, so give it a few
-   minutes.
-3. In the codespace terminal:
-
-   ```bash
-   ./scripts/run-codespace.sh
-   ```
-
-   It works out the public URL from the codespace itself and prints the exact
-   redirect URI to register - PUBLIC_BASE_URL and the redirect URI cannot
-   drift apart, which is the usual reason sign-in fails.
-4. Paste that redirect URI into the OAuth client in Google Cloud Console.
-5. **PORTS** tab -> right-click port 8000 -> **Port Visibility -> Public**.
-   Without this, visitors hit a GitHub login wall instead of the app.
-
-Once the secrets are stored, starting the codespace is the whole procedure -
-the devcontainer starts the server for you and forwards port 8000 publicly.
-`tail -f /tmp/facefinder.log` shows what it is doing.
-
-**A stopped codespace cannot be woken by a visitor.** Idle for the timeout
-period and it stops; the URL is then dead until you open the codespace again.
-Nothing in the repo can change that, so it is worth raising the timeout to its
-240-minute maximum under <https://github.com/settings/codespaces>. If you need
-a URL that stays up unattended for days, a small always-on host is the honest
-answer, not a codespace.
-
-Other caveats: a long scan with nobody connected can be interrupted (it resumes
-by skipping already-indexed file IDs). The index lives in the codespace, so deleting it loses the index,
-not the model. And it is a development environment rather than a hosting
-product - fine for one graduation, not a permanent home.
-
-### Option B - Hugging Face Spaces
-
-2 vCPU and 16 GB RAM, which is far more memory than any other tier here
-and makes this a comfortable fit for a model workload.
-
-**No longer free.** Hugging Face now requires a paid plan (PRO for personal
-accounts) to create Gradio or Docker Spaces - only Static Spaces are free.
-PRO also unlocks "Protected" visibility, which is the setting you want here:
-the source stays private while the running app is publicly reachable. A
-*Private* Space returns 404 to everyone but you, so classmates cannot use it.
-
-1. Create a Space, SDK = **Docker**, visibility public or private.
-2. Put this at the very top of the Space's `README.md`:
-
-   ```yaml
-   ---
-   title: FaceFinder
-   sdk: docker
-   app_port: 8000
-   ---
-   ```
-3. **Settings → Variables and secrets:** add the four required variables as
-   *secrets*. `PUBLIC_BASE_URL` is `https://<user>-<space>.hf.space`.
-4. Push this folder to the Space's git remote. It builds and deploys itself.
-
-Caveat: persistent storage for Spaces was retired in 2026, so a restart clears
-the index and the next search re-scans the album.
-
-### Option C - Google Cloud Run
-
-Neat because it lives in the same Google Cloud project as the OAuth client, and
-it scales to zero so an idle app costs nothing.
+From Cloud Shell, in this repo:
 
 ```bash
-gcloud run deploy facefinder --source . --region asia-southeast1 \
-  --allow-unauthenticated --memory 2Gi --cpu 2 --timeout 3600 \
-  --set-env-vars "PUBLIC_BASE_URL=https://YOUR-URL,DEFAULT_THRESHOLD=0.38" \
-  --set-secrets "GOOGLE_CLIENT_ID=gcid:latest,GOOGLE_CLIENT_SECRET=gcsec:latest,SESSION_SECRET=sess:latest"
+CPU=4 bash scripts/deploy-cloudrun.sh
 ```
 
-Deploy once to learn the URL, put that URL into `PUBLIC_BASE_URL` and into the
-OAuth client's redirect URI, then deploy again.
+The script enables the APIs, stores the secrets in Secret Manager, creates the
+Firestore database and deploys with the settings the app needs: **one instance**
+(`--max-instances 1`) with **CPU always on** (`--no-cpu-throttling`), because
+scans and exports run as background jobs inside the instance, and
+`STORE=firestore`, because Cloud Run's disk is wiped on every restart. It then
+puts Firebase Hosting in front (`scripts/deploy-firebase.sh`). Add
+`SAMPLE_ALBUM="<Drive folder link>"` before `CPU=4` to set the sample album; it
+is remembered for later deploys. Every deploy restarts the instance and stops a
+running scan or export (the scan can be resumed).
+
+GitHub Codespaces and Hugging Face Spaces were tried earlier and are not used:
+a codespace sleeps when idle, and Docker Spaces now need a paid plan.
 
 ### Running it locally (only for development)
 
@@ -307,12 +241,16 @@ app/config.py         environment configuration
 app/faces.py          detection + embedding (insightface, opencv fallback)
 app/cluster.py        group an album's faces into people
 app/google_drive.py   Drive listing, thumbnail fetch, folders, server-side copy
-app/store.py          SQLite cache of embeddings, one row per face
+app/store.py          SQLite store (local), one row per face
+app/store_firestore.py the same functions on Firestore (Cloud Run)
+app/gemini.py         Gemini on Vertex AI: photo notes, sorting, suggestions
+app/curate.py         culling: bursts, flaws, Best 10
 app/main.py           FastAPI routes
 app/static/index.html the whole front end
 tests/test_matching.py accuracy check on real photos
 tests/test_pipeline.py index and search without Google
 tests/test_people.py  grouping, multi-person search and export, through the routes
+tests/test_gemini.py  the Gemini features, scans, stop/resume, names, delete
 tests/fakedrive.py    a stand-in for Google Drive backed by local folders
 tests/devserver.py    the whole app on that stand-in, to try the UI offline
 ```
@@ -330,7 +268,8 @@ entirely in `tests/`.
 
 ## Performance
 
-Roughly 4–8 photos per second per CPU core when scanning, dominated by the
+An estimate from an earlier setup, not a measurement on the current Cloud Run
+service: roughly 4–8 photos per second per CPU core when scanning, dominated by the
 thumbnail download rather than the model. A 4,000-photo album takes about 10–15
 minutes on a 2-core host, once. Every search after that returns in well under a
 second, for every person who searches that album.

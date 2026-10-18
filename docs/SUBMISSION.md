@@ -39,7 +39,8 @@ image. It runs in `asia-southeast1` with **one instance** (`--max-instances 1`)
 and CPU always on (`--no-cpu-throttling`), deployed with 4 CPUs. The reason:
 album scans and folder exports run as background jobs inside the web process,
 and their progress is kept in memory, so they need one instance that keeps its
-CPU between requests. A request may run for up to 3600 s.
+CPU between requests. Scans and exports run as background jobs inside the instance, so no request
+has to wait for them.
 
 **Firestore.** Cloud Run's disk is wiped on every restart, so everything that
 must last lives in Firestore: the album's scan status; for each photo its size,

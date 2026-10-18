@@ -12,6 +12,7 @@ from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFil
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from google_auth_oauthlib.flow import Flow
+from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -91,8 +92,12 @@ def _need_album(request: Request, folder_id: str):
         return
     try:
         meta = gd.folder_meta(gd.service(creds), folder_id)
+    except RefreshError as exc:
+        raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from exc
     except HttpError as exc:
-        if exc.resp.status in (401, 403, 404):
+        if exc.resp.status == 401:
+            raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from exc
+        if exc.resp.status in (403, 404):
             raise HTTPException(403, {
                 "code": "no_access", "removed": True,
                 "message": "You no longer have access to this album in Google Drive.",
@@ -182,6 +187,7 @@ def me(request: Request):
         "drive_access": config.DRIVE_ACCESS,
         "gemini": gemini.enabled(),
         "sample_album": config.SAMPLE_ALBUM or None,
+        "sample_folder_id": gd.parse_folder_id(config.SAMPLE_ALBUM) if config.SAMPLE_ALBUM else None,
         "public_base_url": config.PUBLIC_BASE_URL,
     }
 
@@ -220,12 +226,16 @@ def delete_album_data(request: Request, folder_id: str):
     """Delete everything FaceFinder keeps about this album: face data, Gemini's
     notes, and this account's names and recent entry. Nothing in Drive changes."""
     _need_album(request, folder_id)
+    _not_sample(folder_id, "deleted")
     with _jobs_lock:
         if folder_id in _jobs:
             raise HTTPException(409, "Stop the scan first, then delete.")
         ids = [p["file_id"] for p in store.photos(folder_id)]
         store.clear_album(folder_id)
-        store.forget_ai(ids)
+    # Gemini's cached notes go in the background: on a big album this is many
+    # Firestore calls, and the page must not wait (or hold the job lock) for it.
+    threading.Thread(target=store.forget_ai, args=(ids,), daemon=True).start()
+    with _jobs_lock:
         _mat_cache.pop(folder_id, None)
         for cache, pos in ((_people_cache, 0), (_face_cache, 1)):
             for key in [k for k in cache if k[pos] == folder_id]:
@@ -365,7 +375,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
             if stop.is_set():
                 return
             try:
-                result = gemini.judge(gemini.shrink(data))
+                result = gemini.judge(data)      # already shrunk when queued
                 store.save_ai(folder_id, meta["id"], result)
                 store.cache_ai(ai_key(meta), result)
             except Exception:
@@ -393,7 +403,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                              curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
             if gem and not from_cache(meta):
-                sent.append(gem.submit(judge, meta, data))
+                sent.append(gem.submit(judge, meta, gemini.shrink(data)))
 
         def rejudge(meta):
             if stop.is_set() or from_cache(meta):
@@ -402,7 +412,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                 data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
             except Exception:
                 return
-            sent.append(gem.submit(judge, meta, data))
+            sent.append(gem.submit(judge, meta, gemini.shrink(data)))
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))
@@ -448,6 +458,8 @@ async def start_index(request: Request):
     folder_id = body.get("folder_id")
     _creds(request)
     _need_album(request, folder_id)
+    if body.get("rebuild"):
+        _not_sample(folder_id, "rescanned from the start")
     with _jobs_lock:
         if folder_id in _jobs:
             return {"started": False, "reason": "already running"}
@@ -492,6 +504,17 @@ async def start_index(request: Request):
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
+
+
+def _is_sample(folder_id: str) -> bool:
+    return bool(config.SAMPLE_ALBUM) and folder_id == gd.parse_folder_id(config.SAMPLE_ALBUM)
+
+
+def _not_sample(folder_id: str, what: str):
+    """The sample album's scan is shared by every visitor; one person must not
+    wipe or restart it for everyone else."""
+    if _is_sample(folder_id):
+        raise HTTPException(403, "The sample album is shared by everyone, so it cannot be %s." % what)
 
 
 def _settled(folder_id: str, row):
@@ -555,6 +578,7 @@ def stop_index(request: Request, body: dict = Body(...)):
     flight finish; nothing already scanned is thrown away."""
     folder_id = body.get("folder_id")
     _need_album(request, folder_id)
+    _not_sample(folder_id, "stopped; it finishes on its own")
     with _jobs_lock:
         t = _jobs.get(folder_id)
         if t is None:

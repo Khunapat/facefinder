@@ -936,7 +936,7 @@ async function retrying(fn, tries = 5){
   for(let i = 1; ; i++){
     try { return await fn(); }
     catch(e){
-      if(e.status === 404) throw e;      // the server no longer knows the job (it restarted)
+      if(e.status && e.status < 500) throw e;   // refused or unknown job: final, not a lost connection
       if(i >= tries) throw new Error("Lost the connection. The work carries on; check your Drive in a minute."); await sleep(1500 * i); }
   }
 }
@@ -955,7 +955,10 @@ function showAlbum(name, count){
   $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
   $("#albumBtn").title = name;
   $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
-  $("#menuRescan").hidden = $("#menuRescanSep").hidden = $("#menuDelete").hidden = !state.ready; if(!state.ready) $("#menuMore").hidden = true;
+  // the shared sample album: nobody may wipe or restart it for everyone else
+  const shared = !!state.sampleId && state.folderId === state.sampleId;
+  $("#menuRescan").hidden = $("#menuRescanSep").hidden = $("#menuDelete").hidden = !state.ready || shared;
+  if(!state.ready) $("#menuMore").hidden = true;
   if(!state.ready){ $("#menuRetry").replaceChildren(); $("#menuProg").hidden = true; }
 }
 // Small drop-down menus: one open at a time, Escape or a click outside closes.
@@ -1101,6 +1104,7 @@ async function refreshMe(){
   $("#privLine").hidden = !me.signed_in;
   $("#albumPill").hidden = !me.signed_in;
   state.sampleAlbum = me.sample_album || null;
+  state.sampleId = me.sample_folder_id || null;
   state.limitedDrive = me.drive_access !== "full";
   if(state.limitedDrive){
     $("#destLabel").textContent = "Folder name in your Drive";
@@ -1817,6 +1821,8 @@ function saveNames(){
     if(g.name.trim()) people.push({name:g.name.trim(), files:g.all.slice(0, 50).map(m => m.file_id)});
   }
   try { sessionStorage.setItem(NAMES_KEY(), JSON.stringify(out)); } catch(e){}
+  const named = new Set(people.map(x => x.name.toLowerCase()));
+  for(const u of state.namesUnplaced || []) if(!named.has(u.name.toLowerCase())) people.push(u);
   // also on the server, for this account: names survive signing out and work on
   // another device. Saved with their photos, since group numbers change.
   clearTimeout(state.namesTimer);
@@ -1826,6 +1832,7 @@ function saveNames(){
 }
 // Give saved names back to the groups that share the most photos with them.
 function applyServerNames(saved){
+  state.namesUnplaced = [];
   for(const s of saved || []){
     if(state.crowd.some(g => g.name.trim().toLowerCase() === s.name.toLowerCase())) continue;
     const want = new Set(s.files || []);
@@ -1837,7 +1844,7 @@ function applyServerNames(saved){
     }
     if(best && score >= Math.max(1, Math.ceil(0.3 * Math.min(want.size, best.all.length)))){
       best.name = s.name; best.on = true; best.autoOn = true;   // ticked because named
-    }
+    } else state.namesUnplaced.push(s);
   }
 }
 const faceUrl = g => `/api/face/${encodeURIComponent(state.folderId)}/` +
