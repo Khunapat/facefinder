@@ -8,7 +8,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from PIL import Image
 
-D = "./"   # a folder holding base.pptx (the template) and img/
+D = "/tmp/claude-0/-home-user/38c2b7c8-01f8-58c1-be00-aef99bc40a8b/scratchpad/deck/"
 ASSETS = "/home/user/facefinder/design-canvas/assets/"
 TEAM = sys.argv[1] if len(sys.argv) > 1 else "[TEAM NAME]"
 VIDEO = sys.argv[2] if len(sys.argv) > 2 else "[ADD VIDEO LINK]"
@@ -300,8 +300,8 @@ stats = [
     ("0.75–0.98", "face match score for the same person, against −0.05 for a different person"),
     ("40 of 40", "small-face stress test: 40 faces 18 px wide in a synthetic grid"),
     ("1 min 36 s", "one observed live run: 37 photos scanned with Gemini notes (4 vCPU)"),
-    ("45 s", "one observed live run: 54 copies exported into 3 Drive folders"),
-    ("~1 s", "one observed live run: a person found from one selfie"),
+    ("28 s", "one observed live run: 31 copies exported into 5 Drive folders"),
+    ("16 s", "one observed live run: upload a selfie, all 3 of that person's photos found"),
     ("5.2 s", "one observed live run: Stop ends a scan"),
 ]
 for i, (big, label) in enumerate(stats):
@@ -351,7 +351,7 @@ text(s, 0.45, 2.45, 9.1, 1.5, [
 
 LINKS = {"https://github.com/Khunapat/facefinder": "https://github.com/Khunapat/facefinder",
          "https://facefinder-508213.web.app": "https://facefinder-508213.web.app"}
-if not VIDEO.startswith("["):
+if VIDEO.startswith("http"):
     LINKS[VIDEO] = VIDEO
 for shp in S[12].shapes:
     if not shp.has_text_frame:

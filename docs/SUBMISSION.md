@@ -33,23 +33,11 @@ changed, and FaceFinder keeps no photo library.
 
 ## Brief description for the submission form
 
-FaceFinder turns one shared Google Drive event album into one folder per person.
-Paste the album link and FaceFinder scans it once: an InsightFace face model,
-running inside our Cloud Run container, detects faces and groups them into people, and
-Gemini on Vertex AI writes one short note per photo with a quality score, flaws
-and a description. Anyone can then name a face or upload a selfie to find a
-person, let Gemini suggest Keep, Review or Rejected with a reason for each
-photo, sort the album by a plain-word description, and copy one folder per
-person into their own Drive. Originals are never changed, and FaceFinder keeps
-no photo library: photos are processed temporarily.
+Under the form's 1,024-character limit (992 characters).
 
-Google services: **Cloud Run** runs the whole app (FastAPI, the face model and
-background scans). **Firestore** stores face data, Gemini's notes, typed names
-and recent albums, so scans survive restarts. **Firebase Hosting** gives the
-public address and forwards every request to Cloud Run. **Gemini** (Vertex AI)
-judges and describes each photo once (cached, so a rescan does not repeat the Gemini image analysis), sorts
-by description and suggests folders. The **Google Drive API** reads albums and
-copies photos with the user's own sign-in.
+FaceFinder turns one shared Google Drive event album into one folder per person. Paste the album link and FaceFinder scans it once: an InsightFace face model inside our Cloud Run container finds faces and groups them into people, and Gemini on Vertex AI writes a short note per photo with a quality score, flaws and a description. Anyone can then name a face or upload a selfie to find a person, get Keep, Review or Rejected suggestions with a reason for each photo, sort the album by a plain-word description, and copy one folder per person into their own Drive. Originals are never changed and no photo library is kept.
+
+Google Cloud: Cloud Run runs the app (FastAPI, face model, background scans). Firestore stores face data, Gemini notes, names and recent albums. Firebase Hosting gives the public address. Gemini on Vertex AI judges and describes each photo once, sorts by description and suggests folders. The Google Drive API reads albums and copies photos with the user's own sign-in.
 
 ## 2. How we use Google Cloud
 
