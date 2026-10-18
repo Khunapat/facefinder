@@ -67,7 +67,11 @@ def _creds(request: Request):
     data = request.session.get("creds")
     if not data:
         raise HTTPException(401, "Not signed in to Google")
-    creds = gd.creds_from_session(data)
+    try:
+        creds = gd.creds_from_session(data)
+    except RefreshError as e:
+        request.session.pop("creds", None)
+        raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from e
     # creds_from_session may have refreshed; keep the new token so the next
     # request does not refresh all over again.
     fresh = gd.creds_to_session(creds)
@@ -403,16 +407,20 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
                              curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
             if gem and not from_cache(meta):
-                sent.append(gem.submit(judge, meta, gemini.shrink(data)))
+                try:
+                    small = gemini.shrink(data)
+                except Exception:
+                    return          # left unjudged ("Gemini could not check 1"), scan goes on
+                sent.append(gem.submit(judge, meta, small))
 
         def rejudge(meta):
             if stop.is_set() or from_cache(meta):
                 return
             try:
-                data = gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE)
+                data = gemini.shrink(gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE))
             except Exception:
                 return
-            sent.append(gem.submit(judge, meta, gemini.shrink(data)))
+            sent.append(gem.submit(judge, meta, data))
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))

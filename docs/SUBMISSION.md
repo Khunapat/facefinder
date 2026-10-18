@@ -20,8 +20,7 @@ the album link, and FaceFinder scans it once. A face-recognition model
 (InsightFace) finds every face and groups them into people, so you can name the
 people you want or upload a face photo to find someone. Gemini on Vertex AI does
 the jobs a face model cannot: it judges each photo's quality to help the
-photographer cull, writes a short description so you can sort the album by plain
-Thai or English descriptions, suggests folders, and explains each pick in a
+photographer cull, writes a short description so you can sort the album by plain-language descriptions, suggests folders, and explains each pick in a
 person's Best 10. When you are happy, FaceFinder creates one folder per person
 in your own Drive and copies their photos in. Nothing in the original album is
 changed, and photos are never stored by FaceFinder.
@@ -64,7 +63,7 @@ which returns a quality score, flaws (blurry, eyes closed, cut off...), a reason
 and a short description. That one note powers:
 - **Cull photos:** Keep / Review / Rejected piles for the photographer, each
   photo with a reason.
-- **Sort:** describe a folder in plain Thai or English (for example "people in
+- **Sort:** describe a folder in plain words (for example "people in
   blue staff shirts") and Gemini puts the matching photos in it, reading the
   stored descriptions rather than the photos again.
 - **Folder suggestions:** Gemini reads the album's descriptions and proposes
@@ -149,7 +148,7 @@ On screen at the start and whenever the sample album is visible:
 | 0:00 | A Drive folder with hundreds of graduation photos, scrolling fast. | "After graduation, the photographer shares one folder with thousands of photos. Finding yourself, or sending friends their photos, takes an hour of scrolling." |
 | 0:20 | Start page, sign in, open the Sample album card. Caption: face model vs Gemini. | "FaceFinder uses two kinds of AI. A face model, InsightFace, decides who is in each photo. Gemini on Vertex AI judges, describes and sorts photos. Gemini never decides who someone is." |
 | 0:40 | Find people: add Ploy with one face photo, results appear. Open Best 10 with Gemini's reasons. Untick one wrong photo. | "I add Ploy with one photo. Her photos appear in seconds. Best 10 shows her best shots, and Gemini says why for each one. If something is wrong, I untick it." |
-| 1:10 | Sort tab: Gemini's folder suggestions, then a folder described in Thai. Matching photos fill in. | "Sort lets me describe a folder in plain words, Thai or English. Gemini suggests ideas, and sorts from the descriptions it wrote once during the scan, so it does not read every photo again." |
+| 1:10 | Sort tab: Gemini's folder suggestions, then a folder described in plain words ("graduates throwing their caps"). Matching photos fill in. | "Sort lets me describe a folder in plain words. Gemini suggests ideas, and sorts from the descriptions it wrote once during the scan, so it does not read every photo again." |
 | 1:45 | Cull photos: Keep, Review, Rejected piles. Open one rejected photo with its reason; tick it back. | "For the photographer, Cull sorts the album into Keep, Review and Rejected. Every photo says why: blurry, eyes closed, a near-copy. I stay in control and can tick any photo back." |
 | 2:15 | Press Export to Drive: progress, done card. Then a phone showing Google Drive with Ploy, Ton, Mint, Bank and Fah folders. | "One click creates a folder per person in my own Drive and copies their photos in. The original album is never changed. On my phone, everyone's folder is ready to share." |
 | 2:45 | "What FaceFinder keeps" window, then the time-saved number. | "Photos are never stored. Face data and Gemini's notes can be deleted at any time. In our test, finding one person took [TIME FROM TEST] instead of [TIME FROM TEST]. FaceFinder, on Google Cloud." |
@@ -168,11 +167,11 @@ On screen at the start and whenever the sample album is visible:
    - One folder per person, copied into your own Drive.
 3. **Demo**
    - Sample album of made-up people created with Gemini.
-   - Find people, Best 10, Sort in Thai, Cull, export.
+   - Find people, Best 10, Sort by description, Cull, export.
    - Live at facefinder-508213.web.app.
 4. **How Gemini is used**
    - One look per photo (768 px): quality score, flaws, reason, description.
-   - Powers Cull, Sort (Thai or English), folder suggestions and Best 10 reasons.
+   - Powers Cull, Sort by description, folder suggestions and Best 10 reasons.
    - Cached per photo, so a rescan costs nothing; face matching stays on InsightFace.
 5. **Architecture**
    - Firebase Hosting in front of one Cloud Run service.
@@ -210,7 +209,7 @@ On screen at the start and whenever the sample album is visible:
 1. **Everyone:** see the album grouped into people; type a name on a face.
 2. **Find people:** add a person with one face photo and see their photos;
    open Best 10 to read Gemini's reasons.
-3. **Sort:** describe a folder in Thai or English and watch photos fill it.
+3. **Sort:** describe a folder in plain words and watch photos fill it.
 4. **Cull photos:** see Keep, Review and Rejected, each photo with a reason.
 5. **Export to Drive:** copies land in a new `FaceFinder - <album name>` folder in
    your own Drive. You can delete that folder afterwards.

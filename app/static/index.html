@@ -19,7 +19,7 @@
 :root{
   --page:#fdf0f5; --panel:#ffffff; --ink:#1f2540; --muted:#5b6178;
   --accent:#d6336c; --accent-active:#b9255a; --accent-soft:#f6dbe6; --tint:#f3bcd0;
-  --line:#efe6ec; --line-strong:#d9dbe4; --field:#c9ccd8; --error:#b42318; --error-bg:#fff4f2;
+  --line:#efe6ec; --line-strong:#d9dbe4; --field:#858a9e; --error:#b42318; --error-bg:#fff4f2;
   --warn:#b45309; --photo-bg:#f4eef1;
   --shadow:0 1px 2px rgba(31,37,64,.04),0 10px 32px rgba(31,37,64,.06);
   --shadow-lift:0 12px 36px rgba(31,37,64,.16);
@@ -71,7 +71,7 @@ body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--p
 /* ---------------------------------------------------------------- inputs */
 .field{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--field);border-radius:var(--r-ctl);
        background:var(--panel);color:var(--ink);font-size:16px}
-.field::placeholder{color:#7a7f93}
+.field::placeholder,.fname::placeholder{color:var(--muted)}
 .field:focus{outline:0;border-color:var(--ink)}
 .field:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 select.field{width:auto;font-size:14px;height:40px;padding:0 12px;border-radius:10px;cursor:pointer}
@@ -579,7 +579,7 @@ dialog.done h2{font-size:26px}
       <h1>Find your photos. <em>Choose your moments.</em></h1>
       <p>Find people, review the best moments, and save your selections to Drive.</p>
       <p class="ailine">A face-recognition model finds who is in each photo. Gemini judges photo quality and
-        describes each photo, so you can sort and search in Thai or English.</p>
+        describes each photo, so you can sort and search them in plain words.</p>
       <div id="signinBox" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
         <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
         <span class="hint" style="font-size:14px">FaceFinder reads a Google Drive folder with your Google account
@@ -720,7 +720,7 @@ dialog.done h2{font-size:26px}
     <div id="modeSort" hidden>
       <section class="mode">
         <div class="mhead">
-          <div class="mtitle"><h2>Sort by description</h2><p class="sub">Describe a folder in Thai or English.</p></div>
+          <div class="mtitle"><h2>Sort by description</h2><p class="sub">Describe a folder in your own words.</p></div>
           <details class="how"><summary>How it works</summary>
             <p>Gemini wrote a short description of every photo during the scan. Sorting matches your
                folder descriptions against those, so it may miss small details. A photo can go in
@@ -728,7 +728,7 @@ dialog.done h2{font-size:26px}
         </div>
         <div class="main">
           <div id="groupRows" style="display:flex;flex-direction:column;gap:10px"></div>
-          <div class="chips" id="sortChips" aria-label="Example folders"><span>Try, in Thai:</span></div>
+          <div class="chips" id="sortChips" aria-label="Example folders"><span>Try:</span></div>
           <div class="row">
             <button class="btn" id="runSort">Sort the photos</button>
             <button class="btn ghost sm" id="addGroup">+ Add a folder</button>
@@ -1361,6 +1361,7 @@ function pollStatus(){
     }catch(e){
       if(!alive())return;
       if(e.info?.code === "no_access"){ goHome(); showNoAccess(e.info, "", true); return; }
+      if(e.status === 401){ goHome(); await refreshMe().catch(()=>{}); msg($("#albumMsg"), esc(e.message), "err"); return; }
       failures++;
       $('#pstat').textContent='Connection interrupted. Retrying…';
       if(failures>=3){$('#pstat').textContent='Cannot reconnect. Try again when your connection is back.';
@@ -1373,7 +1374,8 @@ function pollStatus(){
 // While scanning: Stop. Once stopped (or failed): carry on, or open another album.
 function scanButtons(mode){
   const running=mode==='running';
-  $('#stopScan').hidden=!running;$('#resumeScan').hidden=running;$('#otherAlbum').hidden=running;
+  const shared=!!state.sampleId&&state.folderId===state.sampleId;   // the sample finishes on its own
+  $('#stopScan').hidden=!running||shared;$('#resumeScan').hidden=running;$('#otherAlbum').hidden=running&&!shared;
   if(running)$('#usePartial').hidden=true;
   $('#resumeScan').classList.toggle('ghost',!running);
   $('#scanCard').classList.toggle('halted',!running);
@@ -1961,13 +1963,13 @@ $("#dlg").addEventListener("close", () => {
 function addGroup(def = {name:"", description:""}){
   state.sortDefs.push(def); renderGroupRows();
 }
-// Example folders in Thai: one tap fills an empty row (or adds one), to show
-// that a folder can be described in Thai as easily as in English.
+// Example folders: one tap fills an empty row (or adds one), to show that a
+// folder is described in plain words.
 const EXAMPLES = [
-  {name:"บนเวที", description:"คนที่อยู่บนเวที รับปริญญาหรือรับรางวัล", en:"On stage"},
-  {name:"รูปหมู่", description:"รูปหมู่ที่มีคนตั้งแต่ห้าคนขึ้นไป", en:"Group photos"},
-  {name:"ดอกไม้และของขวัญ", description:"คนที่ถือช่อดอกไม้ ตุ๊กตา หรือของขวัญ", en:"Flowers & gifts"},
-  {name:"ซุ้มถ่ายรูป", description:"ถ่ายหน้าซุ้มหรือฉากหลังที่ตกแต่งไว้", en:"Photo booth"},
+  {name:"Throwing caps", description:"graduates throwing their caps in the air", en:"caps in the air"},
+  {name:"Group photos", description:"group photos with five or more people", en:"five or more people"},
+  {name:"Flowers & gifts", description:"people holding flowers, bouquets or gifts", en:"holding flowers or gifts"},
+  {name:"Dinner", description:"people eating together at a restaurant or a table", en:"eating together"},
 ];
 for(const ex of EXAMPLES){
   const b = document.createElement("button"); b.type = "button"; b.className = "chip2";

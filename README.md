@@ -20,7 +20,7 @@ photos) means scrolling for an hour.
 1. **Everyone:** see the album grouped into people; type a name on a face.
 2. **Find people:** add a person with one face photo and see their photos;
    open Best 10 to read Gemini's reasons.
-3. **Sort:** describe a folder in Thai or English and watch photos fill it.
+3. **Sort:** describe a folder in plain words and watch photos fill it.
 4. **Cull photos:** see Keep, Review and Rejected, each photo with a reason.
 5. **Export to Drive:** copies land in a new `FaceFinder - <album name>` folder in
    your own Drive. You can delete that folder afterwards.
@@ -136,8 +136,8 @@ You need these before the app can do anything.
 2. **APIs & Services → Library →** enable **Google Drive API**.
 3. **APIs & Services → OAuth consent screen →** choose **External**.
    Fill in the app name, your email, and save.
-4. Under **Audience**, add the Google accounts that may use the app as **test
-   users** — up to 100 of them. See the note on verification below.
+4. Under **Audience**, press **Publish app** so the status reads **In
+   production**. See the note on verification below.
 5. **APIs & Services → Credentials → Create credentials → OAuth client ID →
    Web application.**
    - Authorised redirect URI: `https://YOUR-APP-URL/oauth2/callback`
@@ -200,7 +200,7 @@ Set `DRIVE_ACCESS=full` to ask for the whole-Drive scope instead. Pasted
 destination folders then work directly. The consent screen will say the app can
 see, edit, create and delete all of the user's Drive files, and everyone has to
 sign in again once. Google classes both `drive.readonly` and `drive` as
-restricted, so this does not change the 100-test-user situation.
+restricted, so this does not change the 100-user limit.
 
 ### Google Cloud Run (what FaceFinder uses)
 

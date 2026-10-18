@@ -41,6 +41,11 @@ cv2.imwrite(os.path.join(ALBUM, "obama-b.jpg"), cv2.convertScaleAbs(img, alpha=1
 img = cv2.imread(os.path.join(ALBUM, "biden.jpg"))
 cv2.imwrite(os.path.join(ALBUM, "zz_blur.jpg"), cv2.GaussianBlur(img, (0, 0), 9))
 
+def drive_bytes_of(name):
+    with open(os.path.join(ALBUM, name), "rb") as fh:
+        return fh.read()
+
+
 fakedrive_real_list = main.gd.list_images     # the real one, before the stand-in replaces it
 drive = fakedrive.install(os.path.join(TMP, "drive"), image_dirs=[ALBUM])
 checks = []
@@ -243,6 +248,27 @@ def main_test():
     c.post("/api/index", json={"folder_id": fid})
     st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
     check("resuming afterwards finishes the album", st["status"] == "ready" and st["done"] == 7, st)
+
+    print("A photo Gemini cannot read does not stop the scan")
+    main.store.conn().execute("DELETE FROM ai_cache")
+    main.store.conn().execute("UPDATE photos SET ai=NULL WHERE folder_id=?", (fid,))
+    main.store.conn().commit()
+    real_shrink = main.gemini.shrink
+
+    def picky(data):
+        if len(data) == len(drive_bytes_of("biden.jpg")):
+            raise ValueError("unreadable image")
+        return real_shrink(data)
+    main.gemini.shrink = picky
+    try:
+        c.post("/api/index", json={"folder_id": fid, "rebuild": True})
+        st = wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
+    finally:
+        main.gemini.shrink = real_shrink
+    check("one photo Gemini cannot read leaves the album ready, that photo unchecked",
+          st["status"] == "ready" and st["done"] == 7 and st["judged"] == 6, (st["status"], st.get("done"), st.get("judged"), st.get("message")))
+    c.post("/api/index", json={"folder_id": fid})
+    wait(lambda: c.get("/api/album/%s/status" % fid).json(), lambda s: s["status"] in ("ready", "error"))
 
     print("Names kept for the account")
     r = c.post("/api/album/%s/names" % fid, json={"people": [
