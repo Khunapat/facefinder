@@ -20,6 +20,9 @@ REDIRECT_URI = PUBLIC_BASE_URL + "/oauth2/callback"
 # edit. Both drive.readonly and drive are "restricted" scopes to Google, so this
 # does not change the verification tier, only what the consent screen says.
 DRIVE_ACCESS = os.environ.get("DRIVE_ACCESS", "limited").strip().lower()
+# Optional: a shared Drive folder anyone can open ("anyone with the link"),
+# offered on the start screen as a sample album. Only photos we may publish.
+SAMPLE_ALBUM = os.environ.get("SAMPLE_ALBUM", "").strip()
 if DRIVE_ACCESS == "full":
     SCOPES = ["https://www.googleapis.com/auth/drive"]
 else:
@@ -36,6 +39,11 @@ SESSION_SECRET = os.environ.get("SESSION_SECRET", "dev-only-change-me")
 # rebuilt after a restart (indexing is the only expensive step).
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 DB_PATH = os.path.join(DATA_DIR, "index.sqlite")
+# Where the index lives: "sqlite" (a file in DATA_DIR) or "firestore". Cloud
+# Run's disk is wiped on every restart, so deploy there with STORE=firestore.
+STORE = os.environ.get("STORE", "sqlite").strip().lower()
+GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_CLOUD_PROJECT", "")
+FIRESTORE_DATABASE = os.environ.get("FIRESTORE_DATABASE", "(default)")
 
 # Where the face model files live. Deliberately separate from DATA_DIR:
 # the Docker image bakes the model in at build time, and DATA_DIR is the
@@ -49,6 +57,9 @@ MODEL_ROOT = os.environ.get("MODEL_ROOT", DATA_DIR)
 # 0.35-0.5 is "probably them". We default low and let the user tighten it.
 DEFAULT_THRESHOLD = float(os.environ.get("DEFAULT_THRESHOLD", "0.38"))
 DET_SIZE = int(os.environ.get("DET_SIZE", "640"))
+# Sizes the detector looks at each photo with, merged. The larger one finds the
+# small faces at the back of a group photo.
+DET_SIZES = [int(v) for v in os.environ.get("DET_SIZES", "%d,1280" % DET_SIZE).split(",") if v.strip()]
 MODEL_NAME = os.environ.get("MODEL_NAME", "buffalo_l")
 # Pixel width of the Drive thumbnail we run detection on. Bigger = better on
 # faces far from the camera, but slower.
@@ -58,6 +69,8 @@ INDEX_WORKERS = int(os.environ.get("INDEX_WORKERS", "4"))
 # people. Stricter than DEFAULT_THRESHOLD: a wrong link merges two people.
 CLUSTER_THRESHOLD = float(os.environ.get("CLUSTER_THRESHOLD", "0.46"))
 COPY_WORKERS = int(os.environ.get("COPY_WORKERS", "4"))
+# Parallel Gemini calls while scanning. They wait on the network, not the CPU.
+GEMINI_WORKERS = int(os.environ.get("GEMINI_WORKERS", "24"))
 
 def _ensure_dir(path: str, var: str) -> None:
     try:

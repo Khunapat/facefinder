@@ -1,17 +1,22 @@
 """FaceFinder - sort a shared Drive album into one folder per person."""
+import hashlib
+import json
 import os
 import secrets
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 
 from fastapi import Body, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from google_auth_oauthlib.flow import Flow
+from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import cluster, config, faces
+from . import cluster, config, curate, faces, gemini
 from . import google_drive as gd
 from . import store
 
@@ -19,17 +24,23 @@ app = FastAPI(title="FaceFinder")
 app.add_middleware(
     SessionMiddleware,
     secret_key=config.SESSION_SECRET,
+    # Firebase Hosting forwards only a cookie called __session to Cloud Run
+    # and drops every other one, so the session must use exactly that name.
+    session_cookie="__session",
     same_site="lax",
     https_only=config.PUBLIC_BASE_URL.startswith("https"),
 )
 
 STATIC = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/static", StaticFiles(directory=STATIC), name="static")
 _jobs = {}          # folder_id -> running index thread
 _jobs_lock = threading.Lock()
 _exports = {}       # job_id -> progress dict, read by the page while it runs
 _mat_cache = {}     # folder_id -> (stamp, matrix, meta)
 _people_cache = {}  # (folder_id, faces, threshold) -> grouped people
-_face_cache = {}    # (folder_id, file_id, face_idx) -> small JPEG, memory only
+_face_cache = {}    # (access token, folder_id, file_id, face_idx) -> small JPEG, memory only
+_thumb_meta = {}    # (access token, file_id) -> (time, Drive metadata), ten minutes
+_sorts = {}         # job_id -> sort-by-description progress and result
 
 
 # --------------------------------------------------------------- auth -----
@@ -56,7 +67,11 @@ def _creds(request: Request):
     data = request.session.get("creds")
     if not data:
         raise HTTPException(401, "Not signed in to Google")
-    creds = gd.creds_from_session(data)
+    try:
+        creds = gd.creds_from_session(data)
+    except RefreshError as e:
+        request.session.pop("creds", None)
+        raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from e
     # creds_from_session may have refreshed; keep the new token so the next
     # request does not refresh all over again.
     fresh = gd.creds_to_session(creds)
@@ -65,18 +80,56 @@ def _creds(request: Request):
     return creds
 
 
+ALBUM_RECHECK = 300   # seconds between Drive checks that this user still has the album
+
+
 def _need_album(request: Request, folder_id: str):
     """The index is shared between users, so a session may only read an album
-    it has itself opened through Drive (which is where access is checked)."""
+    it has opened through Drive, and Drive is asked again every few minutes in
+    case the album was unshared since. The time sits in the signed session, so
+    face crops and thumbnails do not cost a Drive call each."""
+    creds = _creds(request)
     if not folder_id or folder_id not in request.session.get("albums", []):
         raise HTTPException(403, "Open the album first")
+    checked = request.session.get("album_checked") or {}
+    if time.time() - checked.get(folder_id, 0) < ALBUM_RECHECK:
+        return
+    try:
+        meta = gd.folder_meta(gd.service(creds), folder_id)
+    except RefreshError as exc:
+        raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from exc
+    except HttpError as exc:
+        if exc.resp.status == 401:
+            raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from exc
+        if exc.resp.status in (403, 404):
+            raise HTTPException(403, {
+                "code": "no_access", "removed": True,
+                "message": "You no longer have access to this album in Google Drive.",
+                "email": (request.session.get("user") or {}).get("emailAddress", ""),
+                "folder_id": folder_id,
+            }) from exc
+        raise HTTPException(503, "Cannot verify album access. Try again.") from exc
+    if meta.get("mimeType") != gd.FOLDER_MIME:
+        raise HTTPException(403, "Album access is no longer available")
+    checked = {k: v for k, v in checked.items() if k in request.session.get("albums", [])}
+    checked[folder_id] = time.time()
+    request.session["album_checked"] = checked
+
+
+def _job_owner(request: Request):
+    _creds(request)
+    if "job_owner" not in request.session:
+        request.session["job_owner"] = secrets.token_urlsafe(24)
+    return request.session["job_owner"]
 
 
 @app.get("/oauth2/login")
 def login(request: Request):
     flow = _flow()
     url, state = flow.authorization_url(
-        access_type="offline", include_granted_scopes="true", prompt="consent"
+        # select_account: someone whose album lives on another Google account
+        # can pick that account instead of being signed straight back in
+        access_type="offline", include_granted_scopes="true", prompt="consent select_account"
     )
     request.session["oauth_state"] = state
     # google-auth-oauthlib turns on PKCE by default: authorization_url() above
@@ -89,14 +142,25 @@ def login(request: Request):
 
 @app.get("/oauth2/callback")
 def callback(request: Request):
+    # Sign-in started on another address (the cookie with its state is not
+    # here), was cancelled, or ran out: back to the start page, which says so.
+    if request.query_params.get("error") or not request.session.get("oauth_state") \
+            or not request.session.get("code_verifier"):
+        return RedirectResponse("/?signin=retry")
     flow = _flow(state=request.session.get("oauth_state"))
     flow.code_verifier = request.session.get("code_verifier")
     url = str(request.url)
     # Hosts terminate TLS in front of us, so the URL we see can say http.
     if config.PUBLIC_BASE_URL.startswith("https") and url.startswith("http://"):
         url = "https://" + url[len("http://"):]
-    flow.fetch_token(authorization_response=url)
+    try:
+        flow.fetch_token(authorization_response=url)
+    except Exception:
+        request.session.pop("oauth_state", None)
+        request.session.pop("code_verifier", None)
+        return RedirectResponse("/?signin=retry")
     creds = flow.credentials
+    request.session.clear()
     request.session["creds"] = gd.creds_to_session(creds)
     try:
         info = (
@@ -125,13 +189,84 @@ def me(request: Request):
         "configured": bool(config.GOOGLE_CLIENT_ID),
         "default_threshold": config.DEFAULT_THRESHOLD,
         "drive_access": config.DRIVE_ACCESS,
+        "gemini": gemini.enabled(),
+        "sample_album": config.SAMPLE_ALBUM or None,
+        "sample_folder_id": gd.parse_folder_id(config.SAMPLE_ALBUM) if config.SAMPLE_ALBUM else None,
+        "public_base_url": config.PUBLIC_BASE_URL,
     }
 
 
 # -------------------------------------------------------------- album -----
+def _user_key(request: Request):
+    """Recent albums are kept per Google account, under a hash of its email,
+    so they survive signing out and in again."""
+    email = (request.session.get("user") or {}).get("emailAddress")
+    return hashlib.sha256(email.strip().lower().encode()).hexdigest()[:32] if email else None
+
+
+@app.get("/api/albums/recent")
+def recent_albums(request: Request):
+    """The albums this account opened before, newest first, with a few photos
+    each. Opening one still goes through /api/album and its Drive check."""
+    _creds(request)
+    user = _user_key(request)
+    out = []
+    for folder_id, opened_at in (store.recent_albums(user, 6) if user else []):
+        row = _settled(folder_id, store.album(folder_id))
+        if row is None:
+            continue
+        row = dict(row)
+        out.append({
+            "folder_id": folder_id, "name": row.get("name") or "Album", "status": row.get("status"),
+            "total": row.get("total") or 0, "done": row.get("done") or 0, "opened_at": opened_at,
+            "album_total": row.get("album_total") or row.get("total") or 0,
+            "covers": store.cover_ids(folder_id, 3) if row.get("done") else [],
+        })
+    return {"albums": out}
+
+
+@app.post("/api/album/{folder_id}/delete")
+def delete_album_data(request: Request, folder_id: str):
+    """Delete everything FaceFinder keeps about this album: face data, Gemini's
+    notes, and this account's names and recent entry. Nothing in Drive changes."""
+    _need_album(request, folder_id)
+    _not_sample(folder_id, "deleted")
+    with _jobs_lock:
+        if folder_id in _jobs:
+            raise HTTPException(409, "Stop the scan first, then delete.")
+        ids = [p["file_id"] for p in store.photos(folder_id)]
+        store.clear_album(folder_id)
+    # Gemini's cached notes go in the background: on a big album this is many
+    # Firestore calls, and the page must not wait (or hold the job lock) for it.
+    threading.Thread(target=store.forget_ai, args=(ids,), daemon=True).start()
+    with _jobs_lock:
+        _mat_cache.pop(folder_id, None)
+        for cache, pos in ((_people_cache, 0), (_face_cache, 1)):
+            for key in [k for k in cache if k[pos] == folder_id]:
+                cache.pop(key, None)
+    user = _user_key(request)
+    if user:
+        store.save_names(user, folder_id, [])
+        store.forget_album(user, folder_id)
+    request.session["albums"] = [a for a in request.session.get("albums", []) if a != folder_id]
+    return {"deleted": len(ids)}
+
+
+@app.post("/api/albums/forget")
+def forget_album(request: Request, body: dict = Body(...)):
+    """Take an album off this account's recent list. The scan is kept."""
+    _creds(request)
+    user, folder_id = _user_key(request), body.get("folder_id")
+    if user and isinstance(folder_id, str):
+        store.forget_album(user, folder_id)
+    return {"ok": True}
+
 @app.post("/api/album")
 async def open_album(request: Request):
     body = await request.json()
+    problem = gd.link_problem(body.get("folder", ""))
+    if problem:
+        raise HTTPException(400, problem)
     folder_id = gd.parse_folder_id(body.get("folder", ""))
     if not folder_id:
         raise HTTPException(400, "Paste a Google Drive folder link")
@@ -139,14 +274,35 @@ async def open_album(request: Request):
     svc = gd.service(creds)
     try:
         meta = gd.folder_meta(svc, folder_id)
+    except HttpError as e:
+        status = e.resp.status
+        if status in (403, 404):
+            # Drive answers "not found" for a folder this account may not see,
+            # so the page explains sharing instead of just failing.
+            raise HTTPException(403, {
+                "code": "no_access",
+                "message": "This Google account cannot open that folder.",
+                "email": (request.session.get("user") or {}).get("emailAddress", ""),
+                "folder_id": folder_id,
+            }) from e
+        if status == 401:
+            raise HTTPException(401, "Your Google sign-in has run out. Sign in again.") from e
+        raise HTTPException(503, "Google Drive did not answer. Try again in a minute.") from e
     except Exception as e:
-        raise HTTPException(
-            404, "Cannot open that folder. Check it is shared with your account."
-        ) from e
+        raise HTTPException(503, "Google Drive did not answer. Try again in a minute.") from e
     if meta["mimeType"] != gd.FOLDER_MIME:
         raise HTTPException(400, "That link points at a file, not a folder")
-    if store.album(folder_id) is None:
+    row = store.album(folder_id)
+    if row is None:
         store.set_album(folder_id, name=meta["name"], status="pending")
+    elif row["name"] != meta["name"]:          # renamed in Drive, or lost by an old rescan
+        store.set_album(folder_id, name=meta["name"])
+    user = _user_key(request)
+    if user:
+        try:
+            store.remember_album(user, folder_id)
+        except Exception:
+            pass                # the list of recent albums is a convenience
     opened = [a for a in request.session.get("albums", []) if a != folder_id]
     request.session["albums"] = (opened + [folder_id])[-20:]
     return {
@@ -156,47 +312,150 @@ async def open_album(request: Request):
     }
 
 
-def _index_worker(folder_id: str, creds_data: dict):
-    """Walk the album once and cache an embedding for every face found."""
+def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved_ai: dict = None):
+    """Walk the album once: cache an embedding for every face found, a burst
+    fingerprint for every photo and, when Gemini is on, its judgement of the
+    photo. Photos scanned before Gemini was switched on get judged too.
+    Setting `stop` ends it early; what is already scanned is kept, and opening
+    the album again carries on from there."""
+    gem = None
+    alive = threading.Event()
+
+    def heartbeat():            # lets a status check tell a slow scan from a dead one
+        while not alive.wait(20):
+            try:
+                store.set_album(folder_id)
+            except Exception:
+                pass
+
+    threading.Thread(target=heartbeat, daemon=True).start()
     try:
         creds = gd.creds_from_session(creds_data)
         svc = gd.service(creds)
         files = gd.list_images(svc, folder_id)
+        album_total = len(files)
+        scope = _scope(store.album(folder_id))
+        if scope is not None:           # only the photos the user chose
+            files = [f for f in files if f["id"] in scope]
         already = store.indexed_file_ids(folder_id)
         todo = [f for f in files if f["id"] not in already]
+        for f in files:                 # notes kept from before a rescan
+            if saved_ai and f["id"] in saved_ai:
+                try:
+                    store.cache_ai("%s:%s" % (f["id"], f.get("md5Checksum") or ""), saved_ai[f["id"]])
+                except Exception:
+                    pass
         store.set_album(
             folder_id,
             status="indexing",
             total=len(files),
+            album_total=album_total,
             done=len(already),
             message="%d new photos to scan" % len(todo),
         )
         faces.engine()   # load the model once, before the pool starts
         local = threading.local()   # Drive clients are not thread-safe
+        # Gemini calls wait on the network, not the CPU, so they get their own,
+        # wider pool and run alongside the face scan.
+        if gemini.enabled():
+            gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
+        sent = []                       # Gemini calls in flight, waited on below
+
+        def ai_key(meta):
+            return "%s:%s" % (meta["id"], meta.get("md5Checksum") or "")
+
+        def from_cache(meta):
+            """Gemini's notes from an earlier scan of the same photo, if any."""
+            try:
+                cached = store.cached_ai(ai_key(meta))
+                if cached:
+                    store.save_ai(folder_id, meta["id"], cached)
+                    return True
+            except Exception:
+                pass
+            return False
+
+        def judge(meta, data):
+            if stop.is_set():
+                return
+            try:
+                result = gemini.judge(data)      # already shrunk when queued
+                store.save_ai(folder_id, meta["id"], result)
+                store.cache_ai(ai_key(meta), result)
+            except Exception:
+                pass            # left unjudged; the next scan retries it
+
+        def drive_svc():
+            if not hasattr(local, "svc"):
+                local.svc = gd.service(creds)
+            return local.svc
+
+        failed = []
 
         def one(meta):
+            if stop.is_set():
+                return
             try:
-                if not hasattr(local, "svc"):
-                    local.svc = gd.service(creds)
-                data = gd.fetch_image_bytes(creds, local.svc, meta)
+                data = gd.fetch_image_bytes(creds, drive_svc(), meta)
                 found, size = faces.analyze(data)
             except Exception:
-                found, size = [], None
-            store.save_photo(folder_id, meta["id"], meta["name"], found, size)
+                # Not saved, so it is not mistaken for a photo with no faces
+                # and the next scan tries it again.
+                failed.append(meta["id"])
+                return
+            store.save_photo(folder_id, meta["id"], meta["name"], found, size,
+                             curate.dhash(data))
             store.bump_progress(folder_id, 1, len(found))
+            if gem and not from_cache(meta):
+                try:
+                    small = gemini.shrink(data)
+                except Exception:
+                    return          # left unjudged ("Gemini could not check 1"), scan goes on
+                sent.append(gem.submit(judge, meta, small))
+
+        def rejudge(meta):
+            if stop.is_set() or from_cache(meta):
+                return
+            try:
+                data = gemini.shrink(gd.fetch_image_bytes(creds, drive_svc(), meta, gemini.SEND_SIZE))
+            except Exception:
+                return
+            sent.append(gem.submit(judge, meta, data))
 
         with ThreadPoolExecutor(max_workers=config.INDEX_WORKERS) as pool:
             list(pool.map(one, todo))
+            if gem:     # scanned earlier, before Gemini was on or when it failed
+                fresh = {f["id"] for f in todo}
+                missing = {m["id"] for m in store.unjudged(folder_id)} - fresh
+                list(pool.map(rejudge, [f for f in files if f["id"] in missing]))
+        if gem:
+            # Wait for Gemini's answers, but not after Stop: a slow or stuck call
+            # must not keep the album "scanning". Late answers are still saved.
+            pending = set(sent)
+            while pending and not stop.is_set():
+                _, pending = futures_wait(pending, timeout=1)
+            gem.shutdown(wait=False, cancel_futures=True)
 
         row = store.album(folder_id)
-        store.set_album(
-            folder_id,
-            status="ready",
-            message="%d faces across %d photos" % (row["faces"], row["done"]),
-        )
+        if stop.is_set() and row["done"] < row["total"]:
+            store.set_album(folder_id, status="stopped", message=(
+                "Stopped after %d of %d photos. Use them as they are, or carry on later."
+                % (row["done"], row["total"])))
+            return
+        msg = "%d faces across %d photos" % (row["faces"], row["done"])
+        if failed:
+            msg += "; %d could not be read (scan again to retry)" % len(failed)
+        if gem:
+            missed = row["done"] - store.judged_count(folder_id)
+            if missed:
+                msg += "; Gemini could not check %d (scan again to retry)" % missed
+        store.set_album(folder_id, status="ready", message=msg)
     except Exception as e:
         store.set_album(folder_id, status="error", message=str(e)[:300])
     finally:
+        alive.set()
+        if gem:
+            gem.shutdown(wait=False, cancel_futures=True)
         with _jobs_lock:
             _jobs.pop(folder_id, None)
 
@@ -208,27 +467,148 @@ async def start_index(request: Request):
     _creds(request)
     _need_album(request, folder_id)
     if body.get("rebuild"):
-        store.clear_album(folder_id)
-        store.set_album(folder_id, status="pending")
+        _not_sample(folder_id, "rescanned from the start")
     with _jobs_lock:
         if folder_id in _jobs:
             return {"started": False, "reason": "already running"}
+        old = store.album(folder_id)
+        # Which photos: the whole album, the ones picked now (added to what
+        # was picked or scanned before), or, by default, the same as last time.
+        scope = _scope(old)
+        if body.get("all"):
+            scope = None
+        elif isinstance(body.get("file_ids"), list):
+            picked = {f for f in body["file_ids"] if isinstance(f, str)}
+            if not picked:
+                raise HTTPException(400, "Choose at least one photo to scan")
+            # a rescan starts from nothing, so it keeps only what is picked now
+            kept = set() if body.get("rebuild") else store.indexed_file_ids(folder_id) | (scope or set())
+            scope = picked | kept
+        saved_ai = None
+        if body.get("rebuild"):
+            # Gemini's notes are kept, so the rescan does not pay for them again
+            saved_ai = {p["file_id"]: p["ai"] for p in store.photos(folder_id) if p.get("ai")}
+            store.clear_album(folder_id)
+            if old is not None:
+                store.set_album(folder_id, name=old["name"], status="pending")
+            _mat_cache.pop(folder_id, None)
+            for key in list(_people_cache):
+                if key[0] == folder_id:
+                    _people_cache.pop(key, None)
+            for key in list(_face_cache):
+                if key[1] == folder_id:
+                    _face_cache.pop(key, None)
+        # Say so before the thread starts, so a status poll right after this
+        # never sees the previous scan's "ready".
+        store.set_album(folder_id, status="pending",
+                        scope=json.dumps(sorted(scope)) if scope is not None else None)
+        stop = threading.Event()
         t = threading.Thread(
             target=_index_worker,
-            args=(folder_id, request.session["creds"]),
+            args=(folder_id, request.session["creds"], stop, saved_ai),
             daemon=True,
         )
+        t.stop = stop
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
 
 
+def _is_sample(folder_id: str) -> bool:
+    return bool(config.SAMPLE_ALBUM) and folder_id == gd.parse_folder_id(config.SAMPLE_ALBUM)
+
+
+def _not_sample(folder_id: str, what: str):
+    """The sample album's scan is shared by every visitor; one person must not
+    wipe or restart it for everyone else."""
+    if _is_sample(folder_id):
+        raise HTTPException(403, "The sample album is shared by everyone, so it cannot be %s." % what)
+
+
+def _settled(folder_id: str, row):
+    """A scan marked as running but with no thread here, and no sign of life
+    for a while, died with its server (a restart or a new deploy; Cloud Run runs
+    one instance). Say it stopped, so the page offers Resume instead of waiting
+    forever. A live scan touches its row every 20 seconds."""
+    if row is None or row["status"] != "indexing":
+        return row
+    with _jobs_lock:
+        if folder_id in _jobs:
+            return row
+    if time.time() - (dict(row).get("updated_at") or 0) < 90:
+        return row
+    store.set_album(folder_id, status="stopped", message=(
+        "The scan was interrupted (the server restarted). Photos already scanned "
+        "are kept; resume to carry on."))
+    return store.album(folder_id)
+
+
+def _scope(row):
+    """The set of photos chosen for this album's scan, or None for all of them."""
+    raw = (dict(row).get("scope") if row is not None else None)
+    return set(json.loads(raw)) if raw else None
+
+
+@app.get("/api/album/{folder_id}/files")
+def album_files(request: Request, folder_id: str):
+    """Every photo in the album with when it was taken, so the user can choose
+    which to scan: by date, by hand, or all of them."""
+    creds = _creds(request)
+    _need_album(request, folder_id)
+    files = gd.list_images(gd.service(creds), folder_id)
+    scanned = store.indexed_file_ids(folder_id)
+    out = [{"id": f["id"], "name": f.get("name"), "taken": gd.taken_at(f), "scanned": f["id"] in scanned}
+           for f in files]
+    out.sort(key=lambda f: (f["taken"] or "9999", f["name"] or ""))
+    return {"files": out}
+
+
+@app.post("/api/index/use")
+def use_partial(request: Request, body: dict = Body(...)):
+    """Work with the photos checked so far: a stopped scan becomes a ready
+    album of those photos. The rest can be scanned later from the album menu."""
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    with _jobs_lock:
+        if folder_id in _jobs:
+            raise HTTPException(409, "The scan is still stopping. Try again in a moment.")
+        row = store.album(folder_id)
+        if row is None or not row["done"]:
+            raise HTTPException(400, "No photos have been checked yet")
+        store.set_album(folder_id, status="ready", message="Using %d of %d photos; scan the rest any time."
+                        % (row["done"], row["total"]))
+    return {"ok": True}
+
+
+@app.post("/api/index/stop")
+def stop_index(request: Request, body: dict = Body(...)):
+    """Stop a scan (the wrong album was pasted, or it can wait). Photos in
+    flight finish; nothing already scanned is thrown away."""
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    _not_sample(folder_id, "stopped; it finishes on its own")
+    with _jobs_lock:
+        t = _jobs.get(folder_id)
+        if t is None:
+            # no scan runs here (the instance restarted mid-scan): say stopped
+            row = store.album(folder_id)
+            if row is not None and row["status"] in ("indexing", "pending"):
+                store.set_album(folder_id, status="stopped", message="Stopped. Photos already scanned are kept.")
+            return {"stopping": False}
+        t.stop.set()
+    return {"stopping": True}
+
+
 @app.get("/api/album/{folder_id}/status")
-def album_status(folder_id: str):
-    row = store.album(folder_id)
+def album_status(request: Request, folder_id: str):
+    _need_album(request, folder_id)
+    row = _settled(folder_id, store.album(folder_id))
     if row is None:
         raise HTTPException(404, "Unknown album")
-    return dict(row)
+    out = dict(row)
+    out["judged"] = store.judged_count(folder_id)
+    out["gemini"] = gemini.enabled()
+    return out
 
 
 def _matrix(folder_id: str):
@@ -259,6 +639,9 @@ def search(
     _creds(request)
     _need_album(request, folder_id)
     images = [f.file.read() for f in selfies]
+    if not any(faces.decode(d) is not None for d in images):
+        raise HTTPException(400, "Could not read that photo. Use a JPEG or PNG (iPhone HEIC photos: "
+                                 "share or export them as JPEG first).")
     query = faces.best_query_vector(images)
     if query is None:
         raise HTTPException(
@@ -296,11 +679,36 @@ def search(
         "count": len(hits),
         "scanned": len(best),
         "threshold": threshold,
-        "matches": hits[:2000],
+        "matches": hits,
     }
 
 
 GROUPING = {"loose": -0.06, "balanced": 0.0, "strict": 0.06}
+
+
+@app.get("/api/album/{folder_id}/names")
+def get_names(request: Request, folder_id: str):
+    """The names this account gave people in this album, kept on the server so
+    they survive signing out and work on another device."""
+    _need_album(request, folder_id)
+    user = _user_key(request)
+    return {"people": store.load_names(user, folder_id) if user else []}
+
+
+@app.post("/api/album/{folder_id}/names")
+def put_names(request: Request, folder_id: str, body: dict = Body(...)):
+    _need_album(request, folder_id)
+    user = _user_key(request)
+    if not user:
+        return {"saved": False}
+    clean = []
+    for p in (body.get("people") or [])[:500]:
+        name = str(p.get("name") or "").strip()[:100]
+        files = [f for f in (p.get("files") or []) if isinstance(f, str)][:50]
+        if name and files:
+            clean.append({"name": name, "files": files})
+    store.save_names(user, folder_id, clean)
+    return {"saved": True}
 
 
 @app.post("/api/people")
@@ -334,7 +742,8 @@ def face(request: Request, folder_id: str, file_id: str, face_idx: int):
     """A small crop of one face, so a person can be recognised and named."""
     creds = _creds(request)
     _need_album(request, folder_id)
-    key = (folder_id, file_id, face_idx)
+    # per sign-in: a crop is only reused for someone Drive already let see the photo
+    key = (creds.token, folder_id, file_id, face_idx)
     data = _face_cache.get(key)
     if data is None:
         box = store.face_box(folder_id, file_id, face_idx)
@@ -363,17 +772,211 @@ def face(request: Request, folder_id: str, file_id: str, face_idx: int):
 def thumb(request: Request, file_id: str, s: int = 0):
     creds = _creds(request)
     svc = gd.service(creds)
-    meta = (
-        svc.files()
-        .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
-        .execute()
-    )
-    size = min(max(s, 200), config.THUMB_SIZE) if s else None
+    # Per account, so one person's Drive access never serves another's thumbnail.
+    key = (creds.token, file_id)
+    hit = _thumb_meta.get(key)
+    try:
+        if hit and time.time() - hit[0] < 600:
+            meta = hit[1]
+        else:
+            meta = (
+                svc.files()
+                .get(fileId=file_id, fields="id,name,thumbnailLink", supportsAllDrives=True)
+                .execute()
+            )
+            if len(_thumb_meta) > 5000:
+                _thumb_meta.clear()
+            _thumb_meta[key] = (time.time(), meta)
+        size = min(max(s, 200), config.THUMB_SIZE) if s else None
+        data = gd.fetch_image_bytes(creds, svc, meta, size)
+    except HttpError as e:
+        # deleted, moved out of the album, or not shared with this account
+        code = 404 if e.resp.status in (403, 404) else 502
+        raise HTTPException(code, "Photo not available") from e
+    except Exception as e:
+        raise HTTPException(502, "Photo not available right now") from e
     return Response(
-        content=gd.fetch_image_bytes(creds, svc, meta, size),
+        content=data,
         media_type="image/jpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+
+# ------------------------------------------------------ Gemini curation -----
+def _need_gemini():
+    if not gemini.enabled():
+        raise HTTPException(
+            400, "Gemini is not switched on for this server (set GOOGLE_CLOUD_PROJECT or GEMINI_API_KEY)."
+        )
+
+
+def _ready_photos(folder_id: str) -> list:
+    row = store.album(folder_id)
+    if row is None or row["status"] != "ready":
+        raise HTTPException(400, "Wait for the scan to finish first.")
+    return store.photos(folder_id)
+
+
+@app.get("/api/photo/{folder_id}/{file_id}")
+def photo_notes(request: Request, folder_id: str, file_id: str):
+    """What Gemini saw in one photo, for the preview: no new Gemini call, it
+    reads the note saved during the scan."""
+    _need_album(request, folder_id)
+    row = store.photo_ai(folder_id, file_id)
+    ai = (row or {}).get("ai") or {}
+    keep = ("description", "people", "scene", "keeper", "flaws", "unsure", "reason")
+    return {k: ai[k] for k in keep if k in ai}
+
+
+@app.post("/api/cull")
+def cull(request: Request, body: dict = Body(...)):
+    """For the photographer: which frames to keep, which to drop, and why."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    out = curate.cull(_ready_photos(folder_id), body.get("strictness") or "normal")
+    out["checked"] = store.judged_count(folder_id)
+    return out
+
+
+@app.post("/api/best")
+def best(request: Request, body: dict = Body(...)):
+    """For the graduate: one person's best photos, out of all of theirs."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    file_ids = list(dict.fromkeys(f for f in (body.get("file_ids") or []) if isinstance(f, str)))
+    if len(file_ids) > 5000:
+        raise HTTPException(413, "Select at most 5,000 photos for one shortlist")
+    if not file_ids:
+        raise HTTPException(400, "No photos given")
+    n = max(1, min(int(body.get("n") or 10), 50))
+    photos = {p["file_id"]: p for p in _ready_photos(folder_id)}
+    mat, meta = _matrix(folder_id)
+
+    # This person's face in each photo: the face nearest to the face all the
+    # photos share. Its size in the frame says portrait or crowd shot.
+    sizes = {}
+    vec = curate.person_vector(mat, meta, file_ids) if len(meta) else None
+    if vec is not None:
+        sims = mat @ vec
+        for i, m in enumerate(meta):
+            f = m["file_id"]
+            if f in photos and sims[i] > sizes.get(f, (None, None, -1.0))[2]:
+                box, size = m["bbox"], photos[f]["size"]
+                side = max(box[2] - box[0], box[3] - box[1]) if len(box) == 4 else 0
+                frac = side / max(size) if size else 0.0
+                sizes[f] = (frac, m["det_score"], float(sims[i]))
+    faces_info = {f: (v[0], v[1]) for f, v in sizes.items()}
+    ai = {f: p["ai"] for f, p in photos.items()}
+    prints = {f: p["dhash"] for f, p in photos.items()}
+    picks = curate.best_shots([f for f in file_ids if f in photos], ai, faces_info, n, prints)
+    for p in picks:
+        p["name"] = photos[p["file_id"]]["name"]
+    return {"best": picks, "of": len(file_ids)}
+
+
+def _sample_lines(photos: list, limit: int) -> list:
+    judged = [p for p in photos if p["ai"]]
+    if len(judged) <= limit:
+        return [gemini.as_text(p["ai"]) for p in judged]
+    indexes = [round(i * (len(judged) - 1) / (limit - 1)) for i in range(limit)]
+    return [gemini.as_text(judged[i]["ai"]) for i in indexes]
+
+
+@app.post("/api/groups/suggest")
+def suggest_groups(request: Request, body: dict = Body(...)):
+    """Gemini reads the album's descriptions and proposes folders to sort into."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    _need_gemini()
+    lines = _sample_lines(_ready_photos(folder_id), 150)
+    if not lines:
+        raise HTTPException(400, "Gemini has not checked any photos in this album yet.")
+    try:
+        return {"groups": gemini.suggest_groups(lines)}
+    except Exception as e:
+        raise HTTPException(502, "Gemini did not answer: %s" % str(e)[:160]) from e
+
+
+def _sort_worker(job: dict, photos: list, groups: list):
+    """Put every checked photo into the folders it fits, a batch at a time."""
+    try:
+        judged = [p for p in photos if p["ai"]]
+        batches = [judged[i:i + gemini.SORT_BATCH] for i in range(0, len(judged), gemini.SORT_BATCH)]
+
+        def one(batch):
+            try:
+                res = gemini.sort_batch([gemini.as_text(p["ai"]) for p in batch], groups)
+            except Exception:
+                res = [{"groups": [], "sure": False}] * len(batch)
+            with job["lock"]:
+                for p, r in zip(batch, res):
+                    if not r["sure"]:
+                        job["check"].append(p["file_id"])
+                    elif not r["groups"]:
+                        job["none"].append(p["file_id"])
+                    for g in r["groups"] if r["sure"] else ():
+                        job["groups"][g]["file_ids"].append(p["file_id"])
+                job["done"] += len(batch)
+
+        with ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS) as pool:
+            list(pool.map(one, batches))
+        with job["lock"]:
+            unchecked = [p["file_id"] for p in photos if not p["ai"]]
+            job["unchecked"].extend(unchecked)
+            job["done"] += len(unchecked)
+            job["status"] = "done"
+    except Exception as e:
+        job["status"] = "error"
+        job["message"] = str(e)[:300]
+    finally:
+        job["finished"] = time.time()
+
+
+@app.post("/api/sort")
+def sort_album(request: Request, body: dict = Body(...)):
+    """Sort by description. groups: [{name, description}], in Thai or English.
+    The result feeds the same export as people: one Drive folder per group."""
+    _creds(request)
+    folder_id = body.get("folder_id")
+    _need_album(request, folder_id)
+    _need_gemini()
+    groups = []
+    for g in (body.get("groups") or [])[:12]:
+        name = _clean_name(g.get("name"))
+        desc = " ".join(str(g.get("description") or name).split())[:300]
+        if name:
+            groups.append({"name": name, "description": desc})
+    if not groups:
+        raise HTTPException(400, "Describe at least one group")
+    photos = _ready_photos(folder_id)
+    for old in [k for k, j in _sorts.items() if time.time() - j.get("finished", 9e18) > 3600]:
+        _sorts.pop(old, None)
+    job = {
+        "status": "running", "folder_id": folder_id, "total": len(photos), "done": 0,
+        "groups": [dict(g, file_ids=[]) for g in groups], "check": [], "unchecked": [], "none": [],
+        "names": {p["file_id"]: p["name"] for p in photos},
+        "message": None, "lock": threading.Lock(),
+    }
+    job["owner"] = _job_owner(request)
+    job_id = secrets.token_urlsafe(12)
+    _sorts[job_id] = job
+    threading.Thread(target=_sort_worker, args=(job, photos, groups), daemon=True).start()
+    return {"job_id": job_id, "total": len(photos)}
+
+
+@app.get("/api/sort/{job_id}")
+def sort_status(request: Request, job_id: str):
+    job = _sorts.get(job_id)
+    if job is None:
+        raise HTTPException(404, "This sort was interrupted (the server restarted). Run it again.")
+    if job.get("owner") != _job_owner(request):
+        raise HTTPException(404, "This sort was interrupted (the server restarted). Run it again.")
+    _need_album(request, job["folder_id"])
+    with job["lock"]:
+        return {k: v for k, v in job.items() if k not in ("lock", "owner")}
 
 
 # ------------------------------------------------------------- export -----
@@ -476,12 +1079,15 @@ def export(request: Request, body: dict = Body(...)):
     folder_id = body.get("folder_id")
     _need_album(request, folder_id)
 
+    allowed_ids = {p["file_id"] for p in _ready_photos(folder_id)}
     merged = {}                 # two groups with one name are one person
     for g in (body.get("groups") or [])[:300]:
         name = _clean_name(g.get("name"))
         ids = [f for f in (g.get("file_ids") or []) if isinstance(f, str)]
         if not name or not ids:
             continue
+        if any(fid not in allowed_ids for fid in ids):
+            raise HTTPException(400, "Export contains photos outside this album")
         slot = merged.setdefault(name.casefold(), {"name": name, "ids": {}})
         slot["ids"].update(dict.fromkeys(ids))
     if not merged:
@@ -517,6 +1123,8 @@ def export(request: Request, body: dict = Body(...)):
         "note": None,
         "message": None,
     }
+    job["folder_id"] = folder_id
+    job["owner"] = _job_owner(request)
     job_id = secrets.token_urlsafe(12)
     _exports[job_id] = job
     threading.Thread(
@@ -533,11 +1141,13 @@ def export(request: Request, body: dict = Body(...)):
 
 
 @app.get("/api/export/{job_id}")
-def export_status(job_id: str):
+def export_status(request: Request, job_id: str):
     job = _exports.get(job_id)
-    if job is None:
-        raise HTTPException(404, "Unknown export")
-    out = {k: v for k, v in job.items() if k not in ("people", "failed")}
+    if job is None or job.get("owner") != _job_owner(request):
+        raise HTTPException(404, "This export was interrupted (the server restarted). Export again: "
+                                 "photos already copied are skipped, so nothing is copied twice.")
+    _need_album(request, job["folder_id"])
+    out = {k: v for k, v in job.items() if k not in ("people", "failed", "owner")}
     out["failed"] = len(job["failed"])
     out["people"] = [
         {k: v for k, v in p.items() if k != "file_ids"} for p in job["people"]
@@ -554,3 +1164,14 @@ def healthz():
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC, "index.html"))
+
+
+# Public pages Google's sign-in screen links to (OAuth branding).
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse(os.path.join(STATIC, "privacy.html"))
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse(os.path.join(STATIC, "terms.html"))

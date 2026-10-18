@@ -17,11 +17,26 @@ os.environ.setdefault("DATA_DIR", os.path.join(ROOT, "data"))
 os.environ.setdefault("GOOGLE_CLIENT_ID", "dev")
 os.environ.setdefault("PUBLIC_BASE_URL", "http://127.0.0.1:%d" % PORT)
 
-from app import config, main  # noqa: E402
-from tests import fakedrive  # noqa: E402
+from app import config, gemini, main  # noqa: E402
+from tests import fakedrive, fakegemini  # noqa: E402
 
 config.DB_PATH = os.path.join(config.DATA_DIR, "dev-index.sqlite")
 fakedrive.install(os.path.join(config.DATA_DIR, "dev-export"))
+# DEV_SLOW=0.6 makes every full-size photo download take that many seconds, so a
+# scan of the small demo album runs long enough to stop it part way.
+if os.environ.get("DEV_SLOW"):
+    import time
+
+    _fetch, _delay = main.gd.fetch_image_bytes, float(os.environ["DEV_SLOW"])
+
+    def _slow(creds, svc, meta, size=None):
+        if size is None:
+            time.sleep(_delay)
+        return _fetch(creds, svc, meta, size)
+    main.gd.fetch_image_bytes = _slow
+# Real Gemini when a key or project is set, the stand-in otherwise.
+if not gemini.enabled():
+    fakegemini.install()
 
 if __name__ == "__main__":
     import uvicorn

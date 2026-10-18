@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Motion reel</title>
+<!-- One display face, one UI face. display=block so canvas never paints a fallback face. -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Nunito+Sans:opsz,wght@6..12,700&display=block" rel="stylesheet">
+<style>
+html,body{margin:0;background:#121318}
+canvas{display:block;height:100vh;width:auto;margin:0 auto}
+body.render canvas{height:auto}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script src="lib/motion.js"></script>
+<script src="timeline.js"></script>
+<script>
+// The film: a pure function of time. window.seek(t) paints frame t.
+// This is the starter's 6-second demo. Replace each draw function with your
+// shots; keep seek, ready and the live preview at the bottom.
+
+const { W, H, DUR } = TL;
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const g = cv.getContext('2d');
+const { clamp, lerp, inv, smooth, spring, track, SNAPPY, SOFT, HEAVY, rng, rrect, words, finger, fingerIn } = M;
+
+// Brand. One accent.
+const INK = '#121318', PAPER = '#FFFFFF', SOFTBG = '#EEF0F6', ACCENT = '#2E4BE8', MUTED = '#5E6170';
+const DISPLAY = '"Bricolage Grotesque", sans-serif', UI = '"Nunito Sans", sans-serif';
+
+// Assets: real UI screenshots go in assets/ui/ and are listed here, e.g.
+//   const IMG = await M.loadImages(['pill_0', 'card'], 'assets/ui');
+let IMG = {};
+window.ready = (async () => {
+  // IMG = await M.loadImages([...], 'assets/ui');
+  await Promise.race([
+    Promise.all([document.fonts.load(`800 100px ${DISPLAY}`), document.fonts.load(`700 40px ${UI}`)]),
+    new Promise((r) => setTimeout(r, 8000)),   // offline: render with fallbacks rather than hang
+  ]);
+  return true;
+})();
+
+// ------------------------------------------------------------------ shots
+
+// Hook: the problem in a few huge words over something that moves.
+function drawHook(t) {
+  g.fillStyle = INK; g.fillRect(0, 0, W, H);
+  const r = rng(3), cols = 5, size = W / cols;
+  const drift = 900 * (1 - Math.exp(-t / 1.2));
+  for (let i = 0; i < 60; i++) {
+    const c = i % cols, row = Math.floor(i / cols);
+    const y = row * size - drift + (c % 2) * size * 0.5;
+    if (y < -size || y > H) continue;
+    g.fillStyle = `rgba(255,255,255,${0.04 + 0.08 * r()})`;
+    rrect(g, c * size + 8, y + 8, size - 16, size - 16, 24); g.fill();
+  }
+  words(g, ['[THE PROBLEM]'], 72, 620, 150, t, TL.hookIn, TL.hookSwap - 0.25, PAPER, { font: DISPLAY });
+  words(g, ['[in five', 'big words]'], 72, 620, 150, t, TL.hookSwap, null, PAPER, { font: DISPLAY });
+}
+
+// Product: a real UI moment. The card below is a placeholder for a real
+// screenshot; draw it with M.panel(g, IMG.card, x, y, scale, radius).
+function drawProduct(t) {
+  g.fillStyle = SOFTBG; g.fillRect(0, 0, W, H);
+  words(g, ['[One feature,', 'one line.]'], 72, 300, 112, t, TL.cardIn + 0.05, null, INK, { font: DISPLAY, accentWord: 'feature,', accent: ACCENT });
+  const s = spring(t - TL.cardIn - 0.1, ...SOFT);
+  const x = 60, y = lerp(H + 100, 620, s), w = W - 120, h = 760;
+  g.save();
+  M.shadow(g, 60, 24, 0.14); rrect(g, x, y, w, h, 42); g.fillStyle = PAPER; g.fill(); M.noShadow(g);
+  g.fillStyle = MUTED; g.font = `700 44px ${UI}`;
+  g.fillText('[Real screenshot goes here]', x + 56, y + 110);
+  // a button that the fingertip presses
+  const done = spring(t - TL.tap, ...SNAPPY);
+  const bx = x + 56, by = y + h - 180, bw = w - 112, bh = 120;
+  rrect(g, bx, by, bw, bh, 24); g.fillStyle = ACCENT; g.fill();
+  g.fillStyle = PAPER; g.font = `700 48px ${UI}`; g.textAlign = 'center';
+  g.fillText(done > 0.5 ? 'Done' : '[Do the thing]', bx + bw / 2, by + 76); g.textAlign = 'left';
+  g.restore();
+  const fa = fingerIn(t, TL.tap);
+  if (fa > 0) finger(g, bx + bw / 2 + (1 - fa) * 160, by + bh / 2 + (1 - fa) * 240, TL.tap, t, fa);
+}
+
+// Lockup and call to action.
+function drawEnd(t) {
+  const u = spring(t - TL.endIn, 160, 26);
+  const top = H * (1 - u);
+  g.fillStyle = INK; g.fillRect(0, top, W, H - top + 2);
+  g.save(); g.translate(0, top * 0.35);
+  const s = spring(t - TL.endIn - 0.15, ...HEAVY);
+  g.globalAlpha = clamp(s * 2);
+  g.fillStyle = PAPER; g.font = `800 140px ${DISPLAY}`; g.textAlign = 'center';
+  g.fillText('[PRODUCT]', W / 2, 760 + (1 - s) * 40); g.textAlign = 'left';
+  g.globalAlpha = 1;
+  words(g, ['[Call to action.]'], 92, 1100, 110, t, TL.endLine, null, PAPER, { font: DISPLAY });
+  g.restore();
+}
+
+// ------------------------------------------------------------------ frame
+function draw(t) {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; M.noShadow(g);
+  if (t < TL.product[0]) drawHook(t);
+  else drawProduct(t);
+  if (t >= TL.end[0]) drawEnd(t);    // the end card rises over the last shot
+}
+
+window.seek = (t) => { draw(clamp(t, 0, DUR - 1e-6)); return true; };
+
+// Live, looping preview in a normal browser; off when rendering headless.
+window.ready.then(() => {
+  if (navigator.webdriver) return;
+  const t0 = performance.now();
+  (function loop() { draw(((performance.now() - t0) / 1000) % DUR); requestAnimationFrame(loop); })();
+});
+</script>
+</body>
+</html>

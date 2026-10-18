@@ -3,3 +3,8 @@ data
 __pycache__
 *.pyc
 .git
+promo
+design-canvas
+design-refs
+tests
+.claude

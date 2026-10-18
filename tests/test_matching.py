@@ -50,6 +50,8 @@ def main():
         ("found in a group photo", got["two_people.jpg"] >= 0.38),
         ("group photo has 2 faces", dict((n, c) for n, c, _ in rows)["two_people.jpg"] == 2),
     ]
+    small = small_faces_found()
+    checks.append(("small faces at the back of a group photo are found (%d of 40)" % small, small >= 36))
     ok = True
     for label, passed in checks:
         print(("  PASS  " if passed else "  FAIL  ") + label)
@@ -58,6 +60,27 @@ def main():
     margin = min(got["obama2.jpg"], got["obama_small.jpg"]) - got["biden.jpg"]
     print(f"separation between same-person and different-person: {margin:.3f}")
     return 0 if ok else 1
+
+
+def small_faces_found() -> int:
+    """A made-up crowd: 40 faces about 18px wide on a 1600px photo, the size
+    of the back rows of a class photo. Detecting at 640px alone finds few."""
+    import cv2
+    import numpy as np
+
+    img = cv2.imread(os.path.join(IMG, "obama.jpg"))
+    found = faces.embed_image(cv2.imencode(".jpg", img)[1].tobytes())
+    x0, y0, x1, y1 = [int(v) for v in found[0]["bbox"]]
+    w, h = x1 - x0, y1 - y0
+    face = img[max(0, y0 - h // 2):y1 + h // 2, max(0, x0 - w // 2):x1 + w // 2]
+    k = 36 / face.shape[0]
+    face = cv2.resize(face, (int(face.shape[1] * k), 36), interpolation=cv2.INTER_AREA)
+    crowd = np.full((1067, 1600, 3), 190, np.uint8)
+    for i in range(40):
+        r, c = divmod(i, 10)
+        y, x = 300 + r * 60, 200 + c * 120
+        crowd[y:y + face.shape[0], x:x + face.shape[1]] = face
+    return len(faces.embed_image(cv2.imencode(".jpg", crowd, [cv2.IMWRITE_JPEG_QUALITY, 92])[1].tobytes()))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+.git
+.gitignore
+.claude/
+data/
+promo/
+design-canvas/
+design-refs/
+tests/
+firebase/
+__pycache__/
+*.pyc

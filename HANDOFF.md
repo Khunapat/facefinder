@@ -70,7 +70,6 @@ scripts/run-codespace.sh   starts the app inside a GitHub Codespace
 tools/diagnose.py     scan diagnosis helper
 tests/                see section 9
 design-canvas/        design work, see section 8
-design-refs/          third-party design specs used as reference, see 7.6
 Dockerfile            multi-stage, python:3.11-slim, bakes the face model in
 ```
 
@@ -100,6 +99,23 @@ tool, cost nothing per photo and are more accurate. Gemini is being added for
 other jobs (section 7.1), not to replace the matching.
 
 ## 5. Where things stand
+
+**Update, 17 October 2026.** Most of what follows in this section is history.
+Now: the app runs on Cloud Run (one instance, Firestore store) behind Firebase
+Hosting, deployed with `CPU=4 bash scripts/deploy-cloudrun.sh` from Cloud Shell.
+Work is on `claude/eloquent-feynman-0cbszg`, not yet merged to `main`.
+Recent fixes: refused scan starts keep the screen as it was; Back/Forward close
+dialogs and always match the address; unticked Keep photos go to "Rejected";
+Gemini notes cannot land on the wrong photo; Gemini results are cached per
+photo (Drive id + checksum) so a rescan pays nothing again; a scan killed by a
+restart shows as stopped with Resume (the worker touches its row every 20 s).
+Names typed on Everyone are saved per account on the server (with each
+person's photos, so they find the right group again after a rescan). Stop no
+longer waits for Gemini; each Gemini call has a 60 s limit. Pages opened on the
+`.run.app` address move to `PUBLIC_BASE_URL` first, since Google only returns
+sign-in there.
+Open: the OAuth app must be published (not Testing) so judges with any Google
+account can sign in; it will show Google's "unverified app" warning.
 
 **Code:** `main` on GitHub has the two-mode app described above, merged with the
 Codespaces fixes. Last commit before this brief: `8b7f6f7`.
@@ -244,10 +260,8 @@ text. The deck must use their template and be exported to PDF under 5 MB.
 
 ### 7.6 Before the repository goes public
 
-- `design-refs/` holds community-written design specs for Airbnb, Pinterest and
-  Claude. The old page's `--accent: #ff385c` is Airbnb's colour. Both go away
-  with the new design; remove `design-refs/` and the README's "Visual design"
-  section when it lands.
+- Done: `design-refs/` and the old Airbnb-based "Visual design" README section were
+  removed once our own pink design landed (they remain in git history).
 - `tests/img/` holds photos of public figures taken from another open-source
   project. Replace them with photos we may publish, and update the three tests'
   expected names and counts.
@@ -351,7 +365,8 @@ it is `limited`.
 
 - Online only; the owner does not want to run anything on his own PC.
 - No LLM for face matching.
-- The OAuth app stays in Testing mode with test users; no Google verification.
+- No Google verification. The OAuth app is published (In production) so judges
+  can sign in; they see the "unverified app" warning and click through.
 - The pink direction and the camera mascot are chosen.
 - Theme: Media, Content & Digital Experiences.
 - Imagen, Veo and BigQuery are not being added just to tick boxes.

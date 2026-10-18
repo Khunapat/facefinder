@@ -6,3 +6,4 @@ data/
 client_secret*.json
 models/
 tests/img_extra/
+firebase.deploy.json

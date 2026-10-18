@@ -3,396 +3,858 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FaceFinder — sort a shared album by who is in it</title>
+<title>FaceFinder — sort a shared photo album in minutes</title>
+<link rel="icon" href="/static/img/cam-wave.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Mitr:wght@400;500;600&family=Roboto:wght@500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ---------------------------------------------------------------------------
-   Visual system adapted from the community DESIGN.md for Airbnb
-   (github.com/VoltAgent/awesome-design-md). Structure kept: one shadow tier,
-   4px spacing scale, pill search surface, photography-forward cards.
-   The accent below is the one token to change for your own brand.
+   FaceFinder's own pink system. One white workspace (the "shell") on a pale
+   pink page: the header, album selector and tabs sit in it as one bar, and
+   every tab's content starts at the same place below it. Strong pink only for
+   primary actions and the active tab. Mitr for headings, Noto Sans Thai for
+   text and controls (both cover Thai and Latin).
 --------------------------------------------------------------------------- */
 :root{
-  /* colour */
-  --accent:#ff385c; --accent-active:#e00b41; --accent-disabled:#ffd1da;
-  --error:#c13515;
-  --ink:#222222; --body:#3f3f3f; --muted:#6a6a6a; --muted-soft:#929292;
-  --hairline:#dddddd; --hairline-soft:#ebebeb; --border-strong:#c1c1c1;
-  --canvas:#ffffff; --surface-soft:#f7f7f7; --surface-strong:#f2f2f2;
-  --on-accent:#ffffff;
-
-  /* radius */
-  --r-xs:4px; --r-sm:8px; --r-md:14px; --r-lg:20px; --r-xl:32px; --r-full:9999px;
-
-  /* spacing */
-  --s-xxs:2px; --s-xs:4px; --s-sm:8px; --s-md:12px; --s-base:16px;
-  --s-lg:24px; --s-xl:32px; --s-xxl:48px; --s-section:64px;
-
-  /* the single shadow in the system */
-  --float:rgba(0,0,0,.02) 0 0 0 1px, rgba(0,0,0,.04) 0 2px 6px 0,
-          rgba(0,0,0,.1) 0 4px 8px 0;
-
-  --font:'Nunito Sans','Airbnb Cereal VF',Circular,-apple-system,
-         'Segoe UI',Roboto,'Noto Sans Thai',sans-serif;
+  --page:#fdf0f5; --panel:#ffffff; --ink:#1f2540; --muted:#5b6178;
+  --accent:#d6336c; --accent-active:#b9255a; --accent-soft:#f6dbe6; --tint:#f3bcd0;
+  --line:#efe6ec; --line-strong:#d9dbe4; --field:#858a9e; --error:#b42318; --error-bg:#fff4f2;
+  --warn:#b45309; --photo-bg:#f4eef1;
+  --shadow:0 1px 2px rgba(31,37,64,.04),0 10px 32px rgba(31,37,64,.06);
+  --shadow-lift:0 12px 36px rgba(31,37,64,.16);
+  --r-shell:24px; --r-card:16px; --r-ctl:12px; --r-tile:12px; --r-full:9999px;
+  --pad:32px; --head:'Mitr','Noto Sans Thai',system-ui,sans-serif;
+  --body:'Noto Sans Thai','Segoe UI',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font);
-     font-size:16px;line-height:1.5;font-weight:400}
+html{-webkit-text-size-adjust:100%;scrollbar-gutter:stable}
+body{margin:0;background:var(--page);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
 h1,h2,h3,p{margin:0}
-a{color:var(--ink)}
-button,input,select{font-family:var(--font)}
-:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-
-/* ---------------------------------------------------------------- top nav */
-.nav{height:80px;display:flex;align-items:center;gap:var(--s-base);
-     padding:0 var(--s-xl);border-bottom:1px solid var(--hairline-soft);
-     position:sticky;top:0;background:var(--canvas);z-index:20}
-.brand{font-size:21px;font-weight:700;letter-spacing:-.4px;color:var(--accent);
-       display:flex;align-items:center;gap:var(--s-sm)}
-.brand svg{display:block}
-.brand b{color:var(--ink);font-weight:700}
+h1,h2,h3{font-family:var(--head);font-weight:600;color:var(--ink);line-height:1.2}
+a{color:var(--ink)} a:hover{color:#000}
+button,input,select{font-family:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.hint{font-size:15px;color:var(--muted)}
 .grow{flex:1}
-.acct{display:flex;align-items:center;gap:var(--s-md);border:1px solid var(--hairline);
-      border-radius:var(--r-full);padding:var(--s-sm) var(--s-sm) var(--s-sm) var(--s-base);
-      background:var(--canvas);cursor:pointer;font-size:14px;font-weight:600;color:var(--ink)}
-.acct:hover{box-shadow:var(--float)}
-.acct .dot{width:32px;height:32px;border-radius:var(--r-full);background:var(--ink);
-      color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
-.email{font-size:13px;color:var(--muted);font-weight:400}
+.mascot{display:block;object-fit:contain}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 
-/* ------------------------------------------------------------------- page */
-main{max-width:1080px;margin:0 auto;padding:var(--s-xxl) var(--s-lg) 160px}
-.hero{text-align:center;margin-bottom:var(--s-xl)}
-.hero h1{font-size:32px;font-weight:700;line-height:1.18;letter-spacing:-.6px;
-     text-wrap:balance}
-.hero p{margin-top:var(--s-md);font-size:16px;color:var(--muted);
-        max-width:560px;margin-left:auto;margin-right:auto;text-wrap:balance}
-
-/* --------------------------------------------------- signature search pill */
-.pill{display:flex;align-items:center;background:var(--canvas);
-      border:1px solid var(--hairline);border-radius:var(--r-full);
-      box-shadow:var(--float);height:64px;padding:0 var(--s-sm) 0 var(--s-lg);
-      max-width:760px;margin:0 auto}
-.pill .seg{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;
-      text-align:left}
-.pill label{font-size:12px;font-weight:700;color:var(--ink);line-height:1.33}
-.pill input{border:0;outline:0;background:transparent;
-      font-size:14px;color:var(--ink);padding:0;width:100%}
-.pill input::placeholder{color:var(--muted-soft)}
-.orb{width:48px;height:48px;flex:0 0 48px;border-radius:var(--r-full);border:0;
-     background:var(--accent);color:var(--on-accent);cursor:pointer;
-     display:grid;place-items:center}
-.orb:hover{background:var(--accent-active)}
-.narrow{max-width:760px;margin:0 auto}
-
-/* ------------------------------------------------------- mode switch */
-.work[data-locked="1"]{opacity:.4;pointer-events:none}
-.modes{display:flex;gap:var(--s-xs);padding:var(--s-xs);margin:var(--s-xl) auto 0;
-       width:fit-content;max-width:100%;background:var(--surface-strong);
-       border-radius:var(--r-full)}
-.modes button{border:0;background:transparent;color:var(--muted);cursor:pointer;
-       font-size:14px;font-weight:600;line-height:1.29;padding:10px 20px;
-       border-radius:var(--r-full)}
-.modes button:hover{color:var(--ink)}
-.modes button[aria-selected="true"]{background:var(--ink);color:#fff}
-
-/* ------------------------------------------------------------------ cards */
-.card{border:1px solid var(--hairline-soft);border-radius:var(--r-md);
-      padding:var(--s-lg);margin-top:var(--s-lg);background:var(--canvas)}
-.card h2{font-size:20px;font-weight:600;letter-spacing:-.18px;line-height:1.2}
-.card .hint{margin-top:var(--s-xs);font-size:14px;color:var(--muted)}
-
-/* ----------------------------------------------------------------- inputs */
-.field{width:100%;height:56px;padding:var(--s-md);border:1px solid var(--border-strong);
-       border-radius:var(--r-sm);background:var(--canvas);color:var(--ink);font-size:16px}
-.field:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-select.field{height:48px;width:auto;font-size:14px;padding:0 var(--s-md);cursor:pointer}
-.btn{height:48px;padding:14px 24px;border:0;border-radius:var(--r-sm);
-     background:var(--accent);color:var(--on-accent);
-     font-size:16px;font-weight:500;line-height:1.25;cursor:pointer;white-space:nowrap}
+/* ------------------------------------------------------------- buttons */
+.btn{height:48px;padding:0 24px;border:1.5px solid transparent;border-radius:var(--r-ctl);background:var(--accent);color:#fff;
+     font-size:16px;font-weight:600;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:8px}
 .btn:hover{background:var(--accent-active)}
-.btn:disabled{background:var(--accent-disabled);cursor:not-allowed}
-.btn.secondary{background:var(--canvas);color:var(--ink);border:1px solid var(--ink)}
-.btn.secondary:hover{background:var(--surface-strong)}
-.btn.text{background:transparent;color:var(--ink);padding:14px 0;height:auto;
-     text-decoration:underline}
-.btn.text:hover{background:transparent;color:#000}
-.btn.sm{height:auto;padding:10px 20px;font-size:14px;border-radius:var(--r-full)}
-.row{display:flex;gap:var(--s-md);flex-wrap:wrap;align-items:center}
-.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r-full);border:0;
-     background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center}
-.iconbtn:hover{background:var(--surface-strong);color:var(--ink)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{height:40px;padding:0 16px;font-size:14px;border-radius:10px}
+.btn.ghost{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
+.btn.ghost:hover{background:var(--page);border-color:var(--field)}
+.btn.soft{background:var(--accent-soft);color:var(--accent-active)}
+.btn.soft:hover{background:var(--tint);color:var(--ink)}
+.linkbtn{border:0;background:transparent;padding:8px 0;min-height:44px;color:var(--ink);text-decoration:underline;font-size:14px;font-weight:500}
+.iconbtn{width:44px;height:44px;flex:0 0 44px;border-radius:10px;border:0;background:transparent;color:var(--muted);
+     display:grid;place-items:center;padding:0}
+.iconbtn:hover{background:var(--page);color:var(--ink)}
+/* one clear action: once there is something to export, the run button steps back */
+body.can-export .mode .main .btn:not(.ghost):not(.soft){background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
+body.can-export .mode .main .btn:not(.ghost):not(.soft):hover{background:var(--page)}
 
-/* -------------------------------------------------- the people to look for */
-.roster{display:flex;flex-direction:column;margin-top:var(--s-base)}
-.person{display:flex;align-items:center;gap:var(--s-base);padding:var(--s-md) 0;
-     border-top:1px solid var(--hairline-soft)}
-.person:first-child{border-top:0}
-.person.drag{background:var(--surface-soft)}
-.shots{display:flex;gap:var(--s-sm);flex:0 0 auto}
-.shots img,.addshot{width:64px;height:64px;border-radius:var(--r-md)}
-.shots img{object-fit:cover;display:block}
-.addshot{border:1px dashed var(--border-strong);background:var(--surface-soft);
-     color:var(--muted);cursor:pointer;display:flex;flex-direction:column;
-     align-items:center;justify-content:center;gap:2px;font-size:11px;font-weight:600}
-.addshot:hover{border-color:var(--ink);color:var(--ink);background:var(--canvas)}
-.person .field{flex:1;min-width:0}
+/* the official "Sign in with Google" button (Google's branding guidelines) */
+.gsi{height:44px;padding:0 16px 0 12px;border:1px solid #747775;border-radius:var(--r-full);background:#fff;color:#1f1f1f;
+     font-family:'Roboto',arial,sans-serif;font-size:14px;font-weight:500;letter-spacing:.25px;
+     display:inline-flex;align-items:center;gap:10px;white-space:nowrap;text-decoration:none}
+.gsi:hover{background:#f8f9fa;box-shadow:0 1px 2px rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);color:#1f1f1f}
+.gsi svg{width:20px;height:20px;flex:0 0 20px}
+.gsi.lg{height:52px;font-size:16px;padding:0 22px 0 16px}
 
-.slider-head{display:flex;align-items:baseline;gap:var(--s-sm);flex-wrap:wrap;
-      margin-top:var(--s-lg);font-size:14px;color:var(--muted)}
-.slider-head b{color:var(--ink);font-size:16px;font-weight:600;
-      font-variant-numeric:tabular-nums}
-input[type=range]{width:100%;margin-top:var(--s-sm);accent-color:var(--accent)}
+/* ---------------------------------------------------------------- inputs */
+.field{width:100%;height:48px;padding:0 14px;border:1.5px solid var(--field);border-radius:var(--r-ctl);
+       background:var(--panel);color:var(--ink);font-size:16px}
+.field::placeholder,.fname::placeholder{color:var(--muted)}
+.field:focus{outline:0;border-color:var(--ink)}
+.field:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+select.field{width:auto;font-size:14px;height:40px;padding:0 12px;border-radius:10px;cursor:pointer}
+.flabel{display:flex;flex-direction:column;gap:6px;font-size:14px;font-weight:600;color:var(--ink)}
+.flabel .field{flex:none}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;color:var(--muted)}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
 
-/* --------------------------------------------------------------- progress */
-.bar{height:4px;border-radius:var(--r-full);background:var(--surface-strong);
-     overflow:hidden;margin:var(--s-base) 0 var(--s-sm)}
-.bar > i{display:block;height:100%;background:var(--accent);width:0;
-     transition:width .4s ease}
+/* ---------------------------------------------------- the app shell */
+.shell{max-width:1240px;margin:20px auto 0;background:var(--panel);border:1px solid #f3e4eb;
+       border-radius:var(--r-shell);box-shadow:var(--shadow);min-height:calc(100vh - 20px)}
+.apphead{display:grid;grid-template-columns:auto minmax(0,auto) auto minmax(0,1fr) auto;grid-template-areas:"brand album tabs . side";
+         align-items:center;column-gap:20px;min-height:76px;padding:0 var(--pad);border-bottom:1px solid var(--line);
+         position:relative;z-index:40}
+.brand{grid-area:brand;display:flex;align-items:center;gap:10px;color:var(--accent);font-family:var(--head);
+       font-size:22px;font-weight:600;text-decoration:none;white-space:nowrap}
+.brand:hover{color:var(--accent-active)}
+.brand .logo{width:40px;height:40px;border-radius:var(--r-full);background:var(--page);display:grid;place-items:center}
+.albumsel{grid-area:album;position:relative;min-width:0;padding-left:20px;border-left:1px solid var(--line)}
+.albumbtn{display:flex;align-items:center;gap:8px;min-height:44px;max-width:min(320px,100%);padding:0 10px;border:1px solid transparent;
+          border-radius:10px;background:transparent;color:var(--ink);font-size:15px}
+.albumbtn:hover,.albumbtn[aria-expanded="true"]{background:var(--page);border-color:var(--line)}
+.aname{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acount{color:var(--muted);font-size:13px;white-space:nowrap}
+.caret{flex:0 0 auto;color:var(--muted)}
+.tabs{grid-area:tabs;display:flex;align-self:stretch;gap:4px;min-width:0;padding-left:20px;border-left:1px solid var(--line)}
+.tabs button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:15px;font-weight:600;
+      padding:3px 12px 0;min-height:44px;white-space:nowrap}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.headside{grid-area:side;display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.helpbtn{display:flex;align-items:center;gap:6px;height:44px;padding:0 10px;border:0;border-radius:10px;background:transparent;
+         color:var(--ink);font-size:14px;font-weight:600}
+.helpbtn:hover{background:var(--page)}
+.helpbtn .q{width:26px;height:26px;border-radius:var(--r-full);border:1.5px solid var(--line-strong);display:grid;place-items:center;font-size:13px}
+.headmascot{width:44px;height:44px}
+.acctbtn{display:flex;align-items:center;gap:6px;height:44px;padding:0 6px 0 4px;border:0;border-radius:var(--r-full);background:transparent}
+.acctbtn:hover,.acctbtn[aria-expanded="true"]{background:var(--page)}
+.acctbtn .initial{width:34px;height:34px;border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent-active);
+         display:grid;place-items:center;font-weight:700;font-size:15px}
+.dropwrap{position:relative}
+.menu{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:min(340px,calc(100vw - 32px));background:var(--panel);
+      border:1px solid var(--line-strong);border-radius:12px;box-shadow:var(--shadow-lift);padding:6px;z-index:60}
+.menu.right{left:auto;right:0}
+/* menus: a header saying what this is, then actions with an icon and one line each */
+.menu.albummenu{min-width:320px}
+.mhd{display:flex;gap:12px;align-items:center;padding:8px 8px 10px;min-width:0}
+.mhd > div{min-width:0}
+.mhd b{display:block;font-size:15px;color:var(--ink);overflow-wrap:anywhere}
+.mhd span:not(.mic){display:block;font-size:13px;color:var(--muted)}
+.mic{width:40px;height:40px;flex:0 0 40px;border-radius:10px;background:var(--accent-soft);color:var(--accent-active);display:grid;place-items:center;font-weight:700}
+.mprog{height:6px;margin:0 8px 8px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
+.mprog i{display:block;height:100%;background:var(--accent);border-radius:var(--r-full)}
+.msep{height:1px;background:var(--line);margin:6px 2px}
+.menu .mi{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:6px 8px;border:0;border-radius:10px;
+     background:transparent;color:var(--ink);text-align:left;font-size:14px}
+.menu .mi:hover,.menu .mi:focus-visible{background:var(--page)}
+.mi .ico{width:34px;height:34px;flex:0 0 34px;border-radius:9px;background:#f2f2f6;color:var(--ink);display:grid;place-items:center}
+.mi b{display:block;font-size:14px;font-weight:600}
+.mi small{display:block;font-size:12px;color:var(--muted);line-height:1.35}
+.mi.primary .ico{background:var(--accent);color:#fff}
+.mi.primary b{color:var(--accent-active)}
+.mi.danger .ico{background:var(--error-bg);color:var(--error)}
+.mi.danger b{color:var(--error)}
 
-/* ----------------------------------------------------- one person's result */
-.rhead{display:flex;align-items:center;gap:var(--s-base);flex-wrap:wrap}
-.avatar{width:56px;height:56px;flex:0 0 56px;border-radius:var(--r-full);
-     object-fit:cover;background:var(--surface-strong)}
-.rname{font-size:20px;font-weight:600;letter-spacing:-.18px;line-height:1.2;
-     overflow-wrap:anywhere}
+
+main{padding:28px var(--pad) 140px}
+
+/* ---------------------------------------------------- start screen */
+.hero{display:flex;flex-wrap:wrap;gap:32px;align-items:center;padding:24px 0 8px}
+.hero .copy{flex:999 1 480px;min-width:0}
+.hero h1{font-size:46px;line-height:1.15;text-wrap:balance}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p{margin-top:14px;max-width:560px;font-size:18px;color:var(--muted)}
+.hero .art{flex:1 1 220px;max-width:280px;margin:0 auto}
+.hero .art img{width:100%;aspect-ratio:1}
+.openbox{margin-top:28px;max-width:620px}
+.openbox .row{flex-wrap:nowrap;margin-top:6px}
+.openbox .field{flex:1;min-width:0}
+
+/* choosing photos before a scan */
+.backlink{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-10px 0 4px;padding:0 10px 0 2px;border:0;
+     background:transparent;color:var(--muted);font-size:14px;font-weight:600;border-radius:10px}
+.backlink:hover{color:var(--ink);background:var(--page)}
+.choose{max-width:960px}
+.opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1.5px solid var(--line-strong);border-radius:var(--r-card);cursor:pointer}
+.opt:hover{border-color:var(--field)}
+.privline{margin-top:6px;font-size:14px;max-width:620px}
+.ailine{margin-top:10px;font-size:15px;color:var(--muted);max-width:560px}
+.privlist{margin:0;padding-left:20px;display:grid;gap:10px;font-size:15px;line-height:1.45}
+.privlist b{color:var(--ink)}
+.opt.off{opacity:.55;cursor:default}.opt.off:hover{border-color:var(--line-strong)}
+.rmosaic img.gone{object-fit:contain;background:var(--page);padding:12px}
+.opt:has(input:checked){border-color:var(--accent);background:#fff8fb}
+.opt input{width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent);flex:0 0 20px}
+.opt span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.opt b{font-size:15px}.opt em{font-style:normal;font-size:13px;color:var(--muted)}
+.days{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.day{display:flex;flex-direction:column;align-items:flex-start;min-height:52px;padding:6px 14px;border:1.5px solid var(--line-strong);border-radius:10px;
+     background:var(--panel);color:var(--ink);font-size:14px;font-weight:600}
+.day span{font-size:12px;font-weight:400;color:var(--muted)}
+.day[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-active)}
+.pick{position:relative;border:0;padding:0;background:transparent;text-align:left;min-width:0}
+.pick .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
+.pick img{width:100%;height:100%;object-fit:cover;display:block}
+.pick[aria-pressed="true"] .ph{box-shadow:inset 0 0 0 3px var(--accent)}
+.pick .tick{pointer-events:none}
+.pick[aria-pressed="true"] .tick{color:#fff} .pick[aria-pressed="true"] .tick::before{background:var(--accent);border-color:var(--accent)}
+.pick:disabled{cursor:default}.pick:disabled .ph{opacity:.55}
+.pick .nm{display:block;margin-top:6px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.choosebar{position:sticky;bottom:16px;display:flex;align-items:center;gap:10px;margin-top:20px;padding:12px 12px 12px 18px;
+     background:var(--panel);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-lift);z-index:5}
+.choosebar .count{flex:1;min-width:0;font-size:15px;color:var(--muted)} .choosebar .count b{color:var(--ink)}
+
+/* example folders in Sort */
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chips > span{font-size:13px;color:var(--muted);margin-right:2px}
+.chip2{display:flex;flex-direction:column;align-items:flex-start;min-height:44px;padding:5px 12px;border:1.5px dashed var(--tint);
+       border-radius:10px;background:#fff8fb;color:var(--accent-active);font-size:14px;font-weight:600;line-height:1.3}
+.chip2 small{font-size:12px;font-weight:400;color:var(--muted)}
+.chip2:hover{border-color:var(--accent);border-style:solid}
+
+/* recent albums */
+.recent{margin-top:36px;padding-top:28px;border-top:1px solid var(--line)}
+.recent h2{font-size:20px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin-top:14px}
+.rcard{position:relative;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel);overflow:hidden}
+.rcard:hover{border-color:var(--field);box-shadow:var(--shadow)}
+.ropen{display:block;width:100%;padding:0;border:0;background:transparent;text-align:left;color:var(--ink)}
+.rmosaic{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px;height:140px;background:var(--photo-bg)}
+.rmosaic img{width:100%;height:100%;object-fit:cover;display:block;min-height:0}
+.rmosaic img:first-child{grid-row:1 / 3}
+.rmosaic.one img{grid-column:1 / 3}
+.rmosaic.empty{display:grid;place-items:center;grid-template-columns:1fr;grid-template-rows:1fr}
+.rmosaic.empty img{width:96px;height:96px;object-fit:contain;grid-row:auto}
+/* every cover failed: show one mascot, not one per tile */
+.rmosaic:not(:has(img:not(.gone))){grid-template-columns:1fr;grid-template-rows:1fr;place-items:center}
+.rmosaic:not(:has(img:not(.gone))) img{width:96px;height:96px;padding:0;background:none;grid-row:auto;grid-column:auto}
+.rmosaic:not(:has(img:not(.gone))) img:not(:first-child){display:none}
+.rinfo{display:flex;flex-direction:column;gap:2px;padding:12px 14px 14px;min-width:0}
+.rinfo b{font-size:15px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.rinfo span{font-size:13px;color:var(--muted)}
+.rinfo .st{font-weight:600;color:var(--ink)} .rinfo .st.warn{color:var(--warn)}
+.rforget{position:absolute;top:6px;right:6px;width:36px;height:36px;flex-basis:36px;background:rgba(255,255,255,.92);color:var(--ink)}
+.rforget:hover{background:#fff}
+.rcard.sample{border-style:dashed;border-color:var(--tint)}
+.rcard.sample .rmosaic{background:#fff8fb}
+
+/* ---------------------------------------------- one frame for every tab */
+.mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px 20px;min-height:72px;margin-bottom:20px}
+.mtitle{min-width:0}
+.mtitle h2{font-size:30px}
+.mtitle .sub{margin-top:4px;font-size:15px;color:var(--muted)}
+.mtools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:4px}
+.mode .main{display:flex;flex-direction:column;gap:14px;min-width:0}
+.how{display:none}
+.work[data-locked="1"]{display:none}              /* its text is shown by the Help button */
+
+/* ---------------------------------------------------- messages */
+.msg{font-size:15px;line-height:1.45;border-radius:12px;padding:12px 16px}
+.msg.err{background:var(--error-bg);color:var(--error)}
+.msg.ok{background:var(--page);color:var(--ink)}
+.msg.info{background:#f6f6f9;color:var(--muted)}
+.msg.access{background:#fff;color:var(--ink);border:1px solid var(--line);padding:18px 20px;text-align:left}
+.msg.access h3{font-size:17px;margin:0 0 6px;color:var(--error)}
+.msg.access p{margin:6px 0}
+.msg.access ol{margin:8px 0 0;padding-left:22px;display:grid;gap:12px}
+.msg.access li b{display:block}
+.msg.access .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.msg.access .why{color:var(--muted);font-size:14px}
+.msg.access a.btn{text-decoration:none;color:#fff}
+
+/* ---------------------------------------------------- find people */
+.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.person{position:relative;display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line-strong);border-radius:var(--r-card)}
+.person.drag{background:var(--page);border-color:var(--accent)}
+.phead{display:flex;align-items:center;justify-content:space-between;margin:-8px -8px -6px 0;font-size:14px}
+.dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;min-height:180px;
+          border:2px dashed var(--tint);border-radius:var(--r-ctl);background:#fff8fb;color:var(--accent-active);padding:16px}
+.dropzone:hover{border-color:var(--accent);background:var(--page)}
+.dropzone .plus{width:52px;height:52px;border-radius:var(--r-full);background:var(--accent-soft);display:grid;place-items:center}
+.dropzone b{font-size:17px}
+.dropzone span{font-size:13px;color:var(--muted)}
+.shots{display:flex;gap:10px;flex-wrap:wrap}
+.shot{position:relative;margin:0;width:96px;height:96px}
+.shot img{width:100%;height:100%;object-fit:cover;border-radius:var(--r-ctl);display:block}
+.shot .rm{position:absolute;top:-8px;right:-8px;width:32px;height:32px;border-radius:var(--r-full);border:2px solid #fff;
+          background:var(--ink);color:#fff;display:grid;place-items:center;padding:0}
+.shot .rm svg{width:14px;height:14px}
+.addshot{width:96px;height:96px;border:2px dashed var(--tint);border-radius:var(--r-ctl);background:#fff8fb;color:var(--accent-active);
+         display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:12px;font-weight:600}
+.addshot:hover{border-color:var(--accent)}
+.peopleact{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.slider-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.slider-head b{color:var(--ink);font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+
+/* ---------------------------------------------------- result cards */
+.card{background:var(--panel);border:1px solid var(--line-strong);border-radius:var(--r-card);padding:20px 24px;margin-top:16px}
+.card h2{font-size:22px}
+.rhead{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.avatar{width:48px;height:48px;flex:0 0 48px;border-radius:var(--r-full);object-fit:cover;background:var(--photo-bg)}
+.rname{font-family:var(--head);font-size:22px;font-weight:600;color:var(--ink);line-height:1.2;overflow-wrap:anywhere}
 .rcount{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* ---------------------------------------------------------- photo grid */
-.grid{display:grid;gap:var(--s-base);margin-top:var(--s-base);
-      grid-template-columns:repeat(4,minmax(0,1fr))}
-.tile{position:relative;cursor:pointer}
-.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-md);
-      overflow:hidden;background:var(--surface-strong)}
-.tile img{width:100%;height:100%;object-fit:cover;display:block}
-.tile:hover .ph{box-shadow:var(--float)}
-.tile:not(.sel) img{opacity:.45}
-.tick{position:absolute;top:var(--s-md);right:var(--s-md);width:32px;height:32px;
-      border-radius:var(--r-full);display:grid;place-items:center;padding:0;
-      background:rgba(0,0,0,.4);color:transparent;
-      border:1.5px solid rgba(255,255,255,.85)}
-.sel > .ph > .tick,.tick[aria-pressed="true"]{background:var(--accent);
-      border-color:var(--accent);color:#fff}
-.tile .meta{display:flex;align-items:center;gap:var(--s-xs);
-      margin-top:var(--s-sm);font-size:14px;line-height:1.43}
-.tile .meta .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
-      white-space:nowrap;color:var(--ink);font-weight:600}
-.tile .meta .sc{color:var(--muted);font-variant-numeric:tabular-nums}
-.tag{position:absolute;top:var(--s-md);left:var(--s-md);background:var(--canvas);
-      color:var(--ink);font-size:11px;font-weight:600;line-height:1.18;
-      border-radius:var(--r-full);padding:4px 10px;box-shadow:var(--float)}
+/* ---------------------------------------------------- photo grid */
+.grid{display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fill,minmax(176px,1fr))}
+.tile{position:relative;min-width:0;border-radius:var(--r-tile)}
+.tile .ph{position:relative;aspect-ratio:1;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
+.tile img{width:100%;height:100%;object-fit:cover;object-position:center 30%;display:block}
+.tile.sel .ph{box-shadow:inset 0 0 0 3px var(--accent)}
+.tile.viewing .ph{outline:3px solid var(--ink);outline-offset:3px}
+.photo-open{width:100%;height:100%;border:0;padding:0;background:transparent;display:block;cursor:zoom-in}
+.tick{position:absolute;top:6px;right:6px;width:44px;height:44px;border-radius:var(--r-full);display:grid;place-items:center;
+      padding:0;background:transparent;border:0;color:transparent}
+.tick::before{content:"";position:absolute;inset:7px;border-radius:var(--r-full);background:rgba(31,37,64,.35);border:2px solid rgba(255,255,255,.95)}
+.tick svg{position:relative}
+.sel > .ph > .tick,.tick[aria-pressed="true"]{color:#fff}
+.sel > .ph > .tick::before,.tick[aria-pressed="true"]::before{background:var(--accent);border-color:var(--accent)}
+.tag{position:absolute;top:10px;left:10px;background:var(--panel);color:var(--ink);font-size:12px;font-weight:600;
+     border-radius:var(--r-full);padding:3px 10px;pointer-events:none}
+.tag.best{background:var(--accent);color:#fff}
+.tile .meta{display:flex;gap:4px;margin-top:8px;font-size:14px}
+.tile .meta .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.tile .why{display:flex;gap:6px;align-items:flex-start;font-size:13px;color:var(--muted);line-height:1.4;margin-top:2px}
+.tile .why.flag::before{content:"";flex:0 0 8px;height:8px;margin-top:5px;border-radius:var(--r-full);background:#f0a04b}
+.tile .why span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
-/* ------------------------------------------- everyone in the album */
-.faces{display:grid;gap:var(--s-lg) var(--s-base);margin-top:var(--s-lg);
-      grid-template-columns:repeat(6,minmax(0,1fr))}
-.fcard{display:flex;flex-direction:column;gap:var(--s-sm);min-width:0}
+/* ---------------------------------------------------- everyone */
+.faces{display:grid;gap:20px 16px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.fcard{display:flex;flex-direction:column;gap:8px;min-width:0}
 .fwrap{position:relative}
-.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;cursor:pointer;
-      border-radius:var(--r-md);overflow:hidden;background:var(--surface-strong)}
+.fpic{display:block;width:100%;aspect-ratio:1;padding:0;border:0;border-radius:var(--r-tile);overflow:hidden;background:var(--photo-bg)}
 .fpic img{width:100%;height:100%;object-fit:cover;display:block}
-.fpic:hover{box-shadow:var(--float)}
-.fcard .tick{cursor:pointer;top:var(--s-sm);right:var(--s-sm)}
-.fname{width:100%;height:44px;padding:0 var(--s-md);border:1px solid var(--hairline);
-      border-radius:var(--r-sm);font-size:14px;color:var(--ink);background:var(--canvas)}
-.fname:focus{outline:0;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-.fmeta{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fname{width:100%;height:44px;padding:0 12px;border:1.5px solid var(--field);border-radius:10px;
+       font-size:15px;font-weight:600;color:var(--ink);background:var(--panel)}
+.fname:focus{outline:0;border-color:var(--ink)}
+.fname:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.fmeta{padding-left:2px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* ------------------------------------------------- one person's photos */
-dialog{border:0;padding:0;border-radius:var(--r-lg);background:var(--canvas);
-      color:var(--ink);width:min(1040px,calc(100vw - 32px));
-      max-height:calc(100vh - 48px);box-shadow:var(--float)}
+/* ---------------------------------------------------- sort */
+.grow-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:14px;border:1px solid var(--line-strong);border-radius:var(--r-card)}
+.grow-row .gname{flex:1 1 160px;min-width:0}
+.grow-row .gdesc{flex:3 1 280px;min-width:0}
+@media (max-width:640px){.grow-row .gname{flex:1 1 100%}.grow-row .gdesc{flex:1 1 0}.grow-row .iconbtn{flex:0 0 auto}}
+.whyline{font-size:14px;color:var(--muted)}
+
+/* ---------------------------------------------------- cull */
+.piles{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:4px;overflow-x:auto}
+.piles button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--muted);font-size:15px;font-weight:600;
+     padding:0 14px;min-height:46px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.piles button:hover{color:var(--ink)}
+.piles button[aria-pressed="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.piles .n{font-size:13px;font-variant-numeric:tabular-nums;background:#f3f3f7;color:var(--ink);border-radius:var(--r-full);padding:1px 9px}
+.piles button[aria-pressed="true"] .n{background:var(--accent-soft);color:var(--accent-active)}
+.cullwrap{display:block}
+.cullwrap.has-side{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+.sidepreview{position:sticky;top:16px;margin-top:16px;border:1px solid var(--line-strong);border-radius:var(--r-card);background:var(--panel);
+  max-height:calc(100vh - 116px);overflow:auto}   /* clear of the bottom bar; its notes scroll inside */
+
+/* ---------------------------------------------------- dialogs */
+dialog{border:0;padding:0;border-radius:20px;background:var(--panel);color:var(--ink);
+       width:min(1000px,calc(100vw - 32px));max-height:calc(100vh - 48px);box-shadow:0 20px 60px rgba(31,37,64,.25)}
 dialog[open]{display:flex;flex-direction:column}
-dialog::backdrop{background:rgba(0,0,0,.5)}
-.dhead{display:flex;align-items:center;gap:var(--s-base);flex-wrap:wrap;
-      padding:var(--s-base) var(--s-lg);border-bottom:1px solid var(--hairline-soft)}
-.dhead .field{flex:1;min-width:160px;height:48px}
-.dbody{padding:0 var(--s-lg) var(--s-lg);overflow:auto}
+dialog::backdrop{background:rgba(31,37,64,.5)}
+.dhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:16px 20px 16px 24px;border-bottom:1px solid var(--line)}
+.dhead h2{font-size:22px;flex:1;min-width:0}
+.dhead .field{flex:1;min-width:160px}
+.dbody{padding:0 24px 24px;overflow:auto}
+.dfoot{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;padding:16px 24px;border-top:1px solid var(--line)}
+dialog.narrow{width:min(520px,calc(100vw - 32px))}
 
-/* --------------------------------------------------------------- messages */
-.msg{margin-top:var(--s-base);font-size:14px;line-height:1.43;
-     border-radius:var(--r-sm);padding:var(--s-md) var(--s-base)}
-.msg.err{background:#fff8f6;color:var(--error);border:1px solid #f7d6ce}
-.msg.ok{background:var(--surface-soft);color:var(--ink);border:1px solid var(--hairline-soft)}
-.msg.info{background:var(--surface-soft);color:var(--muted);border:1px solid var(--hairline-soft)}
-.donelist{list-style:none;padding:0;margin:var(--s-base) 0 0;display:grid;
-     grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--s-sm) var(--s-lg)}
-.donelist li{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
-.donelist a{font-weight:600}
+/* photo preview: a dialog, or a panel beside the grid on wide screens */
+dialog.preview{width:min(1100px,calc(100vw - 32px))}
+.pv .dhead{flex-wrap:nowrap;padding:10px 10px 10px 20px}
+.pv h2{flex:1;min-width:0;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv .rcount{white-space:nowrap}
+.pv .iconbtn:disabled{opacity:.3;cursor:default}
+.pv .dbody{padding:16px 20px 20px}
+.full-photo{width:100%;height:min(66vh,720px);object-fit:contain;background:var(--photo-bg);border-radius:12px;display:block}
+.full-photo.loading{opacity:.25}
+.sidepreview .full-photo{height:max(240px,calc(100vh - 470px))}   /* fixed, so stepping through photos never jumps */
+.pfoot{display:flex;flex-direction:column;gap:14px;margin-top:16px}
+.why-full{font-size:15px;color:var(--muted)} .why-full b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.pnotes{display:flex;flex-direction:column;gap:12px;min-width:0}
+.seen{font-size:14px;color:var(--muted);padding-top:10px;border-top:1px solid var(--line)}
+.seen b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.seen .tagline{display:block;margin-top:4px;font-size:13px}
+.cmp{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);border:1px solid var(--line-strong);border-radius:10px;
+     background:var(--panel);padding:6px 10px 6px 6px;text-align:left;min-height:44px}
+.cmp:hover{border-color:var(--field);color:var(--ink)}
+.cmp img{width:84px;height:63px;object-fit:cover;border-radius:8px;background:var(--photo-bg)}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg2 .btn{background:var(--panel);color:var(--ink);border-color:var(--line-strong)}
+.seg2 .btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.seg2 #previewOut[aria-pressed="true"]{background:var(--ink);border-color:var(--ink)}
+dialog.preview .pfoot{flex-direction:row-reverse;align-items:center;flex-wrap:wrap}
+dialog.preview .pnotes{flex:1;min-width:220px}
+dialog.preview .seg2{min-width:260px}
 
-/* ------------------------------------------------------- sticky action bar */
-.actionbar{position:fixed;left:0;right:0;bottom:0;background:var(--canvas);
-     border-top:1px solid var(--hairline);padding:var(--s-md) var(--s-lg);
-     z-index:30;box-shadow:rgba(0,0,0,.06) 0 -2px 8px}
-.actionbar .inner{max-width:1080px;margin:0 auto;display:flex;gap:var(--s-md);
-     align-items:center}
-.actionbar .field{flex:1;min-width:180px;height:48px;font-size:15px}
-.actionbar .count{font-size:14px;color:var(--muted);white-space:nowrap}
-.actionbar .count b{color:var(--ink);font-weight:700;font-size:16px;
-     font-variant-numeric:tabular-nums}
-.xprog{max-width:1080px;margin:0 auto var(--s-sm);font-size:14px;color:var(--muted)}
-.xprog .bar{margin:0 0 var(--s-xs)}
+/* export */
+.xlist{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.xlist li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:#f8f8fb;font-size:15px}
+.xlist li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.xlist li.note{background:transparent;padding:4px 2px;font-size:13px;color:var(--muted)}
+.xlist li em{font-style:normal;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.safe{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted)}
 
-@media (max-width:1128px){
-  .grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .faces{grid-template-columns:repeat(4,minmax(0,1fr))}
+/* ---------------------------------------------------- done */
+dialog.done{padding:28px 24px 24px;align-items:center;gap:14px;text-align:center}
+dialog.done h2{font-size:26px}
+.donelist{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:8px 0 0;padding:0;list-style:none}
+.donelist a{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:10px;background:var(--page);
+       font-size:15px;font-weight:600;text-decoration:none}
+
+/* ---------------------------------------------------- selection bar */
+.actionbar{position:fixed;left:0;right:0;bottom:16px;padding:0 16px;z-index:30;pointer-events:none}
+.actionbar .inner{pointer-events:auto;max-width:1176px;margin:0 auto;min-height:68px;display:flex;gap:12px;align-items:center;
+       padding:10px 10px 10px 20px;background:var(--panel);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-lift)}
+.actionbar .count{flex:1;min-width:0;font-size:15px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actionbar .count b{color:var(--ink);font-size:16px;font-variant-numeric:tabular-nums}
+.thumbs{display:flex;flex:0 0 auto}
+.thumbs img{width:36px;height:36px;border-radius:8px;object-fit:cover;border:2px solid #fff;background:var(--photo-bg)}
+.thumbs img + img{margin-left:-14px}
+.xprog{flex:1;min-width:0;font-size:14px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+
+/* ---------------------------------------------------- progress */
+.bar{width:100%;height:8px;border-radius:var(--r-full);background:var(--accent-soft);overflow:hidden}
+.bar > i{display:block;height:100%;width:0;background:var(--accent);border-radius:var(--r-full);transition:width .4s ease}
+.bar.busy > i{width:35%!important;animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(290%)}}
+
+/* processing: the mascot looks over a stack of photos beside the real count */
+.scan{max-width:520px;margin:24px auto 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.scan h2{font-size:28px}
+.scanart{position:relative;width:200px;height:150px}
+.scanart .mascot{position:absolute;left:24px;top:2px;width:140px;height:140px;animation:bob 2.4s ease-in-out infinite}
+.scanart .stack i{position:absolute;right:0;bottom:6px;width:60px;height:46px;border-radius:9px;
+      background:#e7ecff;border:3px solid #fff;box-shadow:0 4px 10px rgba(31,37,64,.12)}
+.scanart .stack i:nth-child(1){transform:rotate(-8deg);background:#fff1d6}
+.scanart .stack i:nth-child(2){transform:rotate(5deg) translate(-6px,-8px);background:#e2f5ec}
+.scanart .stack i:nth-child(3){transform:translate(-12px,-16px);background:#fde3ec}
+.scanart .beam{position:absolute;right:-4px;bottom:0;width:74px;height:4px;border-radius:4px;
+      background:var(--accent);opacity:.55;animation:beam 1.8s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes beam{0%,100%{transform:translateY(-60px)}50%{transform:translateY(0)}}
+.scancount{font-size:18px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.scanact{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:pre-line}
+#scanCard.halted .scanart .mascot{animation:none} #scanCard.halted .beam,#scanCard.halted .scanhint{display:none}
+
+/* ---------------------------------------------------- medium screens */
+@media (max-width:1099px){
+  :root{--pad:28px}
+  .shell{margin:16px 16px 0}
+  .apphead{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"brand album side" "tabs tabs tabs";min-height:0}
+  .apphead > .brand,.apphead > .albumsel,.apphead > .headside{min-height:72px}
+  .albumsel{display:flex;align-items:center}
+  .tabs{margin:0 calc(-1 * var(--pad));padding:0 calc(var(--pad) - 12px);border-left:0;border-top:1px solid var(--line);min-height:52px}
+  .cullwrap.has-side{display:block}
+  .headmascot{display:none}
 }
-@media (max-width:744px){
-  .nav{height:64px;padding:0 var(--s-base)}
-  .email{display:none}
-  main{padding:var(--s-lg) var(--s-base) 200px}
-  .hero h1{font-size:26px}
-  .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .faces{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .pill{height:auto;padding:var(--s-md);border-radius:var(--r-lg)}
-  .pill .seg{padding-right:var(--s-sm)}
-  .modes{width:100%}
-  .modes button{flex:1;padding:10px 8px}
-  .person{flex-wrap:wrap}
-  .person .field{flex:1 1 60%}
-  .shots{flex:1 1 100%}
-  .actionbar .inner{flex-wrap:wrap}
-  .actionbar .field{flex:1 1 100%}
-  .actionbar .btn{flex:1}
+@media (max-width:900px){ .helpbtn .label{display:none} }
+/* ---------------------------------------------------- phones */
+@media (max-width:640px){
+  :root{--pad:16px}
+  body{background:var(--panel)}
+  .shell{margin:0;border-radius:0;border:0;min-height:100vh}
+  .apphead{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"brand side" "album album" "tabs tabs"}
+  .apphead > .brand,.apphead > .headside{min-height:64px}
+  .apphead > .albumsel{min-height:0}
+  .albumsel{padding:0 0 10px;border-left:0}
+  .albumbtn{width:100%;max-width:none;border-color:var(--line-strong);height:44px}
+  .albumbtn .aname{flex:0 1 auto}.albumbtn .caret{margin-left:auto}
+  .albumsel .menu{left:0;right:0;max-width:none}
+  .tabs{overflow-x:auto;scrollbar-width:none;padding:0 4px;gap:0}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{padding:3px 10px 0;font-size:14px;flex:1 0 auto}
+  .helpbtn .label{display:none}
+  .gsi{height:40px;font-size:13px;padding:0 12px 0 10px}
+  main{padding:20px var(--pad) 120px}
+  .hero{padding-top:8px}.hero h1{font-size:32px}.hero p{font-size:16px}
+  .hero .art{display:none}
+  .openbox .row{flex-wrap:wrap}.openbox .btn{width:100%}
+  .mhead{min-height:0;flex-wrap:wrap;margin-bottom:16px}
+  .mtitle{flex:1 1 100%}
+  .mtitle h2{font-size:26px}
+  .mtools{padding-top:0}
+  .roster{grid-template-columns:1fr}
+  .opts{grid-template-columns:1fr}
+  .choosebar{bottom:8px;flex-wrap:wrap}.choosebar .count{flex:1 1 100%}.choosebar .btn{flex:1}
+  .rgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .rmosaic{height:104px}
+  .recent{margin-top:24px;padding-top:20px}
+  .peopleact{flex-direction:column;align-items:stretch}
+  .peopleact .btn{width:100%}
+  .mode .main > .row > .btn:not(.sm){flex:1 1 100%}
+  .card{padding:16px;border-radius:14px}
+  .rhead{gap:8px}.rhead .btn.sm{padding:0 12px}
+  .grid,.faces{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  dialog{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+  dialog.narrow{width:100vw;height:auto;max-height:100dvh;border-radius:20px 20px 0 0;margin:auto 0 0}
+  dialog.preview{width:100vw}
+  .dhead{padding:10px 8px 10px 16px}.dbody{padding:0 16px 16px}.dfoot{padding:12px 16px}
+  #dlg .dhead{padding-right:16px}#dlg .dhead #dlgFace{order:0}#dlg .dhead #dlgCount{order:1;flex:1}#dlg .dhead #dlgDone{order:2}
+  #dlg .dhead .flabel{order:3;flex:1 1 100%!important}#dlg .dhead .btn.ghost,#dlg .dhead #dlgBest{order:4;flex:1 0 auto}
+  .full-photo{height:auto;max-height:58vh;min-height:200px}
+  dialog.preview .pfoot{flex-direction:column;align-items:stretch}
+  .actionbar{bottom:8px;padding:0 8px}
+  .actionbar .inner{min-height:64px;padding:8px 8px 8px 14px}
+  .actionbar .count{white-space:normal;font-size:14px;line-height:1.3}
+  .thumbs{display:none}
 }
-@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+@media (max-width:360px){
+  .tabs button{padding:3px 6px 0;font-size:13px;flex:1 1 auto}
+}
+@media (max-width:340px){
+  .piles{gap:0}
+  .piles button{padding:0 7px;font-size:13.5px;gap:4px}
+  .piles .n{font-size:12px;padding:1px 6px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="brand">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"/>
-      <path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-      <circle cx="8" cy="9.2" r="1" fill="currentColor"/>
-      <circle cx="13" cy="9.2" r="1" fill="currentColor"/>
-      <path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>
-    Face<b>Finder</b>
-  </div>
-  <div class="grow"></div>
-  <span class="email" id="who"></span>
-  <button class="acct" id="auth"><span id="authLabel">Sign in</span><span class="dot" id="authDot">G</span></button>
-</nav>
-
-<main>
-  <div id="setupWarn"></div>
-
-  <section class="hero">
-    <h1>Give everyone their own folder of photos</h1>
-    <p>Paste the album the photographer shared. Tell us who to look for, or let us
-       show you everyone who is in it. Each person gets a folder in your Drive.</p>
-  </section>
-
-  <!-- the album -->
-  <div class="pill">
-    <div class="seg">
-      <label for="album">Shared album</label>
-      <input type="text" id="album" placeholder="Paste the Google Drive folder link">
-    </div>
-    <button class="orb" id="openAlbum" title="Open album" aria-label="Open album">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2.4"/>
-        <path d="M16 16l5 5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+<div class="shell">
+<header class="apphead">
+  <a class="brand" href="/" aria-label="FaceFinder, back to the start">
+    <span class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="7" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M15.8 15.8L21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="8" cy="9.2" r="1" fill="currentColor"/>
+        <circle cx="13" cy="9.2" r="1" fill="currentColor"/>
+        <path d="M8 12.6c1.5 1.3 3.5 1.3 5 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </svg>
-    </button>
-  </div>
-  <div class="narrow">
-    <div id="albumMsg"></div>
-    <div id="indexBox" hidden>
-      <div class="bar"><i id="pbar"></i></div>
-      <div class="row">
-        <span style="font-size:14px;color:var(--muted)" id="pstat"></span>
-        <div class="grow"></div>
-        <button class="btn text" id="rebuild" style="font-size:14px">Rescan from scratch</button>
+    </span>
+    FaceFinder
+  </a>
+
+  <!-- the open album: name, count, and what can be done with it -->
+  <div class="albumsel" id="albumSel" hidden>
+    <div class="dropwrap" style="min-width:0;width:100%">
+      <button class="albumbtn" id="albumBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="albumMenu">
+        <span class="aname" id="albumName"></span><span class="acount" id="albumCount"></span>
+        <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="menu albummenu" id="albumMenu" hidden>
+        <div class="mhd"><span class="mic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
+          <div><b id="menuAlbumName"></b><span id="menuAlbumCount"></span></div></div>
+        <div class="mprog" id="menuProg" hidden><i></i></div>
+        <div id="menuRetry"></div>
+        <div class="msep"></div>
+        <button type="button" class="mi" id="menuMore"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          <span><b>Choose more photos</b><small>Pick by day or by hand</small></span></button>
+        <button type="button" class="mi" id="menuOther"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg></span>
+          <span><b>Open another album</b><small>This one stays saved on the start page</small></span></button>
+        <div class="msep" id="menuRescanSep"></div>
+        <button type="button" class="mi danger" id="menuRescan"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6L20 8.7M20 4v4.7h-4.7"/></svg></span>
+          <span><b>Rescan from the start</b><small>Finds the faces again; keeps Gemini's notes</small></span></button>
+        <button type="button" class="mi danger" id="menuDelete"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></span>
+          <span><b>Delete this album's data</b><small>Face data, Gemini's notes, your names. Drive is not touched</small></span></button>
       </div>
     </div>
   </div>
 
-  <section class="card" id="doneCard" hidden></section>
+  <nav class="tabs" role="tablist" aria-label="What to do with the album" id="tabs" hidden>
+    <button role="tab" id="tabEveryone" aria-selected="true">Everyone</button>
+    <button role="tab" id="tabPeople" aria-selected="false">Find people</button>
+    <button role="tab" id="tabSort" aria-selected="false" data-ai>Sort</button>
+    <button role="tab" id="tabCull" aria-selected="false" data-ai>Cull photos</button>
+  </nav>
+
+  <div class="headside">
+    <button class="helpbtn" id="helpBtn" type="button" aria-label="Help"><span class="q" aria-hidden="true">?</span><span class="label">Help</span></button>
+    <img class="headmascot" src="/static/img/cam-search.png" alt="" width="44" height="44">
+    <a class="gsi" id="gsiNav" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
+    <div class="dropwrap" id="acct" hidden>
+      <button class="acctbtn" id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctMenu" aria-label="Account">
+        <span class="initial" id="acctInitial">?</span>
+        <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="menu right" id="acctMenu" hidden>
+        <div class="mhd"><span class="mic initial2" id="acctInitial2"></span>
+          <div><span>Signed in as</span><b id="who"></b></div></div>
+        <div class="msep"></div>
+        <button type="button" class="mi privlink" id="acctPrivacy"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><span><b>What FaceFinder keeps</b></span></button>
+        <button type="button" class="mi" id="auth"><span class="ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 16l4-4-4-4M14 12H4"/></svg></span><span><b>Sign out</b></span></button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="setupWarn"></div>
+  <div id="appMsg" role="alert"></div>
+
+  <!-- 1. start -->
+  <div id="hero">
+  <section class="hero">
+    <div class="copy">
+      <h1>Find your photos. <em>Choose your moments.</em></h1>
+      <p>Find people, review the best moments, and save your selections to Drive.</p>
+      <p class="ailine">A face-recognition model finds who is in each photo. Gemini judges photo quality and
+        describes each photo, so you can sort and search them in plain words.</p>
+      <div id="signinBox" hidden style="margin-top:28px;display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+        <a class="gsi lg" href="/oauth2/login"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></a>
+        <span class="hint" style="font-size:14px">FaceFinder reads a Google Drive folder with your Google account
+          and puts the folders in your own Drive. It never deletes or moves anything.
+          <button type="button" class="linkbtn privlink">What FaceFinder keeps</button></span>
+      </div>
+      <div class="openbox" id="albumPill">
+        <label class="flabel" for="album">Google Drive folder link</label>
+        <div class="row">
+          <input class="field" type="text" id="album" placeholder="Paste the Google Drive folder link">
+          <button class="btn" id="openAlbum">Open album</button>
+        </div>
+      </div>
+      <div id="albumMsg" style="margin-top:12px;max-width:620px"></div>
+      <p class="hint privline" id="privLine">FaceFinder only reads your photos and makes copies; it never changes your Drive.
+        <button type="button" class="linkbtn privlink">What FaceFinder keeps</button>
+        · <a href="/privacy" class="linkbtn" style="display:inline">Privacy policy</a></p>
+    </div>
+    <div class="art"><img class="mascot" src="/static/img/cam-wave.png" alt="FaceFinder's camera mascot waving hello"></div>
+  </section>
+  <!-- albums this account opened before, and the sample album if there is one -->
+  <section class="recent" id="recentBox" hidden aria-labelledby="recentTitle">
+    <h2 id="recentTitle">Pick up where you left off</h2>
+    <div class="rgrid" id="recentGrid"></div>
+  </section>
+  </div>
+
+  <!-- 2. processing -->
+  <section class="scan" id="scanCard" hidden>
+    <div class="scanart" aria-hidden="true">
+      <div class="stack"><i></i><i></i><i></i></div>
+      <img class="mascot" src="/static/img/cam-search.png" alt="" width="140" height="140">
+      <div class="beam"></div>
+    </div>
+    <h2 id="scanTitle">Preparing your album</h2>
+    <div id="pstat" class="scancount" role="status" aria-live="polite" aria-atomic="true">Starting…</div>
+    <div class="bar" id="pbarBox" role="progressbar" aria-label="Photos checked" aria-valuemin="0" aria-valuemax="100"><i id="pbar"></i></div>
+    <div class="scanact" id="pact"></div>
+    <div class="hint scanhint" style="font-size:14px">Keep this page open. Photos already checked are kept if it stops.</div>
+    <div class="row" style="justify-content:center">
+      <button class="btn" id="usePartial" hidden>Use the checked photos</button>
+      <button class="btn" id="resumeScan" hidden>Resume scan</button>
+      <button class="btn ghost sm" id="stopScan">Stop scan</button>
+      <button class="btn ghost sm" id="otherAlbum" hidden>Open another album</button>
+    </div>
+  </section>
+
+
+  <!-- 2a. before a scan: which photos to check -->
+  <section class="choose" id="chooseCard" hidden aria-labelledby="chooseTitle">
+    <button type="button" class="backlink" id="chooseBack">← Back</button>
+    <div class="mhead">
+      <div class="mtitle"><h2 id="chooseTitle">Which photos should we check?</h2>
+        <p class="sub" id="chooseSub">Faces are found and Gemini checks each photo once. You can add more later.</p></div>
+    </div>
+    <div class="opts" role="radiogroup" aria-label="Photos to check">
+      <label class="opt"><input type="radio" name="scope" value="all" checked>
+        <span><b>All photos</b><em id="optAllN"></em></span></label>
+      <label class="opt"><input type="radio" name="scope" value="date">
+        <span><b>By the day they were taken</b><em id="optDateN">Pick one or more days</em></span></label>
+      <label class="opt"><input type="radio" name="scope" value="hand">
+        <span><b>Pick photos by hand</b><em id="optHandN">Tap the photos you want</em></span></label>
+    </div>
+    <div class="days" id="dayBox" hidden></div>
+    <div id="handBox" hidden>
+      <div class="row" style="margin-top:4px"><button class="btn ghost sm" id="pickAll">All</button>
+        <button class="btn ghost sm" id="pickNone">None</button></div>
+      <div class="grid" id="pickGrid"></div>
+    </div>
+    <div class="choosebar">
+      <span class="count" id="chooseSum"></span>
+      <button class="btn ghost" id="chooseCancel">Cancel</button>
+      <button class="btn" id="chooseGo">Start</button>
+    </div>
+  </section>
 
   <div class="work" id="work" data-locked="1">
-    <div class="modes" role="tablist" aria-label="How to find people">
-      <button role="tab" id="tabPeople" aria-selected="true">I know who I'm looking for</button>
-      <button role="tab" id="tabEveryone" aria-selected="false">Show me everyone in the album</button>
-    </div>
+    <!-- Every tab has the same frame: heading + optional tools, one short line,
+         then the work. The heading's top edge and left edge never move. -->
 
-    <!-- mode 1: named people -->
-    <div id="modePeople">
-      <section class="card">
-        <h2>Who are we looking for</h2>
-        <p class="hint">Add one to three clear photos of each person and give them a name.
-           The name becomes their folder. Two or three angles finds more than one shot.</p>
-        <div class="roster" id="roster"></div>
-        <div class="row" style="margin-top:var(--s-md)">
-          <button class="btn secondary sm" id="addPerson">Add another person</button>
+    <!-- mode: find people -->
+    <div id="modePeople" hidden>
+      <section class="mode">
+        <div class="mhead">
+          <div class="mtitle"><h2>Find your photos</h2><p class="sub">Add a clear photo of each person.</p></div>
+          <details class="how"><summary>How it works</summary>
+            <p>The face model turns each face into numbers and finds every photo with the same
+               face, including group photos. Two or three angles of a person find more.</p></details>
         </div>
-        <div class="row" style="margin-top:var(--s-lg)">
-          <button class="btn" id="go">Find their photos</button>
-        </div>
-        <div id="searchMsg"></div>
-        <div id="strict" hidden>
-          <div class="slider-head">Match strictness <b id="thVal">0.38</b>
-            <span>— lower finds more photos but lets in the wrong people</span></div>
-          <input type="range" id="th" min="0.20" max="0.70" step="0.01" value="0.38"
-                 aria-label="Match strictness">
+        <div class="main">
+          <div id="roster" class="roster"></div>
+          <div class="peopleact">
+            <button class="btn" id="go">Find photos</button>
+            <button class="btn ghost" id="addPerson">+ Add someone</button>
+          </div>
+          <div id="searchMsg"></div>
+          <div id="strict" hidden>
+            <div class="slider-head">Match strictness <b id="thVal">0.38</b>
+              <span>— lower finds more photos but lets in the wrong people</span></div>
+            <input type="range" id="th" min="0.20" max="0.70" step="0.01" value="0.38" aria-label="Match strictness">
+          </div>
         </div>
       </section>
       <div id="results"></div>
     </div>
 
-    <!-- mode 2: everyone -->
-    <div id="modeEveryone" hidden>
-      <section class="card">
-        <div class="row">
-          <div style="flex:1;min-width:240px">
-            <h2>Everyone in this album</h2>
-            <p class="hint">Tick the people you want a folder for and type their name.
-               Tap a face to check their photos. Same person twice? Give both the same name.</p>
+    <!-- mode: everyone -->
+    <div id="modeEveryone">
+      <section class="mode">
+        <div class="mhead">
+          <div class="mtitle"><h2>Choose people</h2><p class="sub">Type a name to make a folder. Tap a face to check their photos.</p></div>
+          <div class="mtools">
+            <label class="check">Grouping
+              <select class="field" id="grouping">
+                <option value="loose">Looser</option>
+                <option value="balanced" selected>Balanced</option>
+                <option value="strict">Stricter</option>
+              </select>
+            </label>
           </div>
-          <label class="row" style="font-size:14px;color:var(--muted);gap:var(--s-sm)">Grouping
-            <select class="field" id="grouping">
-              <option value="loose">Looser — fewer, bigger groups</option>
-              <option value="balanced" selected>Balanced</option>
-              <option value="strict">Stricter — never mix two people</option>
-            </select>
-          </label>
+          <details class="how"><summary>How it works</summary>
+            <p>Every face in the album is grouped into people. Tap a face to check their photos
+               and pick their best shots. Same person twice? Give both cards the same name and
+               they share a folder. "Looser" makes fewer, bigger groups; "Stricter" makes fewer
+               uncertain matches.</p></details>
         </div>
-        <div id="everyMsg"></div>
-        <div class="faces" id="faces"></div>
-        <div class="row" style="margin-top:var(--s-base)">
-          <button class="btn text" id="toggleSingles" style="font-size:14px" hidden></button>
+        <div class="main">
+          <div id="everyMsg"></div>
+          <div class="faces" id="faces"></div>
+          <div><button class="linkbtn" id="toggleSingles" hidden></button>
+            <p class="hint" id="singlesHint" hidden style="font-size:14px;margin-top:2px">Someone seen from the side or
+              laughing can show up here as a new person. Give them the same name as their other card and their photos
+              go into one folder.</p></div>
         </div>
       </section>
     </div>
+
+    <!-- mode: sort by description (Gemini) -->
+    <div id="modeSort" hidden>
+      <section class="mode">
+        <div class="mhead">
+          <div class="mtitle"><h2>Sort by description</h2><p class="sub">Describe a folder in your own words.</p></div>
+          <details class="how"><summary>How it works</summary>
+            <p>Gemini wrote a short description of every photo during the scan. Sorting matches your
+               folder descriptions against those, so it may miss small details. A photo can go in
+               several folders. Uncertain ones appear in "Check these".</p></details>
+        </div>
+        <div class="main">
+          <div id="groupRows" style="display:flex;flex-direction:column;gap:10px"></div>
+          <div class="chips" id="sortChips" aria-label="Example folders"><span>Try:</span></div>
+          <div class="row">
+            <button class="btn" id="runSort">Sort the photos</button>
+            <button class="btn ghost sm" id="addGroup">+ Add a folder</button>
+            <button class="btn soft sm" id="suggest">Suggest folders with Gemini</button>
+          </div>
+          <div class="bar" id="sbarBox" hidden><i id="sbar"></i></div>
+          <div id="sortMsg"></div>
+        </div>
+      </section>
+      <div id="sortResults"></div>
+    </div>
+
+    <!-- mode: cull (Gemini) -->
+    <div id="modeCull" hidden>
+      <section class="mode">
+        <div class="mhead">
+          <div class="mtitle"><h2>Choose the keepers</h2><p class="sub">Review suggestions. Originals stay untouched.</p></div>
+          <div class="mtools">
+            <label class="check">How strict
+              <select class="field" id="strictness">
+                <option value="gentle">Gentle</option>
+                <option value="normal" selected>Normal</option>
+                <option value="strict">Strict</option>
+              </select>
+            </label>
+          </div>
+          <details class="how"><summary>How it works</summary>
+            <p>Gemini checked every photo for blur, closed eyes, people cut off by the frame and
+               bad light. Photos it could not check or was unsure about go to Review, never to
+               Rejected. A near-identical copy is rejected only when a clearly better copy is kept.
+               Ticked photos are copied into a new "Keep" folder; the album is not touched.
+               "Gentle" only drops clear mistakes; "Strict" keeps only the strongest frames.</p></details>
+        </div>
+        <div class="main">
+          <div class="row"><button class="btn" id="runCull">Suggest again</button></div>
+          <div id="cullMsg"></div>
+        </div>
+      </section>
+      <div class="cullwrap" id="cullWrap">
+        <div id="cullResults"></div>
+        <aside class="sidepreview pv" id="cullSide" hidden aria-label="Photo preview"></aside>
+      </div>
+    </div>
   </div>
 </main>
+</div>
 
 <dialog id="dlg" aria-label="Photos of one person">
   <div class="dhead">
     <img class="avatar" id="dlgFace" alt="">
-    <input type="text" class="field" id="dlgName" placeholder="Name — becomes the folder name" maxlength="100">
+    <label class="flabel" style="flex:1;min-width:160px">Folder name
+      <input type="text" class="field" id="dlgName" placeholder="Their name" maxlength="100"></label>
     <span class="rcount" id="dlgCount"></span>
-    <button class="btn secondary sm" id="dlgAll">All</button>
-    <button class="btn secondary sm" id="dlgNone">None</button>
-    <button class="btn secondary sm" id="dlgSure">Confident only</button>
+    <button class="btn soft sm" id="dlgBest" data-ai>Best 10</button>
+    <button class="btn ghost sm" id="dlgAll">All</button>
+    <button class="btn ghost sm" id="dlgNone">None</button>
+    <button class="btn ghost sm" id="dlgSure">Confident only</button>
     <button class="btn sm" id="dlgDone">Done</button>
   </div>
-  <div class="dbody"><div class="grid" id="dlgGrid"></div></div>
+  <div class="dbody"><div id="dlgMsg" style="margin-top:16px"></div><div class="grid" id="dlgGrid"></div></div>
+</dialog>
+
+<dialog id="xdlg" class="narrow" aria-labelledby="xdlgTitle">
+  <div class="dhead"><h2 id="xdlgTitle">Export to Drive</h2>
+    <button type="button" class="iconbtn" id="xClose" aria-label="Close"></button></div>
+  <div class="dbody">
+    <ul class="xlist" id="xlist"></ul>
+    <label class="flabel" style="margin-top:18px"><span><span id="destLabel">Destination folder</span> <span style="font-weight:400;color:var(--muted)">(optional)</span></span>
+      <input class="field" type="text" id="dest" placeholder="A Drive folder link, or a name for a new folder"></label>
+    <p class="hint" style="font-size:13px;margin-top:6px" id="destHint"></p>
+    <label class="check" id="alsoRejectedBox" hidden style="margin-top:14px">
+      <input type="checkbox" id="alsoRejected"> Also copy the unticked photos into a "Rejected" folder
+    </label>
+    <p class="safe" style="margin-top:14px">✓ Originals stay untouched. FaceFinder only copies.</p>
+  </div>
+  <div class="dfoot">
+    <button type="button" class="btn ghost" id="xCancel">Cancel</button>
+    <button type="button" class="btn" id="xGo">Export</button>
+  </div>
+</dialog>
+
+<dialog id="doneCard" class="narrow done" aria-label="Export finished"></dialog>
+
+<dialog id="privacyDlg" class="narrow" aria-labelledby="privacyTitle">
+  <div class="dhead"><h2 id="privacyTitle">What FaceFinder keeps</h2>
+    <button type="button" class="iconbtn" id="privacyClose" aria-label="Close"></button></div>
+  <div class="dbody" style="padding-top:18px">
+    <ul class="privlist">
+      <li><b>Your photos are not stored.</b> FaceFinder reads them from Google Drive with your sign-in when it needs
+        them. It never changes, moves or deletes anything in your Drive; an export makes copies.</li>
+      <li><b>Face data:</b> for each face, 512 numbers that describe it and where it sits in the photo. This is not a
+        picture. It is used only to match faces in that album. Faces are matched by a face-recognition model that runs
+        inside FaceFinder, not by Gemini.</li>
+      <li><b>Gemini's notes:</b> a short description and a quality score for each photo. To make them, each photo is
+        sent to Gemini through Google Cloud's Vertex AI, made smaller first (768 pixels on the long side). Google
+        Cloud's terms say this data is not used to train Google's models.</li>
+      <li><b>Your names and recent albums:</b> the names you type and the albums you opened, kept under a coded form of
+        your email address. Only you see them.</li>
+      <li><b>Where:</b> in FaceFinder's own Google Cloud project (Firestore database, Cloud Run). Face crops and
+        thumbnails are made when shown and kept only in memory.</li>
+      <li><b>Your Google sign-in</b> is kept in a signed cookie in this browser and removed when you sign out. You can
+        remove FaceFinder's access at any time at <a href="https://myaccount.google.com/permissions" target="_blank"
+        rel="noopener">myaccount.google.com/permissions</a>.</li>
+      <li><b>How long:</b> until it is deleted. In an open album, use the album menu, then <b>Delete this album's
+        data</b>. People who can open the same Drive folder share its scan, so it is not done twice; FaceFinder checks
+        with Drive that they can open the folder first. Deleting removes the scan for everyone who uses this folder in
+        FaceFinder; they can scan it again.</li>
+    </ul>
+  </div>
+</dialog>
+<dialog id="helpDlg" class="narrow" aria-labelledby="helpTitle">
+  <div class="dhead"><h2 id="helpTitle">How it works</h2>
+    <button type="button" class="iconbtn" id="helpClose" aria-label="Close"></button></div>
+  <div class="dbody" style="display:flex;gap:16px;align-items:flex-start;padding-top:18px">
+    <img src="/static/img/cam-point.png" alt="" width="72" height="72" style="flex:0 0 72px">
+    <p id="helpText" style="font-size:15px"></p>
+  </div>
 </dialog>
 
 <div class="actionbar" id="actionbar" hidden>
-  <div class="xprog" id="xprog" hidden><div class="bar"><i id="xbar"></i></div><span id="xtext"></span></div>
   <div class="inner">
-    <input type="text" id="dest" class="field"
-           placeholder="Where to put the folders: a Drive folder link, or a name for a new one"
-           aria-label="Destination folder">
+    <div class="thumbs" id="xthumbs" aria-hidden="true"></div>
     <span class="count" id="summary"></span>
-    <button class="btn" id="export" disabled>Create folders in my Drive</button>
+    <div class="xprog" id="xprog" hidden><span id="xtext"></span><div class="bar"><i id="xbar"></i></div></div>
+    <button class="btn" id="export" disabled>Export to Drive</button>
   </div>
 </div>
 
@@ -400,60 +862,274 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g,
   c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const PLUS = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
 const CLOSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const PLAY = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+const ARROW_L = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ARROW_R = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const FOLDER = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>';
 
 const state = {
-  signedIn:false, folderId:null, ready:false, mode:"people", thr:0.38,
+  signedIn:false, gemini:false, folderId:null, albumName:"", ready:false, mode:"everyone", thr:0.38,
   roster:[],        // people the user described: {id, name, files, urls}
   results:[],       // one group per searched person
   crowd:null,       // one group per face cluster, when "everyone" was loaded
+  sortDefs:[],      // groups to sort by: {name, description}
+  sorted:[],        // one group per sorted folder, after sorting
+  culled:null,      // {keep, reject} groups, after culling
   showSingles:false, open:null, poll:null, seq:0, exporting:false,
 };
 
 function msg(el, html, kind="info"){
   el.innerHTML = html ? `<div class="msg ${kind}">${html}</div>` : "";
 }
+// This account cannot open the folder: say why and what to do, on the start page.
+function showNoAccess(info, link, removed){
+  const email = info?.email || "this Google account";
+  const id = info?.folder_id || "";
+  const url = /^https?:/.test(link || "") ? link : `https://drive.google.com/drive/folders/${encodeURIComponent(id)}`;
+  $("#album").value = link || id;
+  const ask = `Hi! Could you share this Google Drive folder with me (${info?.email || "my Google account"}) as Viewer, ` +
+    `or set General access to "Anyone with the link"? ${url}\nI want to sort the photos with FaceFinder. ` +
+    `It only reads the photos; it never changes, moves or deletes them.`;
+  $("#albumMsg").innerHTML = `<div class="msg access" role="alert">
+    <h3>${removed ? "You no longer have access to this folder" : "This account can't open that folder"}</h3>
+    <p>You are signed in as <b>${esc(email)}</b>, and Google Drive does not let this account open the folder.</p>
+    <p class="why">Why: the folder is private, or it is shared only with other Google accounts. FaceFinder can only
+      see what your Google account can see in Drive, and it never changes who a folder is shared with.</p>
+    <ol>
+      <li><b>Ask the owner for access</b>Open the folder in Drive and press "Request access"; Google emails the owner.
+        <span class="row"><a class="btn sm" href="${esc(url)}" target="_blank" rel="noopener">Open in Drive</a>
+        <button class="btn ghost sm" type="button" id="naCopy">Copy a message for the owner</button></span></li>
+      <li><b>If you own the folder: share it</b>In Drive, right-click the folder, choose Share, then under
+        "General access" pick "Anyone with the link" (Viewer). Or add ${esc(info?.email || "the account")} as a Viewer.
+        <span class="row"><button class="btn ghost sm" type="button" id="naRetry">I shared it, try again</button></span></li>
+      <li><b>Signed in with the wrong account?</b>The folder may belong to your other Google account.
+        <span class="row"><button class="btn ghost sm" type="button" id="naSwitch">Use another Google account</button></span></li>
+    </ol></div>`;
+  $("#naRetry").onclick = () => $("#openAlbum").click();
+  $("#naSwitch").onclick = async () => { try { await api("/api/logout", {method:"POST"}); } catch(e){} location.href = "/oauth2/login"; };
+  $("#naCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(ask); }
+    catch(e){ const t = document.createElement("textarea"); t.value = ask; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); }
+    $("#naCopy").textContent = "Copied. Paste it to the owner";
+  };
+}
+// An error from the album menu or a scan start: shown where the user is now.
+function notice(text){
+  const where = !$("#chooseCard").hidden ? $("#chooseSum") : !$("#hero").hidden ? $("#albumMsg") : null;
+  if(where === $("#chooseSum")) { where.textContent = text; return; }
+  if(where) { msg(where, esc(text), "err"); return; }
+  msg($("#appMsg"), `${esc(text)} <button class="linkbtn" type="button" onclick="msg($('#appMsg'),'')">Dismiss</button>`, "err");
+}
 async function api(url, opts={}){
   const r = await fetch(url, {credentials:"same-origin", ...opts});
   const body = await r.json().catch(()=>({}));
-  if(!r.ok) throw new Error(body.detail || r.statusText);
+  if(!r.ok){
+    const d = body.detail, text = typeof d === "object" && d ? d.message : d;
+    throw Object.assign(new Error(text || r.statusText), {status:r.status, info:typeof d === "object" ? d : null});
+  }
   return body;
 }
 const postJSON = (url, data) => api(url, {
   method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(data)});
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plural = (n, one, many) => `${n.toLocaleString("en")} ${n === 1 ? one : many}`;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// For progress checks: a dropped connection is retried a few times before it counts.
+async function retrying(fn, tries = 5){
+  for(let i = 1; ; i++){
+    try { return await fn(); }
+    catch(e){
+      if(e.status && e.status < 500) throw e;   // refused or unknown job: final, not a lost connection
+      if(i >= tries) throw new Error("Lost the connection. The work carries on; check your Drive in a minute."); await sleep(1500 * i); }
+  }
+}
 
-/* A "group" is one person's photos, whichever way it was found:
+// The tabs and their content only exist for an album that is ready.
+function lockWork(locked){
+  $("#work").dataset.locked = locked ? "1" : "0";
+  $("#tabs").hidden = locked;
+  if(locked) closeSide();
+}
+// The album in the header: name, count and its menu.
+function showAlbum(name, count){
+  const on = name != null;
+  $("#albumSel").hidden = !on;
+  if(!on) return;
+  $("#albumName").textContent = name; $("#menuAlbumName").textContent = name;
+  $("#albumBtn").title = name;
+  $("#albumCount").textContent = count; $("#menuAlbumCount").textContent = count;
+  // the shared sample album: nobody may wipe or restart it for everyone else
+  const shared = !!state.sampleId && state.folderId === state.sampleId;
+  $("#menuRescan").hidden = $("#menuRescanSep").hidden = $("#menuDelete").hidden = !state.ready || shared;
+  if(!state.ready) $("#menuMore").hidden = true;
+  if(!state.ready){ $("#menuRetry").replaceChildren(); $("#menuProg").hidden = true; }
+}
+// Small drop-down menus: one open at a time, Escape or a click outside closes.
+function closeMenus(){
+  for(const [btn, menu] of [["#albumBtn","#albumMenu"],["#acctBtn","#acctMenu"]]){
+    $(menu).hidden = true; $(btn).setAttribute("aria-expanded", "false");
+  }
+}
+for(const [btn, menu] of [["#albumBtn","#albumMenu"],["#acctBtn","#acctMenu"]]){
+  $(btn).onclick = e => {
+    e.stopPropagation();
+    const open = $(menu).hidden; closeMenus();
+    if(open){ $(menu).hidden = false; $(btn).setAttribute("aria-expanded", "true"); $(menu).querySelector("button:not([hidden])")?.focus(); }
+  };
+}
+document.addEventListener("click", e => { if(!e.target.closest(".menu")) closeMenus(); });
+document.addEventListener("keydown", e => {
+  const inMenu = e.target.closest?.(".menu");
+  if(inMenu && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Home" || e.key === "End")){
+    const items = [...inMenu.querySelectorAll("button")].filter(b => b.offsetParent && !b.disabled);
+    if(!items.length) return;
+    e.preventDefault();
+    const i = items.indexOf(document.activeElement), n = items.length;
+    const to = e.key === "Home" ? 0 : e.key === "End" ? n - 1 : e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n;
+    items[to].focus(); return;
+  }
+  if(e.key !== "Escape") return;
+  const open = ["#albumMenu","#acctMenu"].find(m => !$(m).hidden);
+  if(open){ closeMenus(); $(open === "#albumMenu" ? "#albumBtn" : "#acctBtn").focus(); }
+});
+$("#menuOther").onclick = () => { closeMenus(); goHome(); };
+$("#menuDelete").onclick = async () => {
+  closeMenus();
+  const name = state.albumName || "this album";
+  if(!confirm(`Delete FaceFinder's data for "${name}"?\n\nThis removes its face data, Gemini's notes and the names you typed. ` +
+              `Nothing in your Google Drive changes. People who share this folder would need to scan it again.`)) return;
+  try {
+    await postJSON(`/api/album/${encodeURIComponent(state.folderId)}/delete`, {});
+    try { sessionStorage.removeItem(NAMES_KEY()); } catch(e){}
+    state.folderId = null;
+    goHome();
+    msg($("#albumMsg"), `Deleted FaceFinder's data for "${esc(name)}". Nothing in your Drive changed.`, "ok");
+  } catch(e){ notice(e.message); }
+};
+$("#menuRescan").onclick = async () => {
+  closeMenus();
+  const k = (state.checkedCount || 0).toLocaleString("en");
+  if(!confirm(`Check these ${k} photos again from the start? Faces are found again; names you typed and Gemini's notes are kept, so this costs no extra Gemini calls.`))return;
+  await startIndex(true);
+};
+// The start screen remembers this account's albums (kept on the server, so
+// they survive signing out) and offers the sample album when there is one.
+const ago = ts => {
+  const m = Math.max(0, (Date.now() / 1000 - ts) / 60);
+  return m < 2 ? "just now" : m < 60 ? `${Math.round(m)} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago`
+       : m < 2880 ? "yesterday" : `${Math.round(m / 1440)} days ago`;
+};
+function albumState(a){
+  const n = x => (x || 0).toLocaleString("en");
+  const whole = Math.max(a.album_total || 0, a.total || 0);
+  if(a.status === "ready") return [whole > a.done ? `Checked ${n(a.done)} of ${n(whole)} · Ready` : `${n(a.done)} photos · Ready`, ""];
+  if(a.status === "stopped") return [`Stopped at ${n(a.done)} of ${n(a.total)}`, "warn"];
+  if(a.status === "error") return ["Scan interrupted", "warn"];
+  return [a.total ? `Scanning · ${n(a.done)} of ${n(a.total)}` : "Not scanned yet", ""];
+}
+async function loadRecent(){
+  if(!state.signedIn) { $("#recentBox").hidden = true; return; }
+  let albums = [];
+  try { albums = (await api("/api/albums/recent")).albums; } catch(e){}
+  const grid = $("#recentGrid"); grid.replaceChildren();
+  const card = (html, open, cls = "") => {
+    const c = document.createElement("div"); c.className = "rcard " + cls; c.innerHTML = html;
+    c.querySelector(".ropen").onclick = () => { $("#album").value = open; $("#openAlbum").click(); };
+    grid.append(c); return c;
+  };
+  for(const a of albums){
+    const [st, warn] = albumState(a);
+    const pics = a.covers.map(id => `<img src="/api/thumb/${encodeURIComponent(id)}?s=300" alt="" loading="lazy"
+      onerror="this.onerror=null;this.src='/static/img/cam-stand.png';this.classList.add('gone')">`).join("");
+    const c = card(`<button class="ropen" type="button" aria-label="Open ${esc(a.name)}, ${esc(st)}">
+        <div class="rmosaic ${a.covers.length === 1 ? "one" : a.covers.length ? "" : "empty"}">${pics || '<img src="/static/img/cam-stand.png" alt="">'}</div>
+        <div class="rinfo"><b title="${esc(a.name)}">${esc(a.name)}</b><span class="st ${warn}">${esc(st)}</span>
+          <span>Opened ${ago(a.opened_at)}</span></div></button>
+      <button class="iconbtn rforget" type="button" aria-label="Remove ${esc(a.name)} from this list">${CLOSE}</button>`, a.folder_id);
+    c.querySelector(".rforget").onclick = async () => {
+      c.remove();
+      try { await postJSON("/api/albums/forget", {folder_id:a.folder_id}); } catch(e){}
+      if(!grid.children.length) $("#recentBox").hidden = true;
+    };
+  }
+  if(state.sampleAlbum)
+    card(`<button class="ropen" type="button"><div class="rmosaic empty"><img src="/static/img/cam-photo.png" alt=""></div>
+      <div class="rinfo"><b>Sample album</b><span>Try it on example photos of made-up people, created with Gemini.</span></div></button>`, state.sampleAlbum, "sample");
+  $("#recentTitle").textContent = albums.length ? "Pick up where you left off" : "Try it first";
+  $("#recentBox").hidden = !grid.children.length;
+}
+
+// Help: the "How it works" of the tab in view.
+$("#helpBtn").onclick = () => {
+  const panel = state.ready ? $("#mode" + state.mode[0].toUpperCase() + state.mode.slice(1)) : null;
+  const how = panel?.querySelector(".how p");
+  $("#helpTitle").textContent = how ? "How " + panel.querySelector("h2").textContent.toLowerCase() + " works" : "How FaceFinder works";
+  $("#helpText").textContent = how ? how.textContent.replace(/\s+/g, " ").trim()
+    : "Paste the link of a shared Google Drive album. FaceFinder finds every face and Gemini checks every photo once. Then you can find people, choose people to get folders, sort by a description, or cull the weak shots. Everything you pick is copied into folders in your own Drive; the album itself is never changed.";
+  $("#helpDlg").showModal();
+};
+$("#helpClose").innerHTML = CLOSE; $("#helpClose").onclick = () => $("#helpDlg").close();
+$("#privacyClose").innerHTML = CLOSE; $("#privacyClose").onclick = () => $("#privacyDlg").close();
+document.querySelectorAll(".privlink").forEach(b => b.onclick = () => { closeMenus(); $("#privacyDlg").showModal(); });
+
+/* A "group" is a set of photos that becomes one folder, however it was found:
    kind "search"  -> all = every match down to 0.20, filtered live by the slider
-   kind "cluster" -> all = the photos grouped under one face                    */
+   kind "cluster" -> all = the photos grouped under one face
+   kind "set"     -> all = photos Gemini sorted or culled into this group
+   Rows are {file_id, name, score?, confident?, why?}; g.removed holds unticked ones. */
 const visible = g => g.kind === "search" ? g.all.filter(m => m.score >= state.thr) : g.all;
-const isSure  = (g, m) => g.kind === "search" ? m.score >= state.thr + 0.12 : m.confident;
+const isSure  = (g, m) => g.kind === "search" ? m.score >= state.thr + 0.12 : m.confident !== false;
 const picked  = g => visible(g).filter(m => !g.removed.has(m.file_id));
 
 // ---- auth ----
 async function refreshMe(){
   const me = await api("/api/me");
-  state.signedIn = me.signed_in;
-  if(!me.configured){
-    msg($("#setupWarn"),
-      "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
+  // Google sends sign-in back to the main address only; starting on the Cloud
+  // Run one would lose the sign-in on the way. Move there first.
+  const base = me.public_base_url || "";
+  if(location.hostname.endsWith(".run.app") && /^https:/.test(base) && !base.includes(location.hostname)){
+    location.replace(base + location.pathname + location.search + location.hash); return;
   }
+  if(new URLSearchParams(location.search).get("signin") === "retry"){
+    history.replaceState(null, "", location.pathname + location.hash);
+    if(!me.signed_in) msg($("#albumMsg"), 'Sign-in did not finish. Please press <b>Sign in with Google</b> again.', "err");
+  }
+  state.signedIn = me.signed_in;
+  state.gemini = !!me.gemini;
+  if(!me.configured)
+    msg($("#setupWarn"), "Server is missing GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET. See the README.", "err");
   const email = me.user?.emailAddress || "";
   $("#who").textContent = email;
-  $("#authLabel").textContent = me.signed_in ? "Sign out" : "Sign in";
-  $("#authDot").textContent = email ? email[0].toUpperCase() : "G";
+  $("#acctInitial").textContent = $("#acctInitial2").textContent = (me.user?.displayName || email || "?").trim()[0].toUpperCase();
+  $("#gsiNav").hidden = me.signed_in;
+  $("#acct").hidden = !me.signed_in;
+  $("#signinBox").hidden = me.signed_in;
+  $("#privLine").hidden = !me.signed_in;
+  $("#albumPill").hidden = !me.signed_in;
+  state.sampleAlbum = me.sample_album || null;
+  state.sampleId = me.sample_folder_id || null;
+  state.limitedDrive = me.drive_access !== "full";
+  if(state.limitedDrive){
+    $("#destLabel").textContent = "Folder name in your Drive";
+    $("#dest").placeholder = "e.g. Graduation 2026";
+  }
+  loadRecent();
   state.thr = Number(me.default_threshold) || 0.38;
   $("#th").value = state.thr; $("#thVal").textContent = state.thr.toFixed(2);
+  document.querySelectorAll("[data-ai]").forEach(el => el.hidden = !state.gemini);
 }
 $("#auth").onclick = async () => {
-  if(state.signedIn){ await api("/api/logout",{method:"POST"}); location.reload(); }
-  else location.href = "/oauth2/login";
+  await api("/api/logout",{method:"POST"});
+  Object.keys(sessionStorage).filter(k=>k.startsWith('ff.names.')).forEach(k=>sessionStorage.removeItem(k));
+  Object.keys(localStorage).filter(k=>k.startsWith('ff.names.')).forEach(k=>localStorage.removeItem(k));
+  location.reload();
 };
 
 // ---- the album ----
 $("#openAlbum").onclick = async () => {
+  const fromPop = popping;   // opened by Back/Forward
   const v = $("#album").value.trim();
   if(!v) return;
   if(!state.signedIn)
@@ -461,91 +1137,568 @@ $("#openAlbum").onclick = async () => {
   msg($("#albumMsg"), "Opening…");
   try{
     const a = await postJSON("/api/album", {folder:v});
-    state.folderId = a.folder_id;
-    state.results = []; state.crowd = null; state.ready = false;
-    renderResults(); renderCrowd(); $("#doneCard").hidden = true;
-    msg($("#albumMsg"), `Album <b>${esc(a.name)}</b> is open.`, "ok");
-    $("#indexBox").hidden = false;
-    if(a.status.status !== "ready") await startIndex(false);
-    pollStatus();
-  }catch(e){ msg($("#albumMsg"), esc(e.message), "err"); }
+    clearTimeout(state.poll); state.pollEpoch=(state.pollEpoch||0)+1;
+    if(state.folderId!==a.folder_id){
+      state.roster.forEach(p=>p.urls.forEach(u=>URL.revokeObjectURL(u)));
+      state.roster=[];addPerson();state.folderId=a.folder_id;loadSortDefs();renderGroupRows();
+      state.showSingles=false;state.open=null;$('#dlg').close();$('#dest').value='';
+      $('#strict').hidden=true;$('#alsoRejected').checked=false;setMode(state.wantMode||'everyone');state.wantMode=null;
+    }
+    state.folderId = a.folder_id; state.albumName = a.name;
+    showAlbum(a.name, "Opening…");
+    state.results = []; state.crowd = null; state.sorted = []; state.culled = null; state.ready = false;
+    renderResults(); renderCrowd(); renderSorted(); renderCull(); $("#doneCard").close();
+    msg($("#albumMsg"), "");
+    const st = a.status;
+    // Never scanned: ask which photos first. Otherwise show where it is
+    // (ready, still scanning, or stopped with its Use / Resume buttons).
+    if(st.status === "pending" && !st.done) await showChooser(false);
+    else { nav("album"); pollStatus(); }
+  }catch(e){
+    if(e.info?.code === "no_access"){
+      if(fromPop) history.replaceState(null, "", location.pathname);
+      if($("#hero").hidden) goHome();
+      showNoAccess(e.info, v);
+      return;
+    }
+    if(!fromPop) notice(e.message);
+    else {      // Back/Forward to an album that cannot open: the start page, with the reason
+      history.replaceState(null, "", location.pathname);
+      if($("#hero").hidden) goHome();
+      msg($("#albumMsg"), esc(e.message), "err");
+    }
+  }
 };
 $("#album").addEventListener("keydown", e => { if(e.key === "Enter") $("#openAlbum").click(); });
-$("#rebuild").onclick = () => startIndex(true);
 
-async function startIndex(rebuild){
-  state.ready = false; $("#work").dataset.locked = "1"; updateBar();
-  await postJSON("/api/index", {folder_id:state.folderId, rebuild});
+async function startIndex(rebuild, choice = {}){
+  // Ask first: if the server says no, the screen stays as it was.
+  try { await postJSON("/api/index", {folder_id:state.folderId, rebuild, ...choice}); }
+  catch(e){ notice(e.message); return false; }
+  msg($("#appMsg"), "");
+  if(rebuild){try{sessionStorage.removeItem(NAMES_KEY());}catch(e){}}
+  state.results=[];state.crowd=null;state.sorted=[];state.culled=null;state.open=null;
+  $('#dlg').close();$('#strict').hidden=true;$('#alsoRejected').checked=false;
+  renderResults();renderCrowd();renderSorted();renderCull();
+  state.ready = false; lockWork(true); updateBar();
+  state.stopping = false; scanButtons('running');
+  $("#chooseCard").hidden = true;
   pollStatus();
-}
-function pollStatus(){
-  clearInterval(state.poll);
-  const tick = async () => {
-    let s;
-    try { s = await api(`/api/album/${state.folderId}/status`); }
-    catch(e){ $("#pstat").textContent = "Lost contact with the server: " + e.message; return; }
-    const pct = s.total ? Math.round(100*s.done/s.total) : 0;
-    $("#pbar").style.width = pct + "%";
-    if(s.status === "indexing")
-      $("#pstat").textContent = `Scanning faces — ${s.done} of ${s.total} photos, ${s.faces} faces found`;
-    else if(s.status === "ready"){
-      $("#pstat").textContent = `Ready — ${s.message}.`;
-      $("#pbar").style.width = "100%";
-      state.ready = true; $("#work").dataset.locked = "0";
-      clearInterval(state.poll);
-      if(state.mode === "everyone" && !state.crowd) loadCrowd();
-    } else if(s.status === "error"){
-      $("#pstat").textContent = "Error: " + s.message;
-      clearInterval(state.poll);
-    } else $("#pstat").textContent = "Starting…";
-  };
-  tick(); state.poll = setInterval(tick, 1500);
+  return true;
 }
 
-// ---- mode switch ----
-function setMode(mode){
-  state.mode = mode;
-  $("#tabPeople").setAttribute("aria-selected", mode === "people");
-  $("#tabEveryone").setAttribute("aria-selected", mode === "everyone");
-  $("#modePeople").hidden = mode !== "people";
-  $("#modeEveryone").hidden = mode !== "everyone";
-  if(mode === "everyone" && state.ready && !state.crowd) loadCrowd();
-  updateBar();
+// ---- before a scan: which photos to check ----
+// All of them, the days they were taken, or picked by hand. When adding to an
+// album, photos already checked are shown but cannot be picked again.
+const SECONDS_PER_PHOTO = () => state.gemini ? 2 : 0.6;   // measured on Cloud Run, 4 CPUs
+async function showChooser(adding){
+  const card = $("#chooseCard");
+  closeMenus(); clearTimeout(state.poll); state.pollEpoch = (state.pollEpoch || 0) + 1;
+  $("#hero").hidden = true; $("#scanCard").hidden = true; lockWork(true); updateBar();
+  card.hidden = false;
+  $("#chooseTitle").textContent = adding ? "Choose more photos to check" : "Which photos should we check?";
+  $("#chooseBack").textContent = adding ? "← Back to the album" : "← Back to the start";
+  nav("choose");
+  $("#chooseSum").textContent = "Reading the album…"; $("#chooseGo").disabled = true;
+  let files;
+  try { files = (await api(`/api/album/${encodeURIComponent(state.folderId)}/files`)).files; }
+  catch(e){ $("#chooseSum").textContent = e.message; return; }
+  const todo = files.filter(f => !f.scanned);
+  showAlbum(state.albumName, plural(files.length, "photo", "photos"));
+  state.choose = {adding, files, todo, days:new Set(), picked:new Set(), page:60};
+  $("#optAllN").textContent = adding ? `The ${plural(todo.length, "photo", "photos")} not checked yet` : `${plural(files.length, "photo", "photos")}`;
+  // one chip per day, with its count
+  const byDay = new Map();
+  for(const f of todo){ const d = (f.taken || "").slice(0, 10) || "unknown"; byDay.set(d, (byDay.get(d) || 0) + 1); }
+  const box = $("#dayBox"); box.replaceChildren();
+  for(const [d, n] of byDay){
+    const b = document.createElement("button"); b.type = "button"; b.className = "day"; b.setAttribute("aria-pressed", "false");
+    const label = d === "unknown" ? "No date" : new Date(d + "T12:00:00").toLocaleDateString("en-GB", {weekday:"short", day:"numeric", month:"short", year:"numeric"});
+    b.innerHTML = `${esc(label)}<span>${plural(n, "photo", "photos")}</span>`;
+    b.onclick = () => { const on = !state.choose.days.has(d); on ? state.choose.days.add(d) : state.choose.days.delete(d);
+      b.setAttribute("aria-pressed", on); chooseSummary(); };
+    box.append(b);
+  }
+  $("#optDateN").textContent = byDay.size > 1 ? `${byDay.size} days in this album` : "All taken on the same day";
+  const dayRadio = card.querySelector('input[value="date"]');
+  dayRadio.disabled = byDay.size < 2; dayRadio.closest(".opt").classList.toggle("off", byDay.size < 2);
+  card.querySelector('input[value="all"]').checked = true;
+  drawPicks(); chooseMode();
+  window.scrollTo({top:0});
 }
-$("#tabPeople").onclick = () => setMode("people");
-$("#tabEveryone").onclick = () => setMode("everyone");
-
-// ---- shared: a grid of one person's photos ----
-function fillGrid(el, g, onChange){
-  el.innerHTML = "";
-  for(const m of visible(g)){
-    const d = document.createElement("div");
-    d.className = "tile" + (g.removed.has(m.file_id) ? "" : " sel");
-    d.tabIndex = 0; d.setAttribute("role", "button");
-    d.innerHTML =
-      `<div class="ph">
-         <img loading="lazy" src="/api/thumb/${encodeURIComponent(m.file_id)}?s=400" alt="${esc(m.name)}">
-         ${isSure(g, m) ? "" : '<span class="tag">Not sure</span>'}
-         <span class="tick">${CHECK}</span>
-       </div>
-       <div class="meta"><span class="nm">${esc(m.name)}</span>
-         <span class="sc">${m.score.toFixed(2)}</span></div>`;
-    const flip = () => {
-      g.removed.has(m.file_id) ? g.removed.delete(m.file_id) : g.removed.add(m.file_id);
-      d.classList.toggle("sel"); onChange();
-    };
-    d.onclick = flip;
-    d.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); flip(); } };
-    el.appendChild(d);
+function chosenIds(){
+  const c = state.choose, mode = $('#chooseCard input[name="scope"]:checked').value;
+  if(mode === "all") return null;
+  if(mode === "date") return c.todo.filter(f => c.days.has((f.taken || "").slice(0, 10) || "unknown")).map(f => f.id);
+  return c.todo.filter(f => c.picked.has(f.id)).map(f => f.id);
+}
+function chooseSummary(){
+  const ids = chosenIds(), n = ids ? ids.length : state.choose.todo.length;
+  const min = Math.max(1, Math.round(n * SECONDS_PER_PHOTO() / 60));
+  $("#chooseSum").innerHTML = n ? `<b>${plural(n, "photo", "photos")}</b> to check · about ${min} ${min === 1 ? "minute" : "minutes"}`
+                                : "No photos chosen yet";
+  $("#chooseGo").disabled = !n;
+  $("#chooseGo").textContent = n ? `Check ${plural(n, "photo", "photos")}` : "Start";
+  const k = state.choose.picked.size;
+  $("#optHandN").textContent = k ? `${k.toLocaleString("en")} picked` : "Tap the photos you want";
+  if(!state.choose.todo.length){
+    $("#chooseSum").textContent = "Every photo in this album is already checked."; $("#chooseGo").disabled = true; $("#chooseGo").textContent = "Start";
   }
 }
+function chooseMode(){
+  const mode = $('#chooseCard input[name="scope"]:checked').value;
+  $("#dayBox").hidden = mode !== "date"; $("#handBox").hidden = mode !== "hand";
+  chooseSummary();
+}
+document.querySelectorAll('#chooseCard input[name="scope"]').forEach(r => r.onchange = chooseMode);
+function drawPicks(){
+  const c = state.choose, grid = $("#pickGrid"); grid.replaceChildren();
+  for(const f of c.files.slice(0, c.page)){
+    const b = document.createElement("button"); b.type = "button"; b.className = "pick";
+    const on = f.scanned || c.picked.has(f.id);
+    b.setAttribute("aria-pressed", on); b.disabled = f.scanned;
+    b.setAttribute("aria-label", `${f.name}${f.scanned ? ", already checked" : ""}`);
+    b.innerHTML = `<div class="ph"><img loading="lazy" src="/api/thumb/${encodeURIComponent(f.id)}?s=200" alt="">
+      <span class="tick">${CHECK}</span></div><span class="nm">${f.scanned ? "Checked · " : ""}${esc(f.name)}</span>`;
+    b.onclick = () => { const now = !c.picked.has(f.id); now ? c.picked.add(f.id) : c.picked.delete(f.id);
+      b.setAttribute("aria-pressed", now); chooseSummary(); };
+    grid.append(b);
+  }
+  if(c.page < c.files.length){
+    const more = document.createElement("button"); more.className = "btn ghost sm"; more.style.gridColumn = "1 / -1";
+    more.textContent = `Show ${Math.min(60, c.files.length - c.page)} more`;
+    more.onclick = () => { c.page += 60; drawPicks(); };
+    grid.append(more);
+  }
+}
+$("#pickAll").onclick = () => { state.choose.picked = new Set(state.choose.todo.map(f => f.id)); drawPicks(); chooseSummary(); };
+$("#pickNone").onclick = () => { state.choose.picked = new Set(); drawPicks(); chooseSummary(); };
+// Leaving the chooser: back to the album when adding to it, else to the start.
+function leaveChooser(){
+  // the chooser has its own history entry: going back is just Back
+  if(!popping && state.choosePushed){ state.choosePushed = false; history.back(); return; }
+  $("#chooseCard").hidden = true;
+  if(state.choose?.adding){ nav("album"); pollStatus(); } else goHome();
+}
+$("#chooseCancel").onclick = $("#chooseBack").onclick = leaveChooser;
+$("#chooseGo").onclick = async () => {
+  const ids = chosenIds();
+  $("#chooseGo").disabled = true;
+  const started = await startIndex(false, ids ? {file_ids:ids} : {all:true});
+  if(started) nav("album", true);      // the scan takes the chooser's place in history
+  else $("#chooseGo").disabled = false;
+};
+function pollStatus(){
+  clearTimeout(state.poll);
+  const epoch=state.pollEpoch=(state.pollEpoch||0)+1,folder=state.folderId;
+  $('#hero').hidden=true;   // the scan card shows only if the album is not ready
+  const alive=()=>epoch===state.pollEpoch && folder===state.folderId;
+  let failures=0;
+  const tick=async()=>{
+    if(!alive())return;
+    try{
+      const s=await api(`/api/album/${encodeURIComponent(folder)}/status`);
+      if(!alive())return;failures=0;
+      const total=Math.max(0,Number(s.total)||0),done=Math.max(0,Number(s.done)||0),judged=Math.max(0,Number(s.judged)||0);
+      const faces=Number(s.faces)||0, n=x=>x.toLocaleString('en');
+      if(s.status!=='ready'){
+        $('#scanCard').hidden=false;
+        if(state.ready){state.ready=false;lockWork(true);updateBar();}
+      }
+      // Faces and the Gemini check run side by side: a photo is "checked"
+      // once both are done with it, so the bar never runs ahead of the work.
+      const checked=s.gemini?Math.floor((done+Math.min(done,judged))/2):done;
+      const box=$('#pbarBox');box.classList.toggle('busy',!total && s.status!=='error' && s.status!=='stopped');
+      const pct=total?Math.min(100,Math.round(100*checked/total)):0;
+      $('#pbar').style.width=pct+'%';
+      if(total)box.setAttribute('aria-valuenow',pct);else box.removeAttribute('aria-valuenow');
+      $('#scanTitle').textContent='Preparing your album';
+      $('#pstat').textContent=!total?'Reading the photo list…'
+        :!done?'Getting ready. The first photos take a little longer…'
+        :`${n(checked)} of ${n(total)} photos checked`;
+      $('#pact').textContent=!total?'':s.gemini
+        ?`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found\nGemini quality check: ${n(judged)} of ${n(total)}`
+        :`Faces: ${n(done)} of ${n(total)} photos, ${n(faces)} found`;
+      showAlbum(state.albumName||s.name, total?`${n(total)} photos`:'Opening…');
+      scanButtons(s.status==='error'||s.status==='stopped'?'stopped':'running');
+      if(s.status==='error'){
+        box.classList.remove('busy');$('#scanTitle').textContent='Scan interrupted';
+        $('#pstat').textContent=s.message||'Some photos could not be checked.';
+        $('#resumeScan').textContent='Retry scan';return;
+      }
+      if(s.status==='stopped'){
+        // Photos with faces found count; any Gemini has not checked yet go to
+        // Review in Cull, and are checked when the scan carries on.
+        $('#usePartial').hidden=!done;
+        $('#usePartial').textContent=`Use the ${n(done)} ${done===1?'photo':'photos'} scanned so far`;
+        box.classList.remove('busy');$('#scanTitle').textContent='Scan stopped';
+        $('#pstat').textContent=`${n(done)} of ${n(total)} photos scanned. They are kept.`;
+        $('#resumeScan').textContent='Resume scan';return;
+      }
+      if(s.status==='ready'){
+        state.ready=true;lockWork(false);$('#scanCard').hidden=true;nav('album');
+        showAlbum(state.albumName||s.name,`${n(done)} photos`);
+        // anything left over can be retried from the album menu
+        const retry=$('#menuRetry');retry.replaceChildren();
+        const add=(label,sub,fn)=>{const b=document.createElement('button');b.type='button';b.className='mi primary';
+          b.innerHTML=`<span class="ico">${PLAY}</span><span><b>${esc(label)}</b><small>${esc(sub)}</small></span>`;
+          b.onclick=async()=>{closeMenus();try{await fn();}catch(e){notice(e.message);}};retry.append(b);};
+        const mins=k=>{const m=Math.max(1,Math.round(k*SECONDS_PER_PHOTO()/60));return `about ${m} ${m===1?'minute':'minutes'}`;};
+        // total: the photos chosen for the scan; whole: every photo in the album
+        const whole=Math.max(total,Number(s.album_total)||0);
+        // carrying on also adds Gemini's notes to photos still missing them
+        if(done<total)add(`Check the other ${plural(total-done,'chosen photo','chosen photos')}`,`Carries on where it stopped · ${mins(total-done)}`,()=>startIndex(false));
+        else if(whole>total)add(`Check the rest of the album`,`${plural(whole-total,'more photo','more photos')} · ${mins(whole-total)}`,()=>startIndex(false,{all:true}));
+        else if(s.gemini&&judged<done)add(`Add Gemini's notes to ${plural(done-judged,'photo','photos')}`,`Faces are done; this adds quality and descriptions`,()=>startIndex(false));
+        if(done<whole)$('#albumCount').textContent=`${n(done)} of ${n(whole)} photos`;
+        $('#menuAlbumCount').textContent=done<whole?`${n(done)} of ${n(whole)} photos checked`:`${n(done)} photos · all checked`;
+        $('#menuProg').hidden=done>=whole;$('#menuProg i').style.width=(whole?Math.round(100*done/whole):0)+'%';
+        $('#menuMore').hidden=done>=whole;
+        state.checkedCount=done;
+        if(state.mode==='everyone'&&!state.crowd)loadCrowd();
+        if(state.mode==='cull'&&s.gemini&&!state.culled&&!state.uiBusy)$('#runCull').click();
+        updateBar();return;
+      }
+    }catch(e){
+      if(!alive())return;
+      if(e.info?.code === "no_access"){ goHome(); showNoAccess(e.info, "", true); return; }
+      if(e.status === 401){ goHome(); await refreshMe().catch(()=>{}); msg($("#albumMsg"), esc(e.message), "err"); return; }
+      failures++;
+      $('#pstat').textContent='Connection interrupted. Retrying…';
+      if(failures>=3){$('#pstat').textContent='Cannot reconnect. Try again when your connection is back.';
+        scanButtons('stopped');$('#resumeScan').textContent='Retry';return;}
+    }
+    if(alive())state.poll=setTimeout(tick,Math.min(10000,1500*Math.max(1,failures)));
+  };
+  tick();
+}
+// While scanning: Stop. Once stopped (or failed): carry on, or open another album.
+function scanButtons(mode){
+  const running=mode==='running';
+  const shared=!!state.sampleId&&state.folderId===state.sampleId;   // the sample finishes on its own
+  $('#stopScan').hidden=!running||shared;$('#resumeScan').hidden=running;$('#otherAlbum').hidden=running&&!shared;
+  if(running)$('#usePartial').hidden=true;
+  $('#resumeScan').classList.toggle('ghost',!running);
+  $('#scanCard').classList.toggle('halted',!running);
+  if(running&&!state.stopping){$('#stopScan').disabled=false;$('#stopScan').textContent='Stop scan';}
+  if(!running)state.stopping=false;
+}
+$('#stopScan').onclick=async()=>{
+  state.stopping=true;$('#stopScan').disabled=true;$('#stopScan').textContent='Stopping…';
+  try{await postJSON('/api/index/stop',{folder_id:state.folderId});}
+  catch(e){state.stopping=false;$('#stopScan').disabled=false;$('#stopScan').textContent='Stop scan';$('#pstat').textContent=e.message;}
+};
+$('#resumeScan').onclick=async()=>{
+  const b=$('#resumeScan');b.disabled=true;
+  try{await startIndex(false);}catch(e){$('#pstat').textContent=e.message;}
+  b.disabled=false;
+};
+$('#otherAlbum').onclick=()=>goHome();
+$('#usePartial').onclick=async()=>{
+  const b=$('#usePartial');b.disabled=true;
+  try{await postJSON('/api/index/use',{folder_id:state.folderId});pollStatus();}
+  catch(e){$('#pstat').textContent=e.message;}
+  b.disabled=false;
+};
+$('#menuMore').onclick=()=>showChooser(true);
+// Back to the start screen to paste another link. A scan that is still
+// running carries on in the background; reopening its album shows it.
+function goHome(){
+  nav("home");
+  closeOverlays(); msg($("#appMsg"), "");
+  clearTimeout(state.poll);state.pollEpoch=(state.pollEpoch||0)+1;
+  state.ready=false;lockWork(true);
+  $('#scanCard').hidden=true;$('#chooseCard').hidden=true;$('#doneCard').close();showAlbum(null);
+  $('#hero').hidden=false;updateBar();
+  const input=$('#album');input.value='';input.focus();
+  loadRecent();
+  window.scrollTo({top:0});
+}
+
+// ---- browser history ----
+// Each screen gets an address: the start page, an album (with its tab), and
+// the photo chooser. Back and Forward move between them, and a reload opens
+// the same album again, instead of Back jumping out to Google sign-in.
+let popping = false;
+function readHash(){
+  const q = new URLSearchParams(location.hash.slice(1));
+  return {a:q.get("a"), t:q.get("t"), choose:q.has("choose")};
+}
+function nav(view, replace = false){
+  if(popping) return;
+  let h = "";
+  if(view === "album" && state.folderId) h = `#a=${encodeURIComponent(state.folderId)}&t=${state.mode}`;
+  else if(view === "choose" && state.folderId) h = `#a=${encodeURIComponent(state.folderId)}&choose`;
+  if(location.hash === h || (!h && !location.hash)) return;
+  const cur = readHash(), next = new URLSearchParams(h.slice(1));
+  // switching tabs, or the same album's scan finishing, replaces the entry
+  const same = cur.a && cur.a === next.get("a") && !cur.choose && !next.has("choose");
+  history[same || replace ? "replaceState" : "pushState"](null, "", h || location.pathname);
+  state.choosePushed = view === "choose" && !same && !replace;
+}
+function closeOverlays(){
+  for(const d of ["#dlg", "#photoPreview", "#xdlg", "#helpDlg", "#privacyDlg", "#doneCard"]) document.querySelector(d)?.open && document.querySelector(d).close();
+  closeSide(); closeMenus();
+}
+window.addEventListener("popstate", () => {
+  const h = readHash();
+  popping = true;
+  try{
+    closeOverlays();
+    if(!h.a){ if($("#hero").hidden) goHome(); return; }
+    if(h.choose){
+      if(state.folderId === h.a && state.ready) showChooser(true);
+      else { $("#album").value = h.a; $("#openAlbum").click(); }   // a new album opens on its chooser
+      return; }
+    if(!$("#chooseCard").hidden){ if(h.t && MODES[h.t] && h.a === state.folderId) setMode(h.t); leaveChooser(); return; }
+    if(state.folderId !== h.a || (!state.ready && $("#scanCard").hidden)){
+      state.wantMode = MODES[h.t] ? h.t : null; $("#album").value = h.a; $("#openAlbum").click(); return; }
+    if(h.t && MODES[h.t] && h.t !== state.mode) setMode(h.t);
+  } finally { popping = false; }
+});
+
+// ---- mode switch ----
+const MODES = {everyone:"#tabEveryone", people:"#tabPeople", sort:"#tabSort", cull:"#tabCull"};
+function setMode(mode){
+  if(mode !== "cull") closeSide();
+  state.mode = mode;
+  if(state.ready) nav("album");
+  for(const [m, tab] of Object.entries(MODES)){
+    $(tab).setAttribute("aria-selected", m === mode);
+    $(tab).tabIndex = m === mode ? 0 : -1;
+    $("#mode" + m[0].toUpperCase() + m.slice(1)).hidden = m !== mode;
+  }
+  if(mode === "everyone" && state.ready && !state.crowd) loadCrowd();
+  if(mode === "cull" && state.ready && state.gemini && !state.culled && !state.uiBusy) $("#runCull").click();
+  if(mode === "sort" && !state.sortDefs.length) addGroup();
+  updateBar();
+}
+for(const [m, tab] of Object.entries(MODES)) $(tab).onclick = () => setMode(m);
+
+// ---- shared: a grid of photos with ticks ----
+function fillGrid(el, g, onChange){
+  el.replaceChildren();
+  const rows = visible(g), limit = Math.min(g.pageSize || g.limit || 24, rows.length);
+  for(const m of rows.slice(0,limit)){
+    const d = document.createElement('div');
+    const selected = () => !g.removed.has(m.file_id);
+    d.className = 'tile' + (selected() ? ' sel' : '');
+    const best = g.best?.get(m.file_id), why = best || m.why || '';
+    d.innerHTML = `<div class="ph">
+      <button type="button" class="photo-open" aria-label="View ${esc(m.name)}">
+        <img loading="lazy" decoding="async" src="/api/thumb/${encodeURIComponent(m.file_id)}?s=400" alt="">
+      </button>
+      ${best ? '<span class="tag best">Suggested</span>' : isSure(g,m) ? '' : '<span class="tag">Check match</span>'}
+      <button type="button" class="tick" aria-label="Include ${esc(m.name)}" aria-pressed="${selected()}">${CHECK}</button>
+    </div><div class="meta"><span class="nm">${esc(m.name)}</span></div>
+    ${why ? `<div class="why${g.flagged ? ' flag' : ''}"><span>${esc(why)}</span></div>` : ''}`;
+    d.querySelector('.photo-open').dataset.fileId=m.file_id;
+    d.querySelector('.photo-open').onclick = () => previewPhoto(m, g, onChange);
+    const tick = d.querySelector('.tick');
+    tick.onclick = () => {
+      if(g._busy) return;
+      selected() ? g.removed.add(m.file_id) : g.removed.delete(m.file_id);
+      d.classList.toggle('sel', selected()); tick.setAttribute('aria-pressed',selected()); onChange();
+    };
+    tick.disabled = !!g._busy;
+    el.append(d);
+  }
+  if(limit < rows.length){
+    const more=document.createElement('button');more.className='btn ghost sm';
+    more.style.gridColumn='1 / -1';more.textContent=`Show ${Math.min(24,rows.length-limit)} more`;
+    more.onclick=()=>{g.pageSize=limit+24;fillGrid(el,g,onChange);el.querySelectorAll('.photo-open')[limit]?.focus();};
+    el.append(more);
+  }
+}
+
+// Tap a photo: see the whole frame, why it is here, and include or exclude it.
+// The arrows (and the arrow keys) step through the same set. In Cull on a wide
+// screen it opens beside the grid; everywhere else it is a dialog.
+function syncTile(id, on){
+  document.querySelectorAll('.photo-open').forEach(b=>{
+    if(b.dataset.fileId!==id)return;
+    const t=b.closest('.tile');t.classList.toggle('sel',on);t.querySelector('.tick')?.setAttribute('aria-pressed',on);
+  });
+}
+function markViewing(id){
+  state.viewingId=id;
+  document.querySelectorAll('.tile.viewing').forEach(t=>t.classList.remove('viewing'));
+  if(id)document.querySelectorAll('#cullResults .photo-open').forEach(b=>{if(b.dataset.fileId===id)b.closest('.tile').classList.add('viewing');});
+}
+// What Gemini saw in a photo, read from the scan's saved notes (no new call).
+const notes = new Map();
+async function showNotes(el, id){
+  el.hidden = true;
+  if(!state.gemini) return;
+  const key = state.folderId + "/" + id;
+  el.dataset.for = key;      // a slower answer for the photo before must not land here
+  let n = notes.get(key);
+  if(!n){
+    try { n = await api(`/api/photo/${encodeURIComponent(state.folderId)}/${encodeURIComponent(id)}`); } catch(e){ return; }
+    notes.set(key, n);
+  }
+  if(!el.isConnected || el.dataset.for !== key || !n.description) return;
+  const FL = {blurry:"blur", eyes_closed:"closed eyes", cut_off:"someone cut off", poor_exposure:"light",
+              blocked:"something in the way", awkward_moment:"awkward moment", no_subject:"no clear subject"};
+  el.innerHTML = `<b>What Gemini saw</b>${esc(n.description)}` +
+    (n.scene ? `<span class="tagline">${esc(n.scene)}${n.flaws?.length ? " · " + n.flaws.map(f => FL[f] || f).join(", ") : ""}</span>` : "");
+  el.hidden = false;
+}
+matchMedia("(max-width:1099px)").addEventListener("change", e => { if(e.matches) closeSide(); });
+function closeSide(){
+  const side=$('#cullSide');if(!side||side.hidden)return;
+  side.hidden=true;side.replaceChildren();$('#cullWrap').classList.remove('has-side');markViewing(null);
+}
+function previewPhoto(m,g,onChange){
+  const beside=state.mode==='cull'&&!$('#dlg').open&&matchMedia('(min-width:1100px)').matches;
+  let dialog=$('#photoPreview');
+  if(!dialog){
+    dialog=document.createElement('dialog');dialog.id='photoPreview';dialog.className='preview pv';
+    dialog.setAttribute('aria-labelledby','previewTitle');document.body.append(dialog);
+  }
+  const host=beside?$('#cullSide'):dialog;
+  (beside?dialog:$('#cullSide')).replaceChildren();          // one preview at a time, one set of ids
+  const opener=document.activeElement, grid=opener?.closest('.grid');
+  const list=visible(g);
+  let at=Math.max(0,list.findIndex(x=>x.file_id===m.file_id));
+  host.innerHTML=`<div class="dhead">
+      <h2 id="previewTitle"></h2><span class="rcount" id="previewPos"></span>
+      <button type="button" class="iconbtn" id="previewPrev" aria-label="Previous photo">${ARROW_L}</button>
+      <button type="button" class="iconbtn" id="previewNext" aria-label="Next photo">${ARROW_R}</button>
+      <button type="button" class="iconbtn" id="previewClose" aria-label="Close">${CLOSE}</button></div>
+    <div class="dbody"><img class="full-photo" id="previewImg" alt="">
+      <div class="pfoot">
+        <div class="seg2" role="group" aria-label="In the export?">
+          <button type="button" class="btn sm" id="previewIn">${CHECK} Keep</button>
+          <button type="button" class="btn sm" id="previewOut">${CLOSE} Exclude</button></div>
+        <div class="pnotes"><p class="why-full" id="previewWhy"></p>
+          <button type="button" class="cmp" id="previewCmp" hidden><img alt=""><span></span></button>
+          <p class="seen" id="previewSeen" hidden></p></div></div></div>`;
+  const q=sel=>host.querySelector(sel);
+  const show=()=>{
+    const x=list[at];
+    q('#previewTitle').textContent=x.name;
+    q('#previewPos').textContent=`${at+1} of ${list.length.toLocaleString('en')}`;
+    const img=q('#previewImg');img.alt=x.name;img.classList.add('loading');
+    img.onload=()=>img.classList.remove('loading');
+    img.onerror=()=>{img.classList.remove('loading');img.alt='This photo could not be loaded';};
+    img.src=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
+    const picked=g.bestWhy?.get(x.file_id);
+    const why=x.long||x.why||picked||'';
+    q('#previewWhy').innerHTML=why?`<b>${g.flagged?'Why this was flagged':picked?'Why it was picked':'Why'}</b>${esc(why)}`:'';
+    const cmp=q('#previewCmp');cmp.hidden=!x.similar_to;
+    if(x.similar_to){cmp.querySelector('img').src=`/api/thumb/${encodeURIComponent(x.similar_to)}?s=300`;
+      cmp.querySelector('span').textContent=`Compare with ${x.similar_name||'the other photo'} · tap to switch`;
+      cmp.onclick=()=>{const other=`/api/thumb/${encodeURIComponent(x.similar_to)}?s=1200`, own=`/api/thumb/${encodeURIComponent(x.file_id)}?s=1200`;
+        const showingOther=img.dataset.other==='1';img.classList.add('loading');img.src=showingOther?own:other;img.dataset.other=showingOther?'':'1';
+        q('#previewTitle').textContent=showingOther?x.name:`${x.similar_name} (to compare)`;};}
+    img.dataset.other='';
+    showNotes(q('#previewSeen'),x.file_id);
+    const on=!g.removed.has(x.file_id);
+    q('#previewIn').setAttribute('aria-pressed',on);q('#previewOut').setAttribute('aria-pressed',!on);
+    q('#previewIn').disabled=q('#previewOut').disabled=!!g._busy;
+    q('#previewPrev').disabled=at===0;q('#previewNext').disabled=at===list.length-1;
+    if(beside)markViewing(x.file_id);
+  };
+  const set=on=>{if(g._busy)return;const id=list[at].file_id;on?g.removed.delete(id):g.removed.add(id);syncTile(id,on);show();onChange();};
+  const step=d=>{const n=at+d;if(n>=0&&n<list.length){at=n;show();}};
+  q('#previewIn').onclick=()=>set(true);q('#previewOut').onclick=()=>set(false);
+  q('#previewPrev').onclick=()=>step(-1);q('#previewNext').onclick=()=>step(1);
+  host.onkeydown=e=>{
+    if(e.target.matches('input,select,textarea'))return;
+    if(e.key==='ArrowLeft'){e.preventDefault();step(-1);}
+    else if(e.key==='ArrowRight'){e.preventDefault();step(1);}
+    else if(e.key==='Escape'&&beside){e.preventDefault();q('#previewClose').click();}
+  };
+  const refocus=()=>{
+    const id=list[at].file_id;
+    const scope=state.open===g && $('#dlg').open ? $('#dlg') : grid?.isConnected ? grid : document;
+    const target=[...scope.querySelectorAll('.photo-open')].find(b=>b.dataset.fileId===id);
+    if(target)target.focus();else if(opener?.isConnected)opener.focus();
+  };
+  if(beside){
+    q('#previewClose').onclick=()=>{closeSide();refocus();};
+    host.hidden=false;$('#cullWrap').classList.add('has-side');show();q('#previewClose').focus({preventScroll:true});
+    const r=host.getBoundingClientRect(), barTop=$('#actionbar').hidden?innerHeight:$('#actionbar .inner').getBoundingClientRect().top;
+    if(r.bottom>barTop-12)window.scrollBy({top:Math.min(r.top-16,r.bottom-barTop+12),behavior:'instant'});
+    return;
+  }
+  q('#previewClose').onclick=()=>dialog.close();
+  dialog.onclose=()=>{
+    // Repaint the grid underneath so its ticks match what was chosen here.
+    if(state.open===g && $('#dlg').open) fillGrid($('#dlgGrid'),g,onChange);
+    else if(state.mode==='people')renderResults();else if(state.mode==='sort')renderSorted();else if(state.mode==='cull')renderCull();
+    refocus();
+  };
+  show();dialog.showModal();q('#previewClose').focus();
+}
+
 function choose(g, which){
+  if(g._busy) return;
+  g.best = null; g.bestWhy = null;
   if(which === "all") g.removed.clear();
   else g.removed = new Set(visible(g)
     .filter(m => which === "none" || !isSure(g, m)).map(m => m.file_id));
 }
+// Gemini's pick of this person's best photos: tick only those, say why.
+async function pickBest(g, n, msgEl){
+  if(g._busy) return;
+  g._busy=true;
+  const folder=state.folderId;
+  msg(msgEl, "Choosing a shortlist from saved analysis…");
+  try{
+    const r = await postJSON("/api/best",
+      {folder_id:folder, file_ids:visible(g).map(m => m.file_id), n});
+    if(folder!==state.folderId) return;
+    if(!r.best.length){
+      msg(msgEl, "No photo here was checked and strong enough to suggest. Choose by hand.", "info");
+      return;
+    }
+    g.best = new Map(r.best.map(b => [b.file_id, b.description || b.reason]));
+    g.bestWhy = new Map(r.best.map(b => [b.file_id, b.reason]));
+    g.removed = new Set(visible(g).map(m => m.file_id).filter(f => !g.best.has(f)));
+    // the picks first, in Gemini's order
+    const order = new Map(r.best.map((b, i) => [b.file_id, i]));
+    g.all.sort((a, b) => (order.get(a.file_id) ?? 1e9) - (order.get(b.file_id) ?? 1e9));
+    msg(msgEl, `Suggested ${plural(r.best.length, "photo", "photos")} out of ${r.of.toLocaleString("en")}${r.best.length < n ? " (only these were strong enough)" : ""}. Tap a photo to check it.`, "ok");
+  }catch(e){ msg(msgEl, esc(e.message), "err"); }
+  finally{g._busy=false;}
+}
 
-// ---- mode 1: the people to look for ----
+// A result card: name, count, pick buttons, grid. Used by search, sort and cull.
+function groupCard(g, {title, avatar, nameId, extraButtons = "", best = false, note = ""}){
+  const sec = document.createElement("section");
+  sec.className = "card";
+  sec.innerHTML =
+    `<div class="rhead">
+       ${avatar ? `<img class="avatar" src="${avatar}" alt="">` : ""}
+       <div style="flex:1;min-width:140px">
+         <div class="rname" ${nameId ? `data-rname="${nameId}"` : ""}>${esc(title)}</div>
+         <div class="rcount"></div>
+       </div>
+       ${best && state.gemini ? '<button class="btn soft sm" data-pick="best">Best 10</button>' : ""}
+       ${extraButtons}
+       <button class="btn ghost sm" data-pick="all">All</button>
+       <button class="btn ghost sm" data-pick="none">None</button>
+     </div>
+     ${note ? `<p class="hint" style="margin-top:8px">${note}</p>` : ""}
+     <div class="gmsg" style="margin-top:12px"></div>
+     <div class="grid"></div>`;
+  const grid = sec.querySelector(".grid"), cnt = sec.querySelector(".rcount");
+  const tally = () => {
+    cnt.textContent = `${picked(g).length.toLocaleString("en")} of ${plural(visible(g).length, "photo", "photos")} selected`;
+    updateBar();
+  };
+  sec.querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+    if(b.dataset.pick === "best") await pickBest(g, 10, sec.querySelector(".gmsg"));
+    else { choose(g, b.dataset.pick); msg(sec.querySelector(".gmsg"), ""); }
+    fillGrid(grid, g, tally); tally();
+  });
+  fillGrid(grid, g, tally); tally();
+  return sec;
+}
+
+// ---- mode: the people to look for ----
 const nameOf = p => p.name.trim() || `Person ${state.roster.indexOf(p) + 1}`;
 
 function addPerson(){
@@ -558,38 +1711,49 @@ function addShots(p, list){
     if(!f.type.startsWith("image/")) continue;
     p.files.push(f); p.urls.push(URL.createObjectURL(f));
   }
+  if($("#searchMsg .msg.err")) msg($("#searchMsg"), "");
   renderRoster();
 }
 function renderRoster(){
-  const box = $("#roster"); box.innerHTML = "";
-  for(const p of state.roster){
-    const row = document.createElement("div");
-    row.className = "person";
-    row.innerHTML =
-      `<div class="shots">
-         ${p.urls.map(u => `<img src="${u}" alt="">`).join("")}
-         ${p.files.length < 3 ? `<button class="addshot" type="button"
-             aria-label="Add a photo of this person">${PLUS}<span>${p.files.length ? "Another" : "Photo"}</span></button>` : ""}
-       </div>
-       <input class="field" type="text" maxlength="100" value="${esc(p.name)}"
-              placeholder="Name — becomes the folder name" aria-label="Name">
-       ${state.roster.length > 1 ? `<button class="iconbtn" type="button"
-              aria-label="Remove this person">${CLOSE}</button>` : ""}
-       <input type="file" accept="image/*" multiple hidden>`;
-    const file = row.querySelector("input[type=file]");
-    row.querySelector(".addshot")?.addEventListener("click", () => file.click());
+  const box = $("#roster"); box.replaceChildren();
+  state.roster.forEach((p, i) => {
+    const card = document.createElement("div");
+    card.className = "person";
+    const label = state.roster.length > 1 ? `Person ${i + 1}: ` : "";
+    card.innerHTML =
+      `${state.roster.length > 1 ? `<div class="phead"><b>Person ${i + 1}</b>
+         <button class="iconbtn rmperson" type="button" aria-label="Remove ${esc(nameOf(p))}">${CLOSE}</button></div>` : ""}
+       ${p.files.length ? `<div class="shots">
+         ${p.urls.map((u, k) => `<figure class="shot"><img src="${u}" alt="Reference photo ${k + 1}">
+            <button class="rm" type="button" data-k="${k}" aria-label="Remove reference photo ${k + 1}">${CLOSE}</button></figure>`).join("")}
+         ${p.files.length < 3 ? `<button class="addshot" type="button" aria-label="${label}add another photo">${PLUS}<span>Add</span></button>` : ""}
+       </div>`
+       : `<button class="dropzone" type="button" aria-label="${label}add a photo of this person">
+            <span class="plus">${PLUS}</span><b>Add photo</b><span>A clear photo of their face. Up to 3 angles.</span></button>`}
+       <label class="flabel">Folder name
+         <input class="field" type="text" maxlength="100" value="${esc(p.name)}" placeholder="e.g. Mint"></label>
+       <input type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple hidden>`;
+    const file = card.querySelector("input[type=file]");
+    card.querySelector(".addshot, .dropzone")?.addEventListener("click", () => file.click());
     file.onchange = e => addShots(p, e.target.files);
-    row.querySelector(".field").oninput = e => { p.name = e.target.value; relabel(); };
-    row.querySelector(".iconbtn")?.addEventListener("click", () => {
+    card.querySelectorAll(".shot .rm").forEach(b => b.onclick = () => {
+      const k = +b.dataset.k;
+      URL.revokeObjectURL(p.urls[k]); p.urls.splice(k, 1); p.files.splice(k, 1);
+      renderRoster();
+      $("#roster").children[i]?.querySelector(".rm, .addshot, .dropzone")?.focus();
+    });
+    card.querySelector(".field").oninput = e => { p.name = e.target.value; relabel(); };
+    card.querySelector(".rmperson")?.addEventListener("click", () => {
+      p.urls.forEach(u=>URL.revokeObjectURL(u));
       state.roster = state.roster.filter(x => x !== p);
       state.results = state.results.filter(g => g.person !== p);
       renderRoster(); renderResults();
     });
-    row.ondragover = e => { e.preventDefault(); row.classList.add("drag"); };
-    row.ondragleave = () => row.classList.remove("drag");
-    row.ondrop = e => { e.preventDefault(); addShots(p, e.dataTransfer.files); };
-    box.appendChild(row);
-  }
+    card.ondragover = e => { e.preventDefault(); card.classList.add("drag"); };
+    card.ondragleave = () => card.classList.remove("drag");
+    card.ondrop = e => { e.preventDefault(); addShots(p, e.dataTransfer.files); };
+    box.appendChild(card);
+  });
 }
 $("#addPerson").onclick = addPerson;
 
@@ -620,9 +1784,11 @@ $("#go").onclick = async () => {
     renderResults();
   }
   const found = state.results.reduce((n, g) => n + visible(g).length, 0);
-  msg($("#searchMsg"),
-    `Found <b>${found}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then create the folders.`, "ok");
-  $("#strict").hidden = false;
+  const worked = state.results.filter(g => !g.error).length;
+  if(!worked) msg($("#searchMsg"), "No search worked. See the message under each person.", "err");
+  else msg($("#searchMsg"),
+    `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(todo.length, "person", "people")}. Check them below, then export to Drive.`, "ok");
+  $("#strict").hidden = !worked;
   $("#go").disabled = false;
 };
 
@@ -630,80 +1796,88 @@ $("#th").oninput = e => {
   state.thr = Number(e.target.value);
   $("#thVal").textContent = state.thr.toFixed(2);
   renderResults();
+  const found = state.results.reduce((n, g) => n + (g.error ? 0 : visible(g).length), 0), people = state.results.filter(g => !g.error).length;
+  if(people) msg($("#searchMsg"), `Found <b>${found.toLocaleString("en")}</b> ${found === 1 ? "photo" : "photos"} for ${plural(people, "person", "people")}. Check them below, then export to Drive.`, "ok");
 };
 
 function renderResults(){
   const box = $("#results"); box.innerHTML = "";
   for(const g of state.results){
-    const sec = document.createElement("section");
-    sec.className = "card";
-    const head =
-      `<div class="rhead">
-         <img class="avatar" src="${g.person.urls[0] || ""}" alt="">
-         <div style="flex:1;min-width:140px">
-           <div class="rname" data-rname="${g.person.id}">${esc(nameOf(g.person))}</div>
-           <div class="rcount"></div>
-         </div>
-         <button class="btn secondary sm" data-pick="all">All</button>
-         <button class="btn secondary sm" data-pick="none">None</button>
-         <button class="btn secondary sm" data-pick="sure">Confident only</button>
-       </div>`;
-    if(g.error){
-      sec.innerHTML = head + `<div class="msg err">${esc(g.error)}</div>`;
-      sec.querySelectorAll("[data-pick]").forEach(b => b.hidden = true);
-    } else if(!visible(g).length){
-      sec.innerHTML = head + `<div class="msg info">No photos at this strictness. Lower the
-        slider above, or add a clearer photo of this person and search again.</div>`;
-      sec.querySelectorAll("[data-pick]").forEach(b => b.hidden = true);
-    } else {
-      sec.innerHTML = head + '<div class="grid"></div>';
-      const grid = sec.querySelector(".grid"), cnt = sec.querySelector(".rcount");
-      const tally = () => {
-        cnt.textContent = `${picked(g).length} of ${plural(visible(g).length, "photo", "photos")} selected`;
-        updateBar();
-      };
-      sec.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => {
-        choose(g, b.dataset.pick); fillGrid(grid, g, tally); tally();
-      });
-      fillGrid(grid, g, tally); tally();
-    }
-    box.appendChild(sec);
+    const opts = {title:nameOf(g.person), avatar:g.person.urls[0], nameId:g.person.id, best:true,
+                  extraButtons:'<button class="btn ghost sm" data-pick="sure">Confident only</button>'};
+    if(g.error || !visible(g).length){
+      const sec = document.createElement("section");
+      sec.className = "card";
+      sec.innerHTML = `<div class="rhead"><img class="avatar" src="${g.person.urls[0] || ""}" alt="">
+          <div class="rname" data-rname="${g.person.id}">${esc(nameOf(g.person))}</div></div>
+        <div class="msg ${g.error ? "err" : "info"}" style="margin-top:12px">${g.error ? esc(g.error) :
+          "No photos at this strictness. Lower the slider above, or add a clearer photo of this person and search again."}</div>`;
+      box.appendChild(sec);
+    } else box.appendChild(groupCard(g, opts));
   }
   updateBar();
 }
 
-// ---- mode 2: everyone in the album ----
-const NAMES_KEY = () => "ff.names." + state.folderId;
+// ---- mode: everyone in the album ----
+const NAMES_KEY = () => "ff.names.v2." + encodeURIComponent($("#who").textContent) + "." + state.folderId + "." + $("#grouping").value;
 function savedNames(){
-  try { return JSON.parse(localStorage.getItem(NAMES_KEY()) || "{}"); } catch(e){ return {}; }
+  try { return JSON.parse(sessionStorage.getItem(NAMES_KEY()) || "{}"); } catch(e){ return {}; }
 }
 function saveNames(){
-  const out = {};
-  for(const g of state.crowd || []) if(g.on) out[g.id] = g.name;
-  try { localStorage.setItem(NAMES_KEY(), JSON.stringify(out)); } catch(e){}
+  const out = {}, people = [];
+  for(const g of state.crowd || []) if(g.on){
+    out[g.id] = g.name;
+    if(g.name.trim()) people.push({name:g.name.trim(), files:g.all.slice(0, 50).map(m => m.file_id)});
+  }
+  try { sessionStorage.setItem(NAMES_KEY(), JSON.stringify(out)); } catch(e){}
+  const named = new Set(people.map(x => x.name.toLowerCase()));
+  for(const u of state.namesUnplaced || []) if(!named.has(u.name.toLowerCase())) people.push(u);
+  // also on the server, for this account: names survive signing out and work on
+  // another device. Saved with their photos, since group numbers change.
+  clearTimeout(state.namesTimer);
+  const folder = state.folderId;
+  state.namesTimer = setTimeout(() =>
+    postJSON(`/api/album/${encodeURIComponent(folder)}/names`, {people}).catch(() => {}), 700);
+}
+// Give saved names back to the groups that share the most photos with them.
+function applyServerNames(saved){
+  state.namesUnplaced = [];
+  for(const s of saved || []){
+    if(state.crowd.some(g => g.name.trim().toLowerCase() === s.name.toLowerCase())) continue;
+    const want = new Set(s.files || []);
+    let best = null, score = 0;
+    for(const g of state.crowd){
+      if(g.name.trim()) continue;
+      const k = g.all.reduce((n, m) => n + (want.has(m.file_id) ? 1 : 0), 0);
+      if(k > score){ score = k; best = g; }
+    }
+    if(best && score >= Math.max(1, Math.ceil(0.3 * Math.min(want.size, best.all.length)))){
+      best.name = s.name; best.on = true; best.autoOn = true;   // ticked because named
+    } else state.namesUnplaced.push(s);
+  }
 }
 const faceUrl = g => `/api/face/${encodeURIComponent(state.folderId)}/` +
   `${encodeURIComponent(g.cover.file_id)}/${g.cover.face_idx}`;
 const crowdName = g => g.name.trim() || `Person ${state.crowd.indexOf(g) + 1}`;
 
 async function loadCrowd(){
-  msg($("#everyMsg"), "Grouping the faces in this album…");
-  $("#faces").innerHTML = ""; $("#toggleSingles").hidden = true;
+  const folder=state.folderId,grouping=$('#grouping').value;
+  const version=state.crowdRequest=(state.crowdRequest||0)+1;
+  msg($('#everyMsg'),'Grouping faces…');
+  $('#faces').replaceChildren();$('#toggleSingles').hidden=true;
+  const current=()=>version===state.crowdRequest&&folder===state.folderId&&grouping===$('#grouping').value;
   try{
-    const r = await postJSON("/api/people",
-      {folder_id:state.folderId, grouping:$("#grouping").value});
-    const names = savedNames();
-    state.crowd = r.people.map(p => ({
-      kind:"cluster", id:p.id, cover:p.cover, all:p.photos, removed:new Set(),
-      name:names[p.id] || "", on:p.id in names,
-    }));
-    const regulars = state.crowd.filter(g => g.all.length > 1).length;
-    msg($("#everyMsg"),
-      `Found <b>${regulars}</b> ${regulars === 1 ? "person" : "people"} who appear more than once, across ${plural(r.photos, "photo", "photos")} with faces.`, "ok");
-    renderCrowd();
-  }catch(e){ msg($("#everyMsg"), esc(e.message), "err"); }
+    const [r,server]=await Promise.all([postJSON('/api/people',{folder_id:folder,grouping}),
+      api(`/api/album/${encodeURIComponent(folder)}/names`).then(x=>x.people).catch(()=>[])]);
+    if(!current())return;
+    const names=savedNames();
+    state.crowd=r.people.map(p=>({kind:'cluster',id:p.id,cover:p.cover,
+      all:p.photos,removed:new Set(),name:names[p.id]||'',on:p.id in names}));
+    applyServerNames(server);
+    const regulars=state.crowd.filter(g=>g.all.length>1).length;
+    msg($('#everyMsg'),`${regulars} people appear in more than one photo.`,'ok');renderCrowd();
+  }catch(e){if(current())msg($('#everyMsg'),esc(e.message),'err');}
 }
-$("#grouping").onchange = () => { if(state.ready) loadCrowd(); };
 
 function renderCrowd(){
   const box = $("#faces"); box.innerHTML = "";
@@ -722,14 +1896,22 @@ function renderCrowd(){
        </div>
        <input class="fname" type="text" maxlength="100" placeholder="Name"
               value="${esc(g.name)}" aria-label="Name">
-       <div class="fmeta">${plural(g.all.length, "photo", "photos")}</div>`;
+       <div class="fmeta">${plural(picked(g).length, "photo", "photos")}${g.best ? " · best picked" : ""}</div>`;
     const tick = card.querySelector(".tick");
     const setOn = on => { g.on = on; tick.setAttribute("aria-pressed", on); saveNames(); updateBar(); };
+    card.querySelector(".fpic").dataset.personId=String(g.id);
+    card.querySelector(".fpic").setAttribute('aria-label',`Review ${crowdName(g)}: ${g.all.length} photos`);
+    tick.setAttribute('aria-label',`Create a folder for ${crowdName(g)}`);
+    card.querySelector('.fname').setAttribute('aria-label',`Name for ${crowdName(g)}`);
     card.querySelector(".fpic").onclick = () => openPerson(g);
-    tick.onclick = () => setOn(!g.on);
+    tick.onclick = () => { g.autoOn = false; setOn(!g.on); };
     card.querySelector(".fname").oninput = e => {
       g.name = e.target.value;
-      setOn(g.on || g.name.trim() !== "");
+      card.querySelector(".fpic").setAttribute("aria-label", `Review ${crowdName(g)}: ${g.all.length} photos`);
+      tick.setAttribute("aria-label", `Create a folder for ${crowdName(g)}`);
+      if(g.name.trim() && !g.on){ g.autoOn = true; setOn(true); }
+      else if(!g.name.trim() && g.autoOn){ g.autoOn = false; setOn(false); }
+      else saveNames();
     };
     box.appendChild(card);
   }
@@ -738,6 +1920,7 @@ function renderCrowd(){
   t.textContent = state.showSingles
     ? "Hide people who appear in only one photo"
     : `Show ${singles === 1 ? "1 person who appears" : singles + " people who appear"} in only one photo`;
+  $("#singlesHint").hidden = !singles && !state.showSingles;
   updateBar();
 }
 $("#toggleSingles").onclick = () => { state.showSingles = !state.showSingles; renderCrowd(); };
@@ -746,93 +1929,407 @@ function openPerson(g){
   state.open = g;
   $("#dlgFace").src = faceUrl(g);
   $("#dlgName").value = g.name;
+  $("#dlgBest").hidden = !state.gemini || g.all.length <= 10;
+  msg($("#dlgMsg"), "");
   const tally = () => $("#dlgCount").textContent =
-    `${picked(g).length} of ${g.all.length} selected`;
-  const refill = () => { fillGrid($("#dlgGrid"), g, tally); tally(); };
-  $("#dlgAll").onclick  = () => { choose(g, "all");  refill(); };
+    `${picked(g).length.toLocaleString("en")} of ${g.all.length.toLocaleString("en")} selected`;
+  // Picking photos here means this person gets a folder: no need to tick
+  // the card as well. "None" leaves it as it was.
+  const touched = () => { g.on = picked(g).length > 0 || g.on; tally(); };
+  const refill = () => { fillGrid($("#dlgGrid"), g, touched); tally(); };
+  $("#dlgAll").onclick  = () => { choose(g, "all");  g.on = true; refill(); };
   $("#dlgNone").onclick = () => { choose(g, "none"); refill(); };
-  $("#dlgSure").onclick = () => { choose(g, "sure"); refill(); };
+  $("#dlgSure").onclick = () => { choose(g, "sure"); g.on = true; refill(); };
+  $("#dlgBest").onclick = async () => {
+    await pickBest(g,10,$('#dlgMsg'));
+    if(g.best) g.on = true;
+    if(state.open===g && $('#dlg').open)refill();
+  };
   refill();
   $("#dlg").showModal();
 }
 $("#dlgName").oninput = e => {
   const g = state.open; if(!g) return;
-  g.name = e.target.value; g.on = g.on || g.name.trim() !== "";
+  g.name = e.target.value;
+  if(g.name.trim() && !g.on){ g.autoOn = true; g.on = true; }
+  else if(!g.name.trim() && g.autoOn && !g.best){ g.autoOn = false; g.on = false; }
 };
 $("#dlgDone").onclick = () => $("#dlg").close();
-$("#dlg").addEventListener("close", () => { saveNames(); renderCrowd(); });
+$("#dlg").addEventListener("close", () => {
+  const id=state.open?.id;state.open=null;saveNames();renderCrowd();
+  const target=[...document.querySelectorAll('.fpic')].find(b=>b.dataset.personId===String(id));target?.focus();
+});
+
+// ---- mode: sort by description ----
+function addGroup(def = {name:"", description:""}){
+  state.sortDefs.push(def); renderGroupRows();
+}
+// Example folders: one tap fills an empty row (or adds one), to show that a
+// folder is described in plain words.
+const EXAMPLES = [
+  {name:"Throwing caps", description:"graduates throwing their caps in the air", en:"caps in the air"},
+  {name:"Group photos", description:"group photos with five or more people", en:"five or more people"},
+  {name:"Flowers & gifts", description:"people holding flowers, bouquets or gifts", en:"holding flowers or gifts"},
+  {name:"Dinner", description:"people eating together at a restaurant or a table", en:"eating together"},
+];
+for(const ex of EXAMPLES){
+  const b = document.createElement("button"); b.type = "button"; b.className = "chip2";
+  b.innerHTML = `+ ${esc(ex.name)}<small>${esc(ex.en)}</small>`;
+  b.onclick = () => {
+    if(state.sortDefs.some(d => d.name === ex.name)) return;
+    const empty = state.sortDefs.find(d => !d.name.trim() && !d.description.trim());
+    if(empty){ empty.name = ex.name; empty.description = ex.description; renderGroupRows(); }
+    else addGroup({name:ex.name, description:ex.description});
+  };
+  $("#sortChips").append(b);
+}
+const SORT_KEY = () => "ff.sort." + state.folderId;
+function saveSortDefs(){
+  try { localStorage.setItem(SORT_KEY(), JSON.stringify(state.sortDefs.filter(d => d.name.trim() || d.description.trim()))); } catch(e){}
+}
+function loadSortDefs(){
+  try { state.sortDefs = JSON.parse(localStorage.getItem(SORT_KEY()) || "[]"); } catch(e){ state.sortDefs = []; }
+}
+function renderGroupRows(){
+  saveSortDefs();
+  const box = $("#groupRows"); box.innerHTML = "";
+  state.sortDefs.forEach((d, i) => {
+    const row = document.createElement("div");
+    row.className = "grow-row";
+    row.innerHTML =
+      `<label class="flabel gname">Folder name
+         <input class="field" type="text" maxlength="60" placeholder="e.g. Staff" value="${esc(d.name)}"></label>
+       <label class="flabel gdesc">What goes in it
+         <input class="field" type="text" maxlength="300"
+                placeholder="e.g. people in blue staff shirts" value="${esc(d.description)}"></label>
+       <button class="iconbtn" type="button" aria-label="Remove this group">${CLOSE}</button>`;
+    row.querySelector(".gname input").oninput = e => { d.name = e.target.value; saveSortDefs(); };
+    row.querySelector(".gdesc input").oninput = e => { d.description = e.target.value; saveSortDefs(); };
+    row.querySelector(".iconbtn").onclick = () => { state.sortDefs.splice(i, 1); renderGroupRows(); };
+    box.appendChild(row);
+  });
+}
+$("#addGroup").onclick = () => addGroup();
+$("#suggest").onclick = async () => {
+  const b = $("#suggest"); b.disabled = true;
+  msg($("#sortMsg"), "Gemini is reading the album…");
+  try{
+    const r = await postJSON("/api/groups/suggest", {folder_id:state.folderId});
+    const have = new Set(state.sortDefs.map(d => d.name.trim().toLowerCase()));
+    state.sortDefs = state.sortDefs.filter(d => d.name.trim() || d.description.trim())
+      .concat(r.groups.filter(g => !have.has(g.name.trim().toLowerCase())));
+    renderGroupRows();
+    msg($("#sortMsg"), r.groups.length
+      ? `Gemini suggests ${plural(r.groups.length, "group", "groups")}. Rename, edit or remove any of them, then sort.`
+      : "Gemini did not find clear groups. Describe your own.", r.groups.length ? "ok" : "info");
+  }catch(e){ msg($("#sortMsg"), esc(e.message), "err"); }
+  b.disabled = false;
+};
+$("#runSort").onclick = async () => {
+  const groups = state.sortDefs
+    .map(d => ({name:d.name.trim(), description:(d.description.trim() || d.name.trim())}))
+    .filter(d => d.name);
+  if(!groups.length) return msg($("#sortMsg"), "Give at least one group a name.", "err");
+  $("#runSort").disabled = true; $("#sbarBox").hidden = false; $("#sbar").style.width = "0%";
+  state.sorted = []; renderSorted();          // old results go, so a re-run is visible
+  msg($("#sortMsg"), "Sorting…");
+  try{
+    const {job_id} = await postJSON("/api/sort", {folder_id:state.folderId, groups});
+    let job;
+    while(true){
+      job = await retrying(() => api("/api/sort/" + job_id));
+      $("#sbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
+      msg($("#sortMsg"), `Sorting — ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}`);
+      if(job.status !== "running") break;
+      await sleep(1000);
+    }
+    if(job.status === "error") throw new Error(job.message || "Sorting failed");
+    const row = f => ({file_id:f, name:job.names[f] || f});
+    state.sortTotal = job.total;
+    state.sorted = job.groups.map(gr => ({kind:"set", name:gr.name, note:gr.description,
+                                           all:gr.file_ids.map(row), removed:new Set(), limit:24}));
+    if(job.unchecked?.length)
+      state.sorted.push({kind:"set", name:"Not checked by Gemini yet", check:true, all:job.unchecked.map(row),
+                         removed:new Set(job.unchecked), limit:24,
+                         note:"The scan stopped before Gemini described these, so they could not be sorted. Finish the scan from the album menu, then sort again."});
+    if(job.check.length)
+      state.sorted.push({kind:"set", name:"Check these", check:true, all:job.check.map(row),
+                         removed:new Set(job.check), limit:24,
+                         note:"Gemini was not sure where these go. Tick any you want in a \"Check these\" folder."});
+    const placed = new Set(job.groups.flatMap(gr => gr.file_ids)).size;
+    const notes = [];
+    if(job.none.length) notes.push(`${plural(job.none.length, "photo fits", "photos fit")} none of the groups`);
+    if(job.check.length) notes.push(`${plural(job.check.length, "photo needs", "photos need")} a look`);
+    if(job.unchecked?.length) notes.push(`${plural(job.unchecked.length, "photo was", "photos were")} not checked by Gemini yet`);
+    const at = new Date().toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
+    msg($("#sortMsg"), `Sorted at ${at}: ${plural(placed, "photo", "photos")} put into folders` +
+      (notes.length ? `; ${notes.join(", and ")}.` : "."), "ok");
+    renderSorted();
+    $("#sortResults").scrollIntoView({behavior:"smooth", block:"start"});
+  }catch(e){ msg($("#sortMsg"), esc(e.message), "err"); }
+  $("#runSort").disabled = false; $("#sbarBox").hidden = true;
+};
+function renderSorted(){
+  const box = $("#sortResults"); box.innerHTML = "";
+  for(const g of state.sorted){
+    if(!g.all.length){
+      const c = document.createElement("section"); c.className = "card";
+      c.innerHTML = `<div class="rname">${esc(g.name)}</div><p class="hint" style="margin-top:6px">None of the
+        ${plural(state.sortTotal || 0, "photo", "photos")} matches "${esc(g.note || g.name)}". Gemini compared it with what it
+        saw in every photo, so it may simply not be in this album. You can also try other words.</p>`;
+      box.append(c); continue;
+    }
+    box.appendChild(groupCard(g, {title:g.name, note:g.note ? esc(g.note) : ""}));
+  }
+  updateBar();
+}
+
+// ---- mode: cull ----
+$("#runCull").onclick = async () => {
+  $("#runCull").disabled = true; closeSide();
+  msg($("#cullMsg"), "Culling…");
+  try{
+    const r = await postJSON("/api/cull", {folder_id:state.folderId, strictness:$("#strictness").value});
+    const SHORT = {blurry:"Out of focus", eyes_closed:"Closed eyes", cut_off:"Cut off by the frame",
+                   poor_exposure:"Too dark or bright", blocked:"Something in the way",
+                   awkward_moment:"Awkward moment", no_subject:"No clear subject"};
+    const base = n => (n || "another photo").replace(/\.[a-z0-9]+$/i, "");
+    const short = (x, pile) =>
+        x.similar_to ? (pile === "reject" ? `Weaker shot of ${base(x.similar_name)}` : `Looks like ${base(x.similar_name)}`)
+      : x.reason === "Gemini could not check this photo" ? "Not checked by Gemini"
+      : x.reason?.startsWith("Gemini was not sure") ? "Gemini was not sure"
+      : x.flaws?.length ? x.flaws.map(f => SHORT[f] || f).join(" · ")
+      : x.reason || (pile === "review" ? "Needs a look" : "Check the full photo");
+    const rows = (list, pile) => list.map(x => ({file_id:x.file_id, name:x.name,
+                                                 why:short(x, pile), long:x.reason,
+                                                 similar_to:x.similar_to, similar_name:x.similar_name}));
+    // Look-alikes of a photo that is kept start unticked: still in Review to
+    // check, but culling actually culls. Everything else in Review is ticked.
+    const lookalikes = r.review.filter(x => x.similar_to).map(x => x.file_id);
+    state.culled = {
+      keep:{kind:"set", name:"Keep", all:rows(r.keep, "keep"), removed:new Set(), limit:24},
+      review:{kind:"set", name:"Review", all:rows(r.review, "review"), removed:new Set(lookalikes), limit:24, flagged:true},
+      reject:{kind:"set", name:"Rejected", all:rows(r.reject, "reject"), removed:new Set(r.reject.map(x => x.file_id)), limit:48, flagged:true},
+    };
+    const counts = {};
+    for(const x of r.reject){ const k = short(x, "reject").split(" · ")[0]; counts[k] = (counts[k] || 0) + 1; }
+    const why = Object.entries(counts).sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${n.toLocaleString("en")} ${esc(k[0].toLowerCase() + k.slice(1))}`).join(" · ");
+    const missed = r.review.filter(x => x.reason === "Gemini could not check this photo").length;
+    state.cullPile = r.review.length ? "review" : "keep";
+    $("#cullMsg").innerHTML =
+      `${why ? `<p class="whyline">Rejected: ${why}</p>` : ""}
+       ${missed ? `<p class="whyline">Gemini could not check ${plural(missed, "photo", "photos")}; they are in Review.
+         <button class="linkbtn" id="recheck">Check them again</button></p>` : ""}`;
+    $("#recheck")?.addEventListener("click", () => { msg($("#cullMsg"), ""); startIndex(false); });
+    $("#alsoRejectedBox").hidden = false;
+    renderCull();
+  }catch(e){ msg($("#cullMsg"), esc(e.message), "err"); }
+  $("#runCull").disabled = false;
+};
+function renderCull(){
+  const box = $("#cullResults"); box.innerHTML = "";
+  if(!state.culled){ updateBar(); return; }
+  const piles = {keep:"Keep", review:"Review", reject:"Rejected"};
+  const notes = {
+    review:"Ticked photos go into Keep. Look-alikes of a kept photo start unticked: open one to compare, and tick it if the moment differs.",
+    reject:"Each photo says why. Tick any you want to keep after all.",
+    keep:""};
+  const bar = document.createElement("div");
+  bar.className = "piles"; bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "Show one pile");
+  for(const [k, label] of Object.entries(piles)){
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("aria-pressed", state.cullPile === k);
+    b.innerHTML = `${label}<span class="n">${state.culled[k].all.length.toLocaleString("en")}</span>`;
+    b.onclick = () => { state.cullPile = k; closeSide(); renderCull(); $(".piles button[aria-pressed='true']")?.focus(); };
+    b.onkeydown = e => {
+      const keys = Object.keys(piles), i = keys.indexOf(k);
+      const to = e.key === "ArrowRight" ? keys[(i + 1) % 3] : e.key === "ArrowLeft" ? keys[(i + 2) % 3] : null;
+      if(to){ e.preventDefault(); state.cullPile = to; closeSide(); renderCull(); $(".piles button[aria-pressed='true']")?.focus(); }
+    };
+    bar.append(b);
+  }
+  box.append(bar);
+  const g = state.culled[state.cullPile];
+  if(g.all.length) box.appendChild(groupCard(g, {title:piles[state.cullPile], note:notes[state.cullPile]}));
+  else { const p = document.createElement("p"); p.className = "msg info"; p.style.marginTop = "16px";
+         p.textContent = `Nothing in ${piles[state.cullPile]}.`; box.append(p); }
+  if(!$("#cullSide").hidden) markViewing(state.viewingId);
+  updateBar();
+}
 
 // ---- create the folders ----
 function exportGroups(){
-  const groups = state.mode === "people"
-    ? state.results.filter(g => !g.error).map(g => ({name:nameOf(g.person), g}))
-    : (state.crowd || []).filter(g => g.on).map(g => ({name:crowdName(g), g}));
-  return groups
-    .map(x => ({name:x.name, file_ids:picked(x.g).map(m => m.file_id)}))
-    .filter(x => x.file_ids.length);
+  let groups;
+  if(state.mode === "people")
+    groups = state.results.filter(g => !g.error).map(g => ({name:nameOf(g.person), ids:picked(g)}));
+  else if(state.mode === "everyone")
+    groups = (state.crowd || []).filter(g => g.on).map(g => ({name:crowdName(g), ids:picked(g)}));
+  else if(state.mode === "sort")
+    groups = state.sorted.map(g => ({name:g.name, ids:picked(g)}));
+  else if(state.culled){
+    const {keep, review, reject} = state.culled;
+    groups = [{name:"Keep", ids:picked(keep).concat(picked(review), picked(reject))}];
+    if($("#alsoRejected").checked)
+      groups.push({name:"Rejected", ids:[keep, review, reject].flatMap(g => g.all.filter(m => g.removed.has(m.file_id)))});
+  } else groups = [];
+  const merged = new Map();     // same name, any case: one folder, each photo once
+  for(const x of groups){
+    const key = x.name.trim().toLowerCase();
+    if(!merged.has(key)) merged.set(key, {name:x.name.trim(), ids:new Set()});
+    x.ids.forEach(m => merged.get(key).ids.add(m.file_id));
+  }
+  return [...merged.values()].map(x => ({name:x.name, file_ids:[...x.ids]})).filter(x => x.file_ids.length);
 }
 function updateBar(){
-  const active = state.mode === "people" ? state.results.length > 0 : !!state.crowd;
-  $("#actionbar").hidden = !(state.ready && active);
   const gs = exportGroups();
+  const ids = [...new Set(gs.flatMap(g => g.file_ids))];
   const folders = new Set(gs.map(g => g.name.toLowerCase())).size;
-  const photos = gs.reduce((n, g) => n + g.file_ids.length, 0);
-  $("#summary").innerHTML = gs.length
-    ? `<b>${folders}</b> ${folders === 1 ? "folder" : "folders"} · <b>${photos}</b> ${photos === 1 ? "photo" : "photos"}`
-    : (state.mode === "people" ? "No photos selected" : "Tick or name someone");
-  $("#export").disabled = !gs.length || state.exporting;
+  $("#actionbar").hidden = !(state.ready && (ids.length || state.exporting));
+  if(!state.exporting){
+    $("#summary").innerHTML = `<b>${ids.length.toLocaleString("en")}</b> ${ids.length === 1 ? "photo" : "photos"} selected` +
+      (folders > 1 ? ` · ${folders} folders` : "");
+    $("#xthumbs").innerHTML = ids.slice(0, 3).map(id =>
+      `<img src="/api/thumb/${encodeURIComponent(id)}?s=200" alt="" loading="lazy">`).join("");
+  }
+  $("#export").disabled = !ids.length || state.exporting;
+  document.body.classList.toggle("can-export", !$("#actionbar").hidden && ids.length > 0);
 }
 
-$("#export").onclick = async () => {
+// Export to Drive: the bar's button opens a short dialog that says exactly what
+// will be copied where; the dialog's button starts the copy.
+$("#xClose").innerHTML = CLOSE;
+$("#xClose").onclick = $("#xCancel").onclick = () => $("#xdlg").close();
+$("#alsoRejected").onchange = () => { fillExport(); updateBar(); };
+function fillExport(){
+  const gs = exportGroups(), total = new Set(gs.flatMap(g => g.file_ids)).size;
+  $("#xlist").innerHTML = gs.map(g =>
+    `<li>${FOLDER}<span>${esc(g.name)}</span><em>${plural(g.file_ids.length, "photo", "photos")}</em></li>`).join("");
+  const parent = `"FaceFinder - ${state.albumName || "album"}"`;
+  $("#destHint").textContent = state.mode === "cull"
+    ? `Your picks go into a "Keep" folder inside ${parent}, or inside the folder you name here (for example "Instagram").`
+    : `Leave it empty to make ${parent} in My Drive.`;
+  $("#alsoRejectedBox").hidden = !(state.mode === "cull" && state.culled);
+  const copies = gs.reduce((n, g) => n + g.file_ids.length, 0);
+  $("#xlist").insertAdjacentHTML("beforeend", copies > total
+    ? `<li class="note">${plural(total, "photo", "photos")} in several folders: ${copies.toLocaleString("en")} copies in all.</li>` : "");
+  $("#xGo").textContent = copies > total ? `Export ${copies.toLocaleString("en")} copies` : `Export ${plural(total, "photo", "photos")}`;
+  $("#xGo").disabled = !total;
+}
+$("#export").onclick = () => {
+  if(!exportGroups().length) return;
+  fillExport(); $("#xdlg").showModal(); $("#dest").focus();
+};
+$("#xGo").onclick = async () => {
   const groups = exportGroups();
   if(!groups.length) return;
+  $("#xdlg").close();
   const v = $("#dest").value.trim();
   const body = {folder_id:state.folderId, groups};
   if(v.includes("drive.google.com") || /^[A-Za-z0-9_-]{25,}$/.test(v)) body.dest_link = v;
   else if(v) body.dest_name = v;
 
   state.exporting = true; updateBar();
+  $("#summary").hidden = true; $("#xthumbs").hidden = true;
   $("#xprog").hidden = false; $("#xbar").style.width = "0%";
   $("#xtext").textContent = "Starting…";
   let job;
   try{
     const {job_id} = await postJSON("/api/export", body);
     while(true){
-      job = await api("/api/export/" + job_id);
+      job = await retrying(() => api("/api/export/" + job_id));
       $("#xbar").style.width = (job.total ? 100 * job.done / job.total : 0) + "%";
-      $("#xtext").textContent = `Copying — ${job.done} of ${job.total} photos`;
+      $("#xtext").textContent = `Copying ${job.done.toLocaleString("en")} of ${plural(job.total, "photo", "photos")}…`;
       if(job.status !== "running") break;
-      await new Promise(r => setTimeout(r, 1200));
+      await sleep(1200);
     }
   }catch(e){ job = {status:"error", message:e.message}; }
-  state.exporting = false; $("#xprog").hidden = true; updateBar();
+  state.exporting = false; $("#xprog").hidden = true; $("#summary").hidden = false; $("#xthumbs").hidden = false;
+  updateBar();
   showDone(job);
 };
 
 function showDone(job){
   const card = $("#doneCard");
   if(job.status === "error"){
-    card.innerHTML = `<h2>The folders were not created</h2>
-      <div class="msg err">${esc(job.message || "Something went wrong.")}</div>`;
+    card.innerHTML = `<img class="mascot" src="/static/img/cam-sad.png" alt="The mascot looking sorry" width="140" height="140">
+      <h2>Export interrupted</h2>
+      <div class="msg err">${esc(job.message || "Some copies may already exist. Retry the same export to check for missing copies.")}</div>`;
   } else {
     const made = job.people.filter(p => p.url);
     card.innerHTML =
-      `<h2>${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
+      `<img class="mascot" src="/static/img/cam-celebrate.png" alt="The mascot celebrating" width="160" height="160">
+       <h2>${plural(job.copied, "photo", "photos")} copied into ${plural(made.length, "folder", "folders")}</h2>
        <p class="hint">Inside <a href="${esc(job.root_url)}" target="_blank" rel="noopener"><b>${esc(job.root_name)}</b></a> in your Drive.
          ${job.skipped ? `${plural(job.skipped, "photo was", "photos were")} already there and left alone.` : ""}</p>
        ${job.note ? `<div class="msg info">${esc(job.note)}</div>` : ""}
        ${job.failed ? `<div class="msg err">${plural(job.failed, "photo", "photos")} could not be copied.
-            Press Create folders again — it only retries the missing ones.</div>` : ""}
+            Press Export to Drive again — it only retries the missing ones.</div>` : ""}
        <ul class="donelist">${made.map(p =>
-         `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.name)}</a>
-            — ${plural(p.copied + p.skipped, "photo", "photos")}</li>`).join("")}</ul>`;
+         `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${FOLDER}${esc(p.name)} · ${(p.copied + p.skipped).toLocaleString("en")}</a></li>`).join("")}</ul>`;
   }
-  card.hidden = false;
-  card.scrollIntoView({behavior:"smooth", block:"center"});
+  card.insertAdjacentHTML("beforeend", '<button type="button" class="btn" id="doneOk" style="margin-top:6px">Done</button>');
+  $("#doneOk").onclick = () => card.close();
+  card.showModal(); $("#doneOk").focus();
 }
 
+
+// Review patch: relationships for native tab buttons and accessible messages.
+for(const [mode, selector] of Object.entries(MODES)){
+  const tab = $(selector), panel = $("#mode" + mode[0].toUpperCase() + mode.slice(1));
+  tab.setAttribute("aria-controls", panel.id);
+  panel.setAttribute("role", "tabpanel"); panel.setAttribute("aria-labelledby", tab.id);
+}
+document.querySelector('.tabs').addEventListener('keydown', e => {
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')].filter(t => !t.hidden);
+  const index = tabs.indexOf(document.activeElement);
+  if(index < 0) return;
+  let target = index;
+  if(e.key === 'ArrowRight') target = (index+1)%tabs.length;
+  else if(e.key === 'ArrowLeft') target = (index+tabs.length-1)%tabs.length;
+  else if(e.key === 'Home') target = 0;
+  else if(e.key === 'End') target = tabs.length-1;
+  else return;
+  e.preventDefault(); tabs[target].focus(); tabs[target].click();
+});
+for(const id of ['albumMsg','searchMsg','everyMsg','sortMsg','cullMsg','dlgMsg','xtext']){
+  $('#'+id).setAttribute('role','status'); $('#'+id).setAttribute('aria-live','polite');
+}
+const actionObserver = new ResizeObserver(entries => {
+  const height = $('#actionbar').hidden ? 0 : entries[0].contentRect.height;
+  document.querySelector('main').style.paddingBottom = `${height+48}px`;
+  document.documentElement.style.scrollPaddingBottom = `${height+24}px`;
+});
+actionObserver.observe($('#actionbar'));
+
+
+function lockDuring(handler){
+  return async function(event){
+    if(state.uiBusy)return;
+    state.uiBusy=true;
+    const controls=[...document.querySelectorAll('main button, main input, main select, .tabs button, #albumBtn, #dest, #export')]
+      .filter(el=>!el.closest('#chooseCard'));      // the chooser sets its own buttons as it fills
+    const previous=controls.map(el=>[el,el.disabled]);controls.forEach(el=>el.disabled=true);
+    try{return await handler.call(this,event);}
+    finally{previous.forEach(([el,value])=>{if(el.isConnected)el.disabled=value;});state.uiBusy=false;updateBar();}
+  };
+}
+for(const id of ['openAlbum','go','suggest','runSort','runCull','xGo','chooseGo']){
+  const button=$('#'+id);button.onclick=lockDuring(button.onclick);
+}
+$('#grouping').onchange=lockDuring(async()=>{if(state.ready)await loadCrowd();});
+$('#strictness').onchange=()=>{if(state.ready&&state.culled)$('#runCull').click();};
+window.addEventListener('beforeunload',e=>{if(state.exporting||state.uiBusy){e.preventDefault();e.returnValue='';}});
+
+setMode(state.mode);
 addPerson();
-refreshMe();
+refreshMe().then(() => {
+  const h = readHash();
+  if(state.signedIn && h.a){
+    state.wantMode = MODES[h.t] ? h.t : null;
+    $("#album").value = h.a; $("#openAlbum").click();
+  }
+}).catch(e => msg($("#setupWarn"), esc("Cannot connect. Reload to try again. " + e.message), "err"));
 </script>
 </body>
 </html>

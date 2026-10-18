@@ -41,12 +41,22 @@ class InsightFaceEngine:
     def __init__(self):
         from insightface.app import FaceAnalysis
 
+        # Only the two models used: finding faces and turning each into numbers.
+        # The pack's age/gender and landmark models ran on every face for
+        # nothing, which on a big group photo cost over a minute.
         self.app = FaceAnalysis(
             name=config.MODEL_NAME,
             root=config.MODEL_ROOT,
             providers=["CPUExecutionProvider"],
+            allowed_modules=["detection", "recognition"],
         )
         self.app.prepare(ctx_id=-1, det_size=(config.DET_SIZE, config.DET_SIZE))
+        # Look at each photo at more than one size and merge the finds: at 640
+        # alone a face 20px wide in a big group photo is mostly missed and one
+        # 15px wide always is; adding 1280 finds them.
+        sizes = [(s, s) for s in config.DET_SIZES]
+        if len(sizes) > 1 and hasattr(self.app.det_model, "input_sizes"):
+            self.app.det_model.input_sizes = sizes
 
     def detect(self, bgr):
         out = []

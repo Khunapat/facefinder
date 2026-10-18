@@ -71,6 +71,22 @@ def service(creds: Credentials):
     return build("drive", "v3", credentials=creds, cache_discovery=False)
 
 
+def link_problem(value: str):
+    """Why a pasted value cannot be a Drive folder, in plain words, or None."""
+    v = (value or "").strip()
+    if "photos.google.com" in v or "photos.app.goo.gl" in v:
+        return ("That is a Google Photos link. FaceFinder works with Google Drive folders: "
+                "put the photos in a Drive folder and paste that folder's link.")
+    if "drive.google.com" in v or "docs.google.com" in v:
+        return None
+    if re.match(r"^https?://", v):
+        return "That is not a Google Drive link. Paste a link that starts with https://drive.google.com/drive/folders/"
+    if not re.match(r"^https?://", v) and not re.fullmatch(r"[A-Za-z0-9_-]{10,}", v):
+        return ("That does not look like a Google Drive folder link. In Drive, open the folder, "
+                "press Share, then Copy link. It starts with https://drive.google.com/drive/folders/")
+    return None
+
+
 def parse_folder_id(value: str) -> str:
     """Accept a raw ID or any of the Drive URL shapes people actually paste."""
     value = (value or "").strip()
@@ -105,13 +121,18 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
         while True:
             resp = svc.files().list(
                 q=f"'{current}' in parents and trashed=false",
-                fields="nextPageToken, files(id,name,mimeType,size,thumbnailLink,imageMediaMetadata/width)",
+                fields="nextPageToken, files(id,name,mimeType,size,md5Checksum,thumbnailLink,createdTime,imageMediaMetadata(width,time),appProperties)",
                 pageSize=1000,
                 pageToken=page,
                 supportsAllDrives=True,
                 includeItemsFromAllDrives=True,
             ).execute()
             for f in resp.get("files", []):
+                made_here = f.get("appProperties") or {}
+                # An export saved inside the album must not come back as new
+                # photos: skip FaceFinder's own folders and copies.
+                if made_here.get("ff") == "1" or made_here.get("ff_src"):
+                    continue
                 if f["mimeType"] == FOLDER_MIME:
                     if recursive:
                         queue.append(f["id"])
@@ -121,6 +142,16 @@ def list_images(svc, folder_id: str, recursive: bool = True) -> list:
             if not page:
                 break
     return out
+
+
+def taken_at(f: dict):
+    """When the photo was taken, as 'YYYY-MM-DDTHH:MM:SS': the camera's own time
+    when Drive has it (EXIF writes it '2026:06:12 14:03:22'), else the upload time."""
+    t = (f.get("imageMediaMetadata") or {}).get("time")
+    if t and len(t) >= 19 and t[4] == ":" and t[7] == ":":
+        return "%s-%s-%sT%s" % (t[0:4], t[5:7], t[8:10], t[11:19])
+    c = f.get("createdTime")
+    return c[:19] if c else None
 
 
 def fetch_image_bytes(creds: Credentials, svc, file_meta: dict, size: int = None) -> bytes:
