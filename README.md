@@ -29,6 +29,8 @@ Submission notes, architecture and video script: [`docs/SUBMISSION.md`](docs/SUB
 
 ## How it works
 
+![FaceFinder architecture: the browser reaches Firebase Hosting, which forwards every request to Cloud Run. Cloud Run runs the FastAPI app and the InsightFace face model, which does all face matching. Cloud Run talks to the Google Drive API, Firestore and Gemini on Vertex AI; Gemini only writes notes and sorts photos.](docs/architecture.svg)
+
 1. You sign in with Google.
 2. You paste the link of the album the photographer shared.
 3. The server scans the album once and stores a **face embedding** — a vector of

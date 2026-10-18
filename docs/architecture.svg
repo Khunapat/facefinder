@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="ff-arch-title ff-arch-desc">
+  <title id="ff-arch-title">How FaceFinder works</title>
+  <desc id="ff-arch-desc">FaceFinder architecture. A browser on a phone or laptop opens facefinder-508213.web.app on Firebase Hosting, which forwards every request to Cloud Run. Cloud Run runs one Docker container: the FastAPI web app, with the InsightFace buffalo_l face model inside it. Face matching, deciding who is in each photo, happens there, with no LLM and no paid API. Cloud Run sends Gemini on Vertex AI a 768 px copy of each photo once, and stored text for Sort and folder suggestions; Gemini writes a note per photo and sorts by description, and never decides who is in a photo. Cloud Run saves face data, Gemini notes, names and recent albums in Firestore, which stores no photos. Cloud Run reads the album and copies photos through the Google Drive API with the user's own sign-in; the album is never changed and exports are copies.</desc>
+
+  <defs>
+    <marker id="ff-arrow" viewBox="0 0 16 14" refX="1" refY="7" markerWidth="16" markerHeight="14" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M0,0 L16,7 L0,14 Z" fill="#5b6178"/>
+    </marker>
+  </defs>
+
+  <!-- white slide background -->
+  <rect x="0" y="0" width="1600" height="900" fill="#ffffff"/>
+
+  <g font-family="'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" fill="#1f2540">
+
+    <!-- title -->
+    <text x="48" y="76" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="40" font-weight="600">How FaceFinder works</text>
+    <text x="48" y="118" font-size="22" fill="#5b6178">Face matching runs inside Cloud Run with the InsightFace model. Gemini only writes notes and sorts photos.</text>
+
+    <!-- ============ left column: Browser -> Firebase Hosting ============ -->
+    <rect x="48" y="290" width="320" height="140" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="72" y="348" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="30" font-weight="600">Browser</text>
+    <text x="72" y="384" font-size="20" fill="#5b6178">phone or laptop</text>
+
+    <line x1="208" y1="431" x2="208" y2="524" stroke="#5b6178" stroke-width="3" marker-end="url(#ff-arrow)"/>
+    <text x="224" y="491" font-size="20">opens the app</text>
+
+    <rect x="48" y="540" width="320" height="170" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="72" y="592" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600">Firebase Hosting</text>
+    <text x="72" y="630" font-size="20">facefinder-508213.web.app</text>
+    <text x="72" y="668" font-size="20" fill="#5b6178">Gives the public address</text>
+
+    <!-- Hosting -> Cloud Run -->
+    <line x1="369" y1="625" x2="482" y2="625" stroke="#5b6178" stroke-width="3" marker-end="url(#ff-arrow)"/>
+    <text x="433" y="553" font-size="20" text-anchor="middle">every</text>
+    <text x="433" y="579" font-size="20" text-anchor="middle">request</text>
+    <text x="433" y="605" font-size="20" text-anchor="middle">forwarded</text>
+
+    <!-- ============ Cloud Run: one container ============ -->
+    <rect x="498" y="172" width="460" height="656" rx="24" fill="#fdf0f5" stroke="#f3bcd0" stroke-width="2"/>
+    <text x="522" y="224" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="34" font-weight="600">Cloud Run</text>
+    <text x="522" y="256" font-size="20" fill="#5b6178">One Docker container</text>
+
+    <!-- FastAPI web app -->
+    <rect x="518" y="278" width="420" height="530" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="542" y="318" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600">FastAPI web app</text>
+    <text x="542" y="352" font-size="20">Serves the page</text>
+    <text x="542" y="380" font-size="20">Google sign-in (OAuth)</text>
+    <text x="542" y="408" font-size="20">Runs scans and exports</text>
+
+    <!-- InsightFace face model: where face matching happens -->
+    <rect x="538" y="440" width="380" height="348" rx="14" fill="#f6dbe6"/>
+    <path d="M538,492 V454 A14,14 0 0 1 552,440 H904 A14,14 0 0 1 918,454 V492 Z" fill="#d6336c"/>
+    <rect x="538" y="440" width="380" height="348" rx="14" fill="none" stroke="#d6336c" stroke-width="3"/>
+    <text x="728" y="473" font-size="20" font-weight="700" fill="#ffffff" text-anchor="middle">Face matching happens here</text>
+    <text x="558" y="534" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="24" font-weight="600">InsightFace face model</text>
+    <text x="558" y="564" font-size="20" fill="#5b6178">buffalo_l, on the CPU</text>
+    <text x="558" y="606" font-size="20">Finds every face</text>
+    <text x="558" y="634" font-size="20">Makes 512 numbers per face</text>
+    <text x="558" y="662" font-size="20">Compares them to find</text>
+    <text x="558" y="690" font-size="20">who is in each photo</text>
+    <line x1="558" y1="714" x2="898" y2="714" stroke="#f3bcd0" stroke-width="2"/>
+    <text x="558" y="748" font-size="20" font-weight="700" fill="#b9255a">No LLM, no paid API</text>
+
+    <!-- ============ arrows from Cloud Run to the three services ============ -->
+    <!-- to Gemini -->
+    <line x1="959" y1="302" x2="1222" y2="302" stroke="#5b6178" stroke-width="3" marker-end="url(#ff-arrow)"/>
+    <text x="1098" y="232" font-size="20" text-anchor="middle">768 px photo, once each;</text>
+    <text x="1098" y="258" font-size="20" text-anchor="middle">text for Sort and</text>
+    <text x="1098" y="284" font-size="20" text-anchor="middle">folder suggestions</text>
+
+    <!-- to Firestore -->
+    <line x1="959" y1="545" x2="1222" y2="545" stroke="#5b6178" stroke-width="3" marker-end="url(#ff-arrow)"/>
+    <text x="1098" y="501" font-size="20" text-anchor="middle">face data, Gemini notes,</text>
+    <text x="1098" y="527" font-size="20" text-anchor="middle">names, recent albums</text>
+
+    <!-- to Google Drive API -->
+    <line x1="959" y1="743" x2="1222" y2="743" stroke="#5b6178" stroke-width="3" marker-end="url(#ff-arrow)"/>
+    <text x="1098" y="699" font-size="20" text-anchor="middle">read album, copy photos</text>
+    <text x="1098" y="725" font-size="20" text-anchor="middle">with the user's sign-in</text>
+
+    <!-- ============ services ============ -->
+    <!-- Gemini on Vertex AI -->
+    <rect x="1238" y="172" width="314" height="260" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="1262" y="220" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600">Gemini</text>
+    <text x="1262" y="254" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600">on Vertex AI</text>
+    <text x="1262" y="294" font-size="20">Writes a note per photo</text>
+    <text x="1262" y="322" font-size="20">Sorts by description</text>
+    <line x1="1262" y1="346" x2="1528" y2="346" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="1262" y="378" font-size="20" font-weight="700" fill="#b9255a">Never decides who</text>
+    <text x="1262" y="406" font-size="20" font-weight="700" fill="#b9255a">is in a photo</text>
+
+    <!-- Firestore -->
+    <rect x="1238" y="460" width="314" height="170" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="1262" y="514" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600">Firestore</text>
+    <text x="1262" y="556" font-size="20">Saved scan results</text>
+    <text x="1262" y="584" font-size="20">No photos stored</text>
+
+    <!-- Google Drive API -->
+    <rect x="1238" y="658" width="314" height="170" rx="16" fill="#ffffff" stroke="#d9dbe4" stroke-width="2"/>
+    <text x="1262" y="712" font-family="Mitr, 'Noto Sans Thai', 'Segoe UI', Arial, sans-serif" font-size="28" font-weight="600">Google Drive API</text>
+    <text x="1262" y="754" font-size="20">Album never changed;</text>
+    <text x="1262" y="782" font-size="20">exports are copies</text>
+  </g>
+</svg>
