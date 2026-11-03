@@ -8,7 +8,7 @@
 import cv2
 import numpy as np
 
-from .gemini import FLAWS
+from .gemini import FLAWS, name as ai_name
 
 # Strictness changes where the lines are drawn, never what Gemini observed.
 # A frame with one of these flaws is a reject only if it also scores low;
@@ -94,12 +94,12 @@ def cull(photos: list, strictness: str = "normal") -> dict:
             p, ai = photos[i], photos[i].get("ai")
             row = {"file_id": p["file_id"], "name": p.get("name")}
             if not ai:
-                row["reason"] = "Gemini could not check this photo"
+                row["reason"] = "%s could not check this photo" % ai_name()
                 out["review"].append(row)
                 continue
             row.update(keeper=ai["keeper"], flaws=ai["flaws"])
             if ai.get("unsure"):
-                row["reason"] = "Gemini was not sure: " + (ai.get("reason") or "details are unclear")
+                row["reason"] = ai_name() + " was not sure: " + (ai.get("reason") or "details are unclear")
                 out["review"].append(row)
                 continue
             pile, row["reason"] = _alone(ai, strictness)
@@ -108,8 +108,8 @@ def cull(photos: list, strictness: str = "normal") -> dict:
                 row["similar_to"], row["similar_name"] = b["file_id"], b.get("name")
                 same = _distance(p.get("dhash"), b.get("dhash")) <= SAME_BITS
                 if same and best_pile == "keep" and ai["keeper"] <= b["ai"]["keeper"] - 2:
-                    pile, row["reason"] = "reject", ("Almost the same shot as %s, which Gemini scored "
-                                                     "higher, so that one is kept" % b.get("name"))
+                    pile, row["reason"] = "reject", ("Almost the same shot as %s, which %s scored "
+                                                     "higher, so that one is kept" % (b.get("name"), ai_name()))
                 else:
                     pile, row["reason"] = "review", "Looks like %s; keep both if the moment differs" % b.get("name")
             out[pile].append(row)

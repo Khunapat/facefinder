@@ -183,6 +183,16 @@ main{padding:28px var(--pad) 140px}
 .pick[aria-pressed="true"] .tick{color:#fff} .pick[aria-pressed="true"] .tick::before{background:var(--accent);border-color:var(--accent)}
 .pick:disabled{cursor:default}.pick:disabled .ph{opacity:.55}
 .pick .nm{display:block;margin-top:6px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aiswitch{display:flex;gap:14px;align-items:flex-start;margin-top:18px;padding:16px;border:1.5px solid var(--line-strong);
+  border-radius:var(--r-card);cursor:pointer;background:var(--paper,#fff)}
+.aiswitch input{position:absolute;opacity:0;width:1px;height:1px}
+.aiswitch .track{flex:0 0 46px;height:26px;border-radius:13px;background:var(--line-strong);position:relative;transition:background .15s;margin-top:1px}
+.aiswitch .track i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.aiswitch input:checked + .track{background:var(--accent)}
+.aiswitch input:checked + .track i{left:23px}
+.aiswitch input:focus-visible + .track{outline:3px solid var(--accent);outline-offset:2px}
+.aiswitch .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.aiswitch b{font-size:15px}.aiswitch em{font-style:normal;font-size:13px;color:var(--muted)}
 .choosebar{position:sticky;bottom:16px;display:flex;align-items:center;gap:10px;margin-top:20px;padding:12px 12px 12px 18px;
      background:var(--panel);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow-lift);z-index:5}
 .choosebar .count{flex:1;min-width:0;font-size:15px;color:var(--muted)} .choosebar .count b{color:var(--ink)}
@@ -649,6 +659,12 @@ dialog.done h2{font-size:26px}
         <button class="btn ghost sm" id="pickNone">None</button></div>
       <div class="grid" id="pickGrid"></div>
     </div>
+    <label class="aiswitch" id="aiSwitch" hidden>
+      <input type="checkbox" id="useAi" role="switch" checked>
+      <span class="track" aria-hidden="true"><i></i></span>
+      <span class="txt"><b>Check photo quality with Gemini</b>
+        <em id="useAiSub">Adds notes for Cull, Best 10 and Sort. Turn off to only group faces: faster, and no photo is sent to the AI.</em></span>
+    </label>
     <div class="choosebar">
       <span class="count" id="chooseSum"></span>
       <button class="btn ghost" id="chooseCancel">Cancel</button>
@@ -1191,13 +1207,29 @@ async function startIndex(rebuild, choice = {}){
 // ---- before a scan: which photos to check ----
 // All of them, the days they were taken, or picked by hand. When adding to an
 // album, photos already checked are shown but cannot be picked again.
-const SECONDS_PER_PHOTO = () => state.gemini ? 2 : 0.6;   // measured on Cloud Run, 4 CPUs
+const SECONDS_PER_PHOTO = () => state.gemini && useAi() ? 2 : 0.6;   // measured on Cloud Run, 4 CPUs
+// The "check with AI" switch: off scans faces only. Remembered in this browser.
+const AI_KEY = "ff:useAi";
+function useAi(){ return !$("#aiSwitch").hidden ? $("#useAi").checked : true; }
+function aiSwitchText(){
+  const on = $("#useAi").checked;
+  $("#chooseSub").textContent = !state.gemini ? "Faces are found in each photo. You can add more later."
+    : on ? "Faces are found and Gemini checks each photo once. You can add more later."
+    : "Only faces are found. You can add Gemini's notes later from the album menu.";
+}
+$("#useAi").onchange = () => {
+  try { localStorage.setItem(AI_KEY, $("#useAi").checked ? "1" : "0"); } catch(e) {}
+  aiSwitchText(); if(state.choose) chooseSummary();
+};
 async function showChooser(adding){
   const card = $("#chooseCard");
   closeMenus(); clearTimeout(state.poll); state.pollEpoch = (state.pollEpoch || 0) + 1;
   $("#hero").hidden = true; $("#scanCard").hidden = true; lockWork(true); updateBar();
   card.hidden = false;
   $("#chooseTitle").textContent = adding ? "Choose more photos to check" : "Which photos should we check?";
+  $("#aiSwitch").hidden = !state.gemini;
+  try { $("#useAi").checked = localStorage.getItem(AI_KEY) !== "0"; } catch(e) {}
+  aiSwitchText();
   $("#chooseBack").textContent = adding ? "← Back to the album" : "← Back to the start";
   nav("choose");
   $("#chooseSum").textContent = "Reading the album…"; $("#chooseGo").disabled = true;
@@ -1285,7 +1317,7 @@ $("#chooseCancel").onclick = $("#chooseBack").onclick = leaveChooser;
 $("#chooseGo").onclick = async () => {
   const ids = chosenIds();
   $("#chooseGo").disabled = true;
-  const started = await startIndex(false, ids ? {file_ids:ids} : {all:true});
+  const started = await startIndex(false, {...(ids ? {file_ids:ids} : {all:true}), ai: useAi()});
   if(started) nav("album", true);      // the scan takes the chooser's place in history
   else $("#chooseGo").disabled = false;
 };
@@ -1355,9 +1387,10 @@ function pollStatus(){
         $('#menuAlbumCount').textContent=done<whole?`${n(done)} of ${n(whole)} photos checked`:`${n(done)} photos · all checked`;
         $('#menuProg').hidden=done>=whole;$('#menuProg i').style.width=(whole?Math.round(100*done/whole):0)+'%';
         $('#menuMore').hidden=done>=whole;
-        state.checkedCount=done;
+        state.checkedCount=done; state.judged=judged;
         if(state.mode==='everyone'&&!state.crowd)loadCrowd();
-        if(state.mode==='cull'&&s.gemini&&!state.culled&&!state.uiBusy)$('#runCull').click();
+        noAiHint();
+        if(state.mode==='cull'&&s.gemini&&judged&&!state.culled&&!state.uiBusy)$('#runCull').click();
         updateBar();return;
       }
     }catch(e){
@@ -1460,6 +1493,23 @@ window.addEventListener("popstate", () => {
 
 // ---- mode switch ----
 const MODES = {everyone:"#tabEveryone", people:"#tabPeople", sort:"#tabSort", cull:"#tabCull"};
+// An album scanned with the AI switch off has no quality notes: Cull and Sort
+// say so and offer to add them, instead of putting every photo in Review.
+function noAiHint(){
+  const none = state.ready && state.gemini && state.judged === 0;
+  for(const id of ["#cullMsg", "#sortMsg"]){
+    const el = $(id); if(!el) continue;
+    if(none){
+      msg(el, `This album was checked without Gemini, so there are no quality notes yet.
+        <button type="button" class="btn soft sm" data-addai>Add Gemini's notes</button>`, "info");
+    } else if(el.querySelector("[data-addai]")) msg(el, "");
+  }
+  for(const id of ["#runCull", "#runSort", "#suggest"]) { const b = $(id); if(b) b.disabled = none; }
+}
+document.addEventListener("click", e => {
+  if(e.target.closest?.("[data-addai]")) startIndex(false, {ai:true});
+});
+
 function setMode(mode){
   if(mode !== "cull") closeSide();
   state.mode = mode;
@@ -1470,7 +1520,8 @@ function setMode(mode){
     $("#mode" + m[0].toUpperCase() + m.slice(1)).hidden = m !== mode;
   }
   if(mode === "everyone" && state.ready && !state.crowd) loadCrowd();
-  if(mode === "cull" && state.ready && state.gemini && !state.culled && !state.uiBusy) $("#runCull").click();
+  noAiHint();
+  if(mode === "cull" && state.ready && state.gemini && state.judged !== 0 && !state.culled && !state.uiBusy) $("#runCull").click();
   if(mode === "sort" && !state.sortDefs.length) addGroup();
   updateBar();
 }

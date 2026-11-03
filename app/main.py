@@ -190,6 +190,7 @@ def me(request: Request):
         "default_threshold": config.DEFAULT_THRESHOLD,
         "drive_access": config.DRIVE_ACCESS,
         "gemini": gemini.enabled(),
+        "ai_name": gemini.name(),
         "sample_album": config.SAMPLE_ALBUM or None,
         "sample_folder_id": gd.parse_folder_id(config.SAMPLE_ALBUM) if config.SAMPLE_ALBUM else None,
         "public_base_url": config.PUBLIC_BASE_URL,
@@ -312,10 +313,12 @@ async def open_album(request: Request):
     }
 
 
-def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved_ai: dict = None):
+def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved_ai: dict = None,
+                  use_ai: bool = True):
     """Walk the album once: cache an embedding for every face found, a burst
     fingerprint for every photo and, when Gemini is on, its judgement of the
     photo. Photos scanned before Gemini was switched on get judged too.
+    use_ai False: faces only, no photo goes to the AI (the user turned it off).
     Setting `stop` ends it early; what is already scanned is kept, and opening
     the album again carries on from there."""
     gem = None
@@ -357,7 +360,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
         local = threading.local()   # Drive clients are not thread-safe
         # Gemini calls wait on the network, not the CPU, so they get their own,
         # wider pool and run alongside the face scan.
-        if gemini.enabled():
+        if gemini.enabled() and use_ai:
             gem = ThreadPoolExecutor(max_workers=config.GEMINI_WORKERS)
         sent = []                       # Gemini calls in flight, waited on below
 
@@ -448,7 +451,7 @@ def _index_worker(folder_id: str, creds_data: dict, stop: threading.Event, saved
         if gem:
             missed = row["done"] - store.judged_count(folder_id)
             if missed:
-                msg += "; Gemini could not check %d (scan again to retry)" % missed
+                msg += "; %s could not check %d (scan again to retry)" % (gemini.name(), missed)
         store.set_album(folder_id, status="ready", message=msg)
     except Exception as e:
         store.set_album(folder_id, status="error", message=str(e)[:300])
@@ -485,6 +488,7 @@ async def start_index(request: Request):
             kept = set() if body.get("rebuild") else store.indexed_file_ids(folder_id) | (scope or set())
             scope = picked | kept
         saved_ai = None
+        use_ai = body.get("ai") is not False     # the page's "check with AI" switch
         if body.get("rebuild"):
             # Gemini's notes are kept, so the rescan does not pay for them again
             saved_ai = {p["file_id"]: p["ai"] for p in store.photos(folder_id) if p.get("ai")}
@@ -505,10 +509,11 @@ async def start_index(request: Request):
         stop = threading.Event()
         t = threading.Thread(
             target=_index_worker,
-            args=(folder_id, request.session["creds"], stop, saved_ai),
+            args=(folder_id, request.session["creds"], stop, saved_ai, use_ai),
             daemon=True,
         )
         t.stop = stop
+        t.use_ai = use_ai
         _jobs[folder_id] = t
     t.start()
     return {"started": True}
@@ -607,7 +612,11 @@ def album_status(request: Request, folder_id: str):
         raise HTTPException(404, "Unknown album")
     out = dict(row)
     out["judged"] = store.judged_count(folder_id)
-    out["gemini"] = gemini.enabled()
+    with _jobs_lock:
+        job = _jobs.get(folder_id)
+    # A scan running without AI must not show an AI progress line that never moves.
+    out["gemini"] = gemini.enabled() and getattr(job, "use_ai", True)
+    out["ai_name"] = gemini.name()
     return out
 
 
@@ -806,7 +815,7 @@ def thumb(request: Request, file_id: str, s: int = 0):
 def _need_gemini():
     if not gemini.enabled():
         raise HTTPException(
-            400, "Gemini is not switched on for this server (set GOOGLE_CLOUD_PROJECT or GEMINI_API_KEY)."
+            400, "%s is not switched on for this server." % gemini.name()
         )
 
 
@@ -893,11 +902,11 @@ def suggest_groups(request: Request, body: dict = Body(...)):
     _need_gemini()
     lines = _sample_lines(_ready_photos(folder_id), 150)
     if not lines:
-        raise HTTPException(400, "Gemini has not checked any photos in this album yet.")
+        raise HTTPException(400, "%s has not checked any photos in this album yet." % gemini.name())
     try:
         return {"groups": gemini.suggest_groups(lines)}
     except Exception as e:
-        raise HTTPException(502, "Gemini did not answer: %s" % str(e)[:160]) from e
+        raise HTTPException(502, "%s did not answer: %s" % (gemini.name(), str(e)[:160])) from e
 
 
 def _sort_worker(job: dict, photos: list, groups: list):
@@ -1161,17 +1170,42 @@ def healthz():
     return {"ok": True}
 
 
+# The pages name Gemini. With Meta's model, they name it instead, and the
+# lines about where photos are sent say Meta's Model API, not Vertex AI. The
+# sample album's pictures were made with Gemini either way, so that stays.
+_META_TEXT = [
+    (r"Gemini\s+on\s+Vertex\s+AI", "Meta's Muse Spark model through the Meta Model API"),
+    (r"Gemini\s+through\s+Google\s+Cloud's\s+Vertex\s+AI", "Meta's Muse Spark model through the Meta Model API"),
+    (r"Google\s+Cloud's\s+terms\s+say\s+this\s+data\s+is\s+not\s+used\s+to\s+train\s+Google's\s+models\.",
+     "Meta's Model API terms say how Meta handles this data."),
+]
+
+
+def _page(name: str):
+    path = os.path.join(STATIC, name)
+    if gemini.name() == "Gemini":
+        return FileResponse(path)
+    import re
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    for pat, new in _META_TEXT:
+        html = re.sub(pat, new, html)
+    html = html.replace("created with Gemini", "created with Gem\u2060ini")   # kept, see above
+    html = html.replace("Gemini", gemini.name()).replace("Gem\u2060ini", "Gemini")
+    return Response(html, media_type="text/html; charset=utf-8")
+
+
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(STATIC, "index.html"))
+    return _page("index.html")
 
 
 # Public pages Google's sign-in screen links to (OAuth branding).
 @app.get("/privacy")
 def privacy_page():
-    return FileResponse(os.path.join(STATIC, "privacy.html"))
+    return _page("privacy.html")
 
 
 @app.get("/terms")
 def terms_page():
-    return FileResponse(os.path.join(STATIC, "terms.html"))
+    return _page("terms.html")

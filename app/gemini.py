@@ -8,11 +8,16 @@ model does that. Gemini answers the questions embeddings cannot:
                    ("staff in blue shirts", "students in white uniforms", ...)
   sort_batch()     put each photo into the groups the user described
 
-Two ways to reach Gemini, picked from the environment:
+Three ways to reach a model, picked from the environment:
   GEMINI_API_KEY        Gemini Developer API (a Codespace, or local testing)
   GOOGLE_CLOUD_PROJECT  Gemini on Google Cloud (Vertex AI) with the service
                         account's own credentials: no key on Cloud Run.
+  AI_PROVIDER=meta      Meta's Muse Spark through the Meta Model API, with
+  + META_API_KEY        the key in META_API_KEY (or MODEL_API_KEY). The same
+                        prompts and JSON schemas; only the transport differs.
+The module keeps its name, gemini, because the rest of the app calls it that.
 """
+import base64
 import json
 import os
 import threading
@@ -22,6 +27,9 @@ import cv2
 import numpy as np
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+META_MODEL = os.environ.get("META_MODEL", "muse-spark-1.1")
+META_URL = os.environ.get("META_BASE_URL", "https://api.meta.ai/v1").rstrip("/")
+META_REASONING = os.environ.get("META_REASONING", "low")      # "" sends none
 LOCATION = os.environ.get("GEMINI_LOCATION", "global")
 SEND_SIZE = int(os.environ.get("GEMINI_IMAGE_SIZE", "768"))   # long edge sent to Gemini
 SORT_BATCH = 40                                                # descriptions per sorting call
@@ -40,10 +48,16 @@ _lock = threading.Lock()
 _client = None
 
 
+def _meta_key():
+    return os.environ.get("META_API_KEY") or os.environ.get("MODEL_API_KEY") or ""
+
+
 def mode():
-    """'key', 'cloud' or None (Gemini features switched off)."""
+    """'key', 'cloud', 'meta' or None (AI features switched off)."""
     if os.environ.get("GEMINI", "").lower() in ("0", "off", "false", "no"):
         return None
+    if os.environ.get("AI_PROVIDER", "").lower() == "meta":
+        return "meta" if _meta_key() else None
     if os.environ.get("GEMINI_API_KEY"):
         return "key"
     if os.environ.get("GOOGLE_CLOUD_PROJECT"):
@@ -53,6 +67,19 @@ def mode():
 
 def enabled() -> bool:
     return mode() is not None
+
+
+def name() -> str:
+    """The model's name as the page shows it."""
+    return "Muse Spark" if os.environ.get("AI_PROVIDER", "").lower() == "meta" else "Gemini"
+
+
+def model_id() -> str:
+    return META_MODEL if mode() == "meta" else MODEL
+
+
+class Jpeg(bytes):
+    """A photo in a prompt. Each transport turns it into its own image part."""
 
 
 def client():
@@ -80,8 +107,13 @@ _HTTP = {"timeout": 60_000}     # milliseconds
 
 def _call(contents, schema, temperature=0.2, attempts=5):
     """One structured call, retried on rate limits and server errors.
-    Returns the parsed JSON object."""
+    contents: text and Jpeg parts, in order. Returns the parsed JSON object."""
+    if mode() == "meta":
+        return _meta_call(contents, schema, temperature, attempts)
     from google.genai import errors, types
+
+    contents = [types.Part.from_bytes(data=bytes(c), mime_type="image/jpeg") if isinstance(c, Jpeg) else c
+                for c in contents]
 
     cfg = types.GenerateContentConfig(
         temperature=temperature,
@@ -102,6 +134,78 @@ def _call(contents, schema, temperature=0.2, attempts=5):
                 time.sleep(2 * 2 ** attempt)
                 continue
             raise
+
+
+class MetaError(RuntimeError):
+    def __init__(self, code, text):
+        super().__init__("Meta Model API %s: %s" % (code, text[:200]))
+        self.code = code
+
+
+def _strict(schema):
+    """The same schema with additionalProperties false on every object, which
+    strict JSON-schema output expects."""
+    if isinstance(schema, dict):
+        out = {k: _strict(v) for k, v in schema.items()}
+        if out.get("type") == "object":
+            out.setdefault("additionalProperties", False)
+        return out
+    if isinstance(schema, list):
+        return [_strict(v) for v in schema]
+    return schema
+
+
+def _json_text(text: str):
+    t = (text or "").strip()
+    if t.startswith("```"):                     # a fenced block, despite JSON mode
+        t = t.split("\n", 1)[1] if "\n" in t else ""
+        t = t.rsplit("```", 1)[0]
+    return json.loads(t)
+
+
+def _meta_call(contents, schema, temperature, attempts):
+    """The same call through Meta's OpenAI-compatible chat completions API."""
+    import httpx
+
+    parts = []
+    for c in contents:
+        if isinstance(c, Jpeg):
+            url = "data:image/jpeg;base64," + base64.b64encode(bytes(c)).decode()
+            parts.append({"type": "image_url", "image_url": {"url": url}})
+        else:
+            parts.append({"type": "text", "text": str(c)})
+    body = {
+        "model": META_MODEL,
+        "messages": [{"role": "user", "content": parts}],
+        "temperature": temperature,
+        "response_format": {"type": "json_schema",
+                            "json_schema": {"name": "answer", "schema": _strict(schema), "strict": True}},
+    }
+    if META_REASONING:
+        body["reasoning_effort"] = META_REASONING
+    head = {"Authorization": "Bearer " + _meta_key(), "Content-Type": "application/json"}
+    for attempt in range(attempts):
+        r = httpx.post(META_URL + "/chat/completions", json=body, headers=head, timeout=_HTTP["timeout"] / 1000)
+        if r.status_code == 400 and "reasoning_effort" in body and "reason" in r.text.lower():
+            body.pop("reasoning_effort")        # a model without that setting
+            continue
+        if r.status_code == 400 and body["response_format"]["type"] == "json_schema" and "schema" in r.text.lower():
+            # a schema feature it does not take: ask for plain JSON, schema in words
+            body["response_format"] = {"type": "json_object"}
+            parts.append({"type": "text", "text": "Answer with one JSON object matching this JSON schema:\n"
+                          + json.dumps(schema)})
+            continue
+        if r.status_code in (429, 500, 502, 503, 504) and attempt < attempts - 1:
+            time.sleep(2 * 2 ** attempt)
+            continue
+        if r.status_code != 200:
+            raise MetaError(r.status_code, r.text)
+        data = r.json()
+        out = _json_text(data["choices"][0]["message"]["content"])
+        if isinstance(out, dict) and data.get("model"):
+            out.setdefault("model", data["model"])
+        return out
+    raise MetaError("retry", "no answer after %d tries" % attempts)
 
 
 # ------------------------------------------------------------------ judge
@@ -205,16 +309,13 @@ def clean_judgement(d: dict) -> dict:
         "people": [p[:160] for p in d["people"][:20]],
         "scene": d["scene"][:120], "keeper": keeper,
         "flaws": list(dict.fromkeys(d["flaws"])), "unsure": d["unsure"],
-        "reason": d["reason"][:200], "model": str(d.get("model") or MODEL)[:60],
+        "reason": d["reason"][:200], "model": str(d.get("model") or model_id())[:60],
     }
 
 
 def judge(jpeg: bytes) -> dict:
     """jpeg: the photo, already made small with shrink()."""
-    from google.genai import types
-
-    part = types.Part.from_bytes(data=jpeg, mime_type="image/jpeg")
-    return clean_judgement(_call([part, JUDGE_PROMPT], JUDGE_SCHEMA))
+    return clean_judgement(_call([Jpeg(jpeg), JUDGE_PROMPT], JUDGE_SCHEMA))
 
 
 def as_text(j: dict) -> str:

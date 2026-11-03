@@ -36,6 +36,8 @@ state, the competition deadline (18 October 2026) and the plan.
 python -m tests.test_people
 python -m tests.test_matching
 python -m tests.test_pipeline
+python -m tests.test_gemini
+python -m tests.test_ai_switch
 ```
 
 `python -m tests.devserver` runs the whole app on a stand-in for Google Drive;
